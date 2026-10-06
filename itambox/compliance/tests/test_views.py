@@ -191,7 +191,6 @@ class CustodyReceiptViewTests(TestCase):
     def test_sign_portal_already_accepted(self):
         from django.utils import timezone
 
-        self.receipt.accepted = True
         self.receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
         self.receipt.signed_at = timezone.now()
         self.receipt.save()
@@ -304,7 +303,6 @@ class CustodyReceiptViewTests(TestCase):
     def test_completed_receipt_is_not_rendered_to_wrong_recipient(self):
         from django.utils import timezone
 
-        self.receipt.accepted = True
         self.receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
         self.receipt.signed_at = timezone.now()
         self.receipt.verification_hash = "completed-test-verification-hash"
@@ -321,7 +319,6 @@ class CustodyReceiptViewTests(TestCase):
     def test_expired_completed_receipt_returns_410_instead_of_success_payload(self):
         from django.utils import timezone
 
-        self.receipt.accepted = True
         self.receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
         self.receipt.signed_at = timezone.now()
         self.receipt.save()
@@ -583,7 +580,6 @@ class CustodyUXAndPreviewTests(TestCase):
 
         # Sign the receipt
         receipt = CustodyReceipt.objects.filter(asset=self.asset, holder=self.holder).first()
-        receipt.accepted = True
         receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
         receipt.signed_at = timezone.now()
         receipt.save()

@@ -104,7 +104,9 @@ class MitigationsPhase4Tests(TestCase):
 
     def test_deletion_cascades_protected_compliance_data(self):
         # CustodyReceipt protects asset and holder
-        receipt = CustodyReceipt.objects.create(asset=self.asset, holder=self.asset_holder, accepted=True)
+        receipt = CustodyReceipt.objects.create(
+            asset=self.asset, holder=self.asset_holder, acceptance_status=CustodyReceipt.STATUS_ACCEPTED
+        )
 
         with self.assertRaises(ProtectedError):
             self.asset.delete()

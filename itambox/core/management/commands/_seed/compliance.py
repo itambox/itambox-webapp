@@ -249,7 +249,6 @@ class SeedComplianceMixin:
                         disclaimer=tmpl.disclaimer,
                         qms_reference=tmpl.qms_reference,
                         eula_version="1.0",
-                        accepted=True,
                         acceptance_status=CustodyReceipt.STATUS_ACCEPTED,
                         accepted_date=receipt_dt,
                         signed_at=receipt_dt,
@@ -265,7 +264,6 @@ class SeedComplianceMixin:
                         disclaimer=tmpl.disclaimer,
                         qms_reference=tmpl.qms_reference,
                         eula_version="1.0",
-                        accepted=False,
                         acceptance_status=CustodyReceipt.STATUS_PENDING,
                         acceptance_method="link",
                     )

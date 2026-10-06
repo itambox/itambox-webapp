@@ -26,6 +26,7 @@ class CustodyReceiptFilterSet(BaseFilterSet):
         widget=forms.Select(attrs={"class": "form-select"}),
     )
     accepted = django_filters.BooleanFilter(
+        method="filter_accepted",
         label=_("Accepted"),
         widget=forms.Select(choices=[("", "Any"), ("true", "Yes"), ("false", "No")], attrs={"class": "form-select"}),
     )
@@ -33,6 +34,10 @@ class CustodyReceiptFilterSet(BaseFilterSet):
     class Meta:
         model = CustodyReceipt
         fields = ["asset", "holder", "acceptance_status", "accepted"]
+
+    def filter_accepted(self, queryset, name, value):
+        accepted = Q(acceptance_status=CustodyReceipt.STATUS_ACCEPTED)
+        return queryset.filter(accepted) if value else queryset.exclude(accepted)
 
     def search(self, queryset, name, value):
         if not value.strip():
