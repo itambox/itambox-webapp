@@ -1,5 +1,4 @@
 import io
-import json
 import sys
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -22,7 +21,7 @@ from core.managers import set_current_tenant
 from core.tests.mixins import grant
 from core.validators import validate_file_attachment, validate_image_attachment
 from licenses.models import License, LicenseSeatAssignment
-from organization.models import AssetHolder, Location, Membership, Role, Tenant
+from organization.models import AssetHolder, Membership, Role, Tenant
 from organization.services.identity_provisioning import organization_identity_provisioner
 
 User = get_user_model()

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import inspect
 import re
 from collections import Counter
 from types import SimpleNamespace

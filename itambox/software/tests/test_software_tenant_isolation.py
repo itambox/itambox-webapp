@@ -125,7 +125,7 @@ class SoftwareApiCrossTenantTestCase(TestCase):
         superuser = User.objects.create_superuser(username="root", email="root@example.com", password="password123")
         self.client.force_login(superuser)
         url = reverse("api:software_api:software-detail", kwargs={"pk": self.software_global.pk})
-        etag = f'W/"{self.software_global.updated_at.isoformat()}"'
+        etag = 'W/"' + self.software_global.updated_at.isoformat() + '"'
         response = self.client.delete(url, HTTP_IF_MATCH=etag)
         self.assertEqual(response.status_code, 204)
         self.assertFalse(Software.objects.filter(pk=self.software_global.pk).exists())

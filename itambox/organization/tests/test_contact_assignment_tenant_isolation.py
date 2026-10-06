@@ -27,7 +27,6 @@ from organization.models import (
     Contact,
     ContactAssignment,
     ContactRole,
-    Membership,
     Role,
     Tenant,
 )

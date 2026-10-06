@@ -10,7 +10,7 @@ from core.managers import set_current_tenant
 from core.models import ObjectChange
 from core.tests.mixins import grant
 from itambox.middleware import _current_user, _request_id
-from organization.models import Location, Membership, Role, Site, Tenant
+from organization.models import Location, Role, Site, Tenant
 from users.models import Token
 
 User = get_user_model()
