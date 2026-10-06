@@ -8,12 +8,75 @@ from assets.models import Asset, AssetRequest, StatusLabel
 from inventory.models import AccessoryStock, ComponentStock, ConsumableStock
 from procurement.models import FulfillmentLink, PurchaseOrder, PurchaseOrderLine
 
+_PURCHASE_ORDER_TRANSITIONS = {
+    "approve": {PurchaseOrder.STATUS_DRAFT: frozenset({PurchaseOrder.STATUS_APPROVED})},
+    "order": {PurchaseOrder.STATUS_APPROVED: frozenset({PurchaseOrder.STATUS_ORDERED})},
+    "receive": {
+        PurchaseOrder.STATUS_ORDERED: frozenset({PurchaseOrder.STATUS_PARTIAL, PurchaseOrder.STATUS_RECEIVED}),
+        PurchaseOrder.STATUS_PARTIAL: frozenset({PurchaseOrder.STATUS_PARTIAL, PurchaseOrder.STATUS_RECEIVED}),
+    },
+    "cancel": {
+        PurchaseOrder.STATUS_DRAFT: frozenset({PurchaseOrder.STATUS_CANCELLED}),
+        PurchaseOrder.STATUS_APPROVED: frozenset({PurchaseOrder.STATUS_CANCELLED}),
+        PurchaseOrder.STATUS_ORDERED: frozenset({PurchaseOrder.STATUS_CANCELLED}),
+    },
+    "reopen": {PurchaseOrder.STATUS_CANCELLED: frozenset({PurchaseOrder.STATUS_DRAFT})},
+}
 
-def _lock_purchase_order_for_asset_request(po):
+_PURCHASE_ORDER_TRANSITION_ERRORS = {
+    "approve": _("Cannot approve a purchase order in '%(status)s' status."),
+    "order": _("Cannot mark a purchase order as ordered when in '%(status)s' status. It must be Approved first."),
+    "receive": _(
+        "Cannot receive stock on a purchase order in '%(status)s' status. It must be Ordered or Partially Received."
+    ),
+    "cancel": _("Cannot cancel a purchase order in '%(status)s' status."),
+    "reopen": _("Cannot reopen a purchase order in '%(status)s' status."),
+}
+
+
+def _lock_purchase_order(po):
+    """Lock and re-read a live purchase order before inspecting or changing its state."""
     try:
-        locked_po = PurchaseOrder._base_manager.select_for_update().get(pk=po.pk, deleted_at__isnull=True)
+        # unscoped: lock the live PO row regardless of ambient tenant-manager scope
+        return PurchaseOrder._base_manager.select_for_update().get(pk=po.pk, deleted_at__isnull=True)
     except PurchaseOrder.DoesNotExist as exc:
         raise ValidationError(_("Purchase order no longer exists.")) from exc
+
+
+def _validate_purchase_order_transition(po, action):
+    """Reject a transition unless its locked source status appears in the single transition table."""
+    if po.status not in _PURCHASE_ORDER_TRANSITIONS[action]:
+        raise ValidationError(_PURCHASE_ORDER_TRANSITION_ERRORS[action] % {"status": po.get_status_display()})
+
+
+def _validate_receipt_transition(po, submitted_status):
+    """Preserve the stale-quantity error when another receipt already completed the PO."""
+    if po.status == PurchaseOrder.STATUS_RECEIVED and submitted_status in {
+        PurchaseOrder.STATUS_ORDERED,
+        PurchaseOrder.STATUS_PARTIAL,
+    }:
+        return True
+    _validate_purchase_order_transition(po, "receive")
+    return False
+
+
+def _transition_purchase_order(po, action, *, target_status=None, update_fields=()):
+    """Persist a permitted transition using the shared source/target table."""
+    _validate_purchase_order_transition(po, action)
+    allowed_targets = _PURCHASE_ORDER_TRANSITIONS[action][po.status]
+    if target_status is None:
+        if len(allowed_targets) != 1:
+            raise RuntimeError("A multi-target purchase-order transition requires an explicit target status.")
+        target_status = next(iter(allowed_targets))
+    if target_status not in allowed_targets:
+        raise ValidationError(_PURCHASE_ORDER_TRANSITION_ERRORS[action] % {"status": po.get_status_display()})
+    po.status = target_status
+    po.save(update_fields=["status", *update_fields])
+    return po
+
+
+def _lock_purchase_order_for_asset_request(po):
+    locked_po = _lock_purchase_order(po)
     if locked_po.tenant_id is None:
         raise ValidationError(_("Asset Request procurement requires a tenant-owned purchase order."))
     return locked_po
@@ -423,24 +486,23 @@ def receive_purchase_order(po, line_quantities, asset_details=None, *, expected_
     on are refused before anything mutates, so a repeated submission can never silently book
     additional stock. Each accepted submission is a new partial delivery.
     """
-    if po.status not in [PurchaseOrder.STATUS_ORDERED, PurchaseOrder.STATUS_PARTIAL]:
-        raise ValidationError(
-            _(
-                "Cannot receive stock on a purchase order in '%(status)s' status. It must be Ordered or Partially Received."
-            )
-            % {"status": po.get_status_display()}
-        )
+    submitted_status = po.status
+    po = _lock_purchase_order(po)
+    completed_concurrently = _validate_receipt_transition(po, submitted_status)
 
     any_outstanding = False
 
-    # Pre-fetch deployable status label
+    lines = list(po.lines.select_for_update().order_by("pk"))
+    _assert_receipt_state(lines, line_quantities, expected_received)
+    if completed_concurrently:
+        _validate_purchase_order_transition(po, "receive")
+
+    # Pre-fetch deployable status label only after stale submissions are refused.
     deployable_status = StatusLabel.objects.filter(type="deployable").first()
     if not deployable_status:
         raise ValidationError(_("Deployable status label does not exist in the database."))
 
     details_by_line = _group_details_by_line(asset_details)
-    lines = list(po.lines.select_for_update().order_by("pk"))
-    _assert_receipt_state(lines, line_quantities, expected_received)
     stock_maps = _lock_receipt_stock_rows(lines, line_quantities, po.destination_location)
 
     for line in lines:
@@ -449,75 +511,79 @@ def receive_purchase_order(po, line_quantities, asset_details=None, *, expected_
         if line.qty_outstanding > 0:
             any_outstanding = True
 
-    # Set correct PO status
-    if any_outstanding:
-        po.status = PurchaseOrder.STATUS_PARTIAL
-    else:
-        po.status = PurchaseOrder.STATUS_RECEIVED
-    po.save(update_fields=["status"])
+    target_status = PurchaseOrder.STATUS_PARTIAL if any_outstanding else PurchaseOrder.STATUS_RECEIVED
+    _transition_purchase_order(po, "receive", target_status=target_status)
 
 
 @transaction.atomic
 def approve_purchase_order(po, user=None, request=None):
     """Transition PO from draft to approved status."""
-    try:
-        locked_po = PurchaseOrder._base_manager.select_for_update().get(pk=po.pk, deleted_at__isnull=True)
-    except PurchaseOrder.DoesNotExist as exc:
-        raise ValidationError(_("Purchase order no longer exists.")) from exc
-    po.status = locked_po.status
-    if po.status != PurchaseOrder.STATUS_DRAFT:
-        raise ValidationError(
-            _("Cannot approve a purchase order in '%(status)s' status.") % {"status": po.get_status_display()}
-        )
+    po = _lock_purchase_order(po)
+    _validate_purchase_order_transition(po, "approve")
     if not po.lines.exists():
         raise ValidationError(_("Cannot approve a purchase order with no line items."))
     # Segregation of duties: the user who created the PO must not approve it.
     if user is not None and po.created_by_id and po.created_by_id == getattr(user, "id", None):
         raise ValidationError(_("A purchase order cannot be approved by the user who created it."))
-    po.status = PurchaseOrder.STATUS_APPROVED
-    po.save(update_fields=["status"])
+    _transition_purchase_order(po, "approve")
     return {"message": _("Purchase Order %(number)s has been approved.") % {"number": po.order_number}}
 
 
 @transaction.atomic
 def order_purchase_order(po, user=None, request=None):
     """Transition PO from approved to ordered status."""
-    if po.status != PurchaseOrder.STATUS_APPROVED:
-        raise ValidationError(
-            _("Cannot mark a purchase order as ordered when in '%(status)s' status. It must be Approved first.")
-            % {"status": po.get_status_display()}
-        )
-    po.status = PurchaseOrder.STATUS_ORDERED
+    po = _lock_purchase_order(po)
+    _validate_purchase_order_transition(po, "order")
     if not po.order_date:
         po.order_date = timezone.now().date()
-    po.save(update_fields=["status", "order_date"])
+    _transition_purchase_order(po, "order", update_fields=("order_date",))
     return {"message": _("Purchase Order %(number)s marked as Ordered.") % {"number": po.order_number}}
 
 
 @transaction.atomic
 def cancel_purchase_order(po, user=None, request=None):
     """Transition PO from draft, approved, or ordered to cancelled status."""
-    allowed_statuses = [PurchaseOrder.STATUS_DRAFT, PurchaseOrder.STATUS_APPROVED, PurchaseOrder.STATUS_ORDERED]
-    if po.status not in allowed_statuses:
-        raise ValidationError(
-            _("Cannot cancel a purchase order in '%(status)s' status.") % {"status": po.get_status_display()}
-        )
+    po = _lock_purchase_order(po)
+    _validate_purchase_order_transition(po, "cancel")
 
-    # Revert linked AssetRequests back to Approved and delete FulfillmentLinks
+    # Lock every live PO line before fulfilment links and their request rows.
+    lines = list(po.lines.select_for_update().order_by("pk"))
+    line_ids = {line.pk for line in lines}
+    if line_ids:
+        # unscoped: soft-deleted links identify request-derived lines across cancellation retries
+        historical_links = list(
+            FulfillmentLink._base_manager.filter(purchase_order_line_id__in=line_ids).values_list(
+                "asset_request_id", "purchase_order_line_id"
+            )
+        )
+    else:
+        historical_links = []
+    request_ids = {request_id for request_id, _line_id in historical_links}
+    # Preserve the shared lock order: PO -> lines -> links -> requests.
+    locked_links = lock_unit_fulfillment_links(request_ids)
+    links = [link for link in locked_links if link.purchase_order_line_id in line_ids]
+    # unscoped: locked PO link IDs remain authoritative outside ambient tenant scope
+    requests = {
+        request.pk: request
+        for request in AssetRequest._base_manager.select_for_update()
+        .filter(pk__in={link.asset_request_id for link in links}, deleted_at__isnull=True)
+        .order_by("request_date", "pk")
+    }
+
     reverted_requests = []
-    for line in po.lines.all():
-        links = FulfillmentLink.objects.filter(purchase_order_line=line)
-        for link in links:
-            req = link.asset_request
-            if req.status == RequestStatusChoices.PROCUREMENT:
-                req.status = RequestStatusChoices.APPROVED
-                req.save(update_fields=["status"])
-                reverted_requests.append(req)
-            link.delete()
+    for link in links:
+        req = requests.get(link.asset_request_id)
+        if req is not None and req.status == RequestStatusChoices.PROCUREMENT:
+            req.status = RequestStatusChoices.APPROVED
+            req.save(update_fields=["status"])
+            reverted_requests.append(req)
+    request_line_ids = {link.purchase_order_line_id for link in links}
+    for line in lines:
+        if line.pk in request_line_ids:
+            line.delete()
     _approve_completed_group_parents(reverted_requests)
 
-    po.status = PurchaseOrder.STATUS_CANCELLED
-    po.save(update_fields=["status"])
+    _transition_purchase_order(po, "cancel")
     return {
         "message": _("Purchase Order %(number)s cancelled. Linked asset requests reverted to Approved status.")
         % {"number": po.order_number}
@@ -527,11 +593,7 @@ def cancel_purchase_order(po, user=None, request=None):
 @transaction.atomic
 def reopen_purchase_order(po, user=None, request=None):
     """Transition PO from cancelled back to draft status."""
-    if po.status != PurchaseOrder.STATUS_CANCELLED:
-        raise ValidationError(
-            _("Cannot reopen a purchase order in '%(status)s' status.") % {"status": po.get_status_display()}
-        )
-
-    po.status = PurchaseOrder.STATUS_DRAFT
-    po.save(update_fields=["status"])
+    po = _lock_purchase_order(po)
+    _validate_purchase_order_transition(po, "reopen")
+    _transition_purchase_order(po, "reopen")
     return {"message": _("Purchase Order %(number)s has been reopened and set to Draft.") % {"number": po.order_number}}
