@@ -16,6 +16,7 @@ from assets.models import (
     Warranty,
     WarrantyTypeChoices,
 )
+from assets.services import checkout_asset
 from assets.tables import AssetMaintenanceTable, AssetTable, AssetTypeTable, WarrantyTable
 from core.models import ObjectChange
 from core.tables import AssigneeColumn, BaseTable, BooleanColumn, ObjectChangeTable
@@ -185,9 +186,11 @@ class CoreTablesTestCase(TestCase):
         location = Location.objects.create(name="Test Location 2", slug="test-location-2", site=site)
 
         role = AssetRole.objects.create(name="Desktop", slug="desktop-ac")
-        asset = Asset.objects.create(name="Test Asset 2", asset_tag="TAG-AC", asset_role=role)
+        deployable = StatusLabel.objects.create(name="Table Deployable 2", slug="table-deployable-2", type="deployable")
+        deployed = StatusLabel.objects.create(name="Table In Use 2", slug="table-in-use-2", type="deployed")
+        asset = Asset.objects.create(name="Test Asset 2", asset_tag="TAG-AC", asset_role=role, status=deployable)
 
-        AssetAssignment.objects.create(asset=asset, assigned_location=location, checked_out_by=self.user)
+        checkout_asset(asset, location=location, user=self.user, status=deployed)
 
         column = AssigneeColumn(assignment_model_path="assets.AssetAssignment")
         table = AssetTable(Asset.objects.filter(pk=asset.pk))
@@ -207,10 +210,14 @@ class CoreTablesTestCase(TestCase):
         role = AssetRole.objects.create(name="Desktop", slug="desktop-ar")
 
         # Asset 1: checked out to location
-        asset_checked_out = Asset.objects.create(
-            name="Asset Checked Out", asset_tag="TAG-AR1", asset_role=role, location=location
+        deployable = StatusLabel.objects.create(
+            name="Table Deployable Render", slug="table-deployable-render", type="deployable"
         )
-        AssetAssignment.objects.create(asset=asset_checked_out, assigned_location=location, checked_out_by=self.user)
+        deployed = StatusLabel.objects.create(name="Table In Use Render", slug="table-in-use-render", type="deployed")
+        asset_checked_out = Asset.objects.create(
+            name="Asset Checked Out", asset_tag="TAG-AR1", asset_role=role, location=location, status=deployable
+        )
+        checkout_asset(asset_checked_out, location=location, user=self.user, status=deployed)
 
         # Asset 2: available, physical location is location
         asset_available = Asset.objects.create(

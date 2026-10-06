@@ -6,7 +6,8 @@ from django.urls import reverse
 from django.utils import timezone
 from model_bakery import baker
 
-from assets.models import Asset, AssetAssignment
+from assets.models import Asset, AssetAssignment, StatusLabel
+from assets.services import checkout_asset
 from compliance.models import CustodyReceipt, CustodyTemplate
 from core.management.commands._seed.access import _technician_permissions
 from core.tests.mixins import TenantTestMixin
@@ -35,14 +36,22 @@ class CustodyReceiptInternalViewTests(TenantTestMixin, TestCase):
             tenant_group=None,
             eula_text="Test custody terms",
         )
-        self.asset = baker.make(Asset, tenant=self.tenant, name="Tenant A laptop")
+        deployable = baker.make(StatusLabel, type="deployable", name="Custody Deployable")
+        deployed = baker.make(StatusLabel, type="deployed", name="Custody Deployed")
+        self.asset = baker.make(Asset, tenant=self.tenant, name="Tenant A laptop", status=deployable)
         self.holder = baker.make(
             AssetHolder,
             tenant=self.tenant,
             first_name="Tenant A",
             last_name="Recipient",
         )
-        AssetAssignment.objects.create(asset=self.asset, assigned_user=self.holder, is_active=True)
+        checkout_asset(
+            self.asset,
+            holder=self.holder,
+            user=self.user,
+            status=deployed,
+            _suppress_custody_receipt=True,
+        )
         self.receipt = CustodyReceipt.objects.create(
             asset=self.asset,
             holder=self.holder,

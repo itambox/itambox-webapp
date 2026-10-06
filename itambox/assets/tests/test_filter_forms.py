@@ -3,6 +3,7 @@ from django.urls import reverse
 
 from assets.forms.filter_forms import AssetFilterForm
 from assets.models import Asset, AssetAssignment, AssetType, Category, Manufacturer, StatusLabel, Supplier
+from assets.services import checkout_asset
 from extras.models import Tag
 from organization.models import AssetHolder, Location, Site, Tenant
 
@@ -21,6 +22,7 @@ class AssetFilterFormTest(TestCase):
         )
         self.supplier = Supplier.objects.create(name="Dell Supplier", slug="dell-supplier")
         self.status = StatusLabel.objects.create(name="In Storage", slug="in-storage")
+        self.deployed = StatusLabel.objects.create(name="Filter In Use", slug="filter-in-use", type="deployed")
 
         self.tag1 = Tag.objects.create(name="Laptop", slug="laptop")
         self.tag2 = Tag.objects.create(name="Hardware", slug="hardware")
@@ -39,7 +41,7 @@ class AssetFilterFormTest(TestCase):
         self.holder = AssetHolder.objects.create(
             first_name="John", last_name="Doe", upn="john.doe@example.com", tenant=self.tenant
         )
-        self.assignment = AssetAssignment.objects.create(asset=self.asset, assigned_user=self.holder, is_active=True)
+        checkout_asset(self.asset, holder=self.holder, status=self.deployed)
 
     def test_empty_form_ajax_attributes_and_empty_querysets(self):
         """Verify that when no filters are selected, querysets are empty but Tom Select attrs are set."""

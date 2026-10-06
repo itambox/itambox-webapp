@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from assets.choices import StatusTypeChoices
 from core.managers import TenantScopingAllObjectsManager, TenantScopingSoftDeleteManager
 from core.mixins import JournalingMixin, SoftDeleteMixin, TaggableMixin
 from core.models import BaseModel, ChangeLoggingMixin
@@ -142,6 +143,9 @@ class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLog
                 )
             if len(filled) > 1:
                 raise ValidationError(_("Select only one assignment target."))
+
+            if self.asset_id and (not self.asset.status_id or self.asset.status.type != StatusTypeChoices.DEPLOYED):
+                raise ValidationError(_("An active assignment requires the asset to have deployed status."))
 
             # Tenant boundary validation
             target = filled[0]

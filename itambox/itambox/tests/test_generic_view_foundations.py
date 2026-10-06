@@ -36,6 +36,7 @@ from django.urls import reverse
 from assets.filters import StatusLabelFilterSet
 from assets.forms.filter_forms import AssetFilterForm
 from assets.models import Asset, AssetAssignment, AssetType, Manufacturer, StatusLabel
+from assets.services import checkout_asset
 from assets.tables import AssetTable
 from assets.views.asset_views import AssetListView
 from core.tests.mixins import TenantTestMixin
@@ -67,6 +68,10 @@ class _CatalogFixtureMixin:
         self.status, _created = StatusLabel.objects.get_or_create(
             slug="available",
             defaults={"name": "Available", "type": "deployable", "color": "28a745"},
+        )
+        self.deployed_status, _created = StatusLabel.objects.get_or_create(
+            slug="foundations-deployed-gvf",
+            defaults={"name": "Foundations In Use GVF", "type": "deployed"},
         )
 
     def make_asset(self, name, tag, tenant, asset_type=None):
@@ -729,11 +734,13 @@ class AssigneePaginationRegressionTests(_CatalogFixtureMixin, TenantTestMixin, T
                 f"ASSIGNEE-PAGE-{index:02d}-GVF",
                 tenant,
             )
-            AssetAssignment.objects.create(
-                asset=asset,
-                assigned_location=locations[tenant.pk],
-                checked_out_by=self.tenant_user,
-            )
+            with self.tenant_context(tenant):
+                checkout_asset(
+                    asset,
+                    location=locations[tenant.pk],
+                    user=self.tenant_user,
+                    status=self.deployed_status,
+                )
 
         self.client_login_to_tenant(self.tenant_user, self.tenant)
         self.url = reverse("assets:asset_list")

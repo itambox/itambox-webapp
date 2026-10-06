@@ -37,6 +37,7 @@ from assets.models import (
     Supplier,
 )
 from assets.models.choices import ReservationStatusChoices
+from assets.services import checkout_asset
 from compliance.models import CustodyReceipt, CustodyTemplate
 from core.tests.mixins import TenantTestMixin
 from inventory.models import (
@@ -79,6 +80,7 @@ class OffboardingReportTests(TestCase):
             slug="ob-deployed",
             type="deployable",
         )
+        self.deployed_status = StatusLabel.objects.create(name="OB In Use", slug="ob-in-use", type="deployed")
         self.asset = Asset.objects.create(
             name="OB Asset",
             asset_tag="OB-ASSET-001",
@@ -123,7 +125,7 @@ class OffboardingReportTests(TestCase):
 
     # ------------------------------------------------------------- asset assignment
     def test_includes_active_asset_assignment(self):
-        AssetAssignment.objects.create(asset=self.asset, assigned_user=self.holder, is_active=True)
+        checkout_asset(self.asset, holder=self.holder, status=self.deployed_status)
         report = get_offboarding_report(self.holder)
         assert not report.is_clear
         items = report.for_kind("asset_assignment")
@@ -422,7 +424,7 @@ class OffboardingReportTests(TestCase):
 
     def _seed_one_obligation_of_each_class(self):
         # asset assignment
-        AssetAssignment.objects.create(asset=self.asset, assigned_user=self.holder, is_active=True)
+        checkout_asset(self.asset, holder=self.holder, status=self.deployed_status)
         # accessory assignment (sanctioned-write-only inventory model)
         accessory = Accessory.objects.create(
             name="CB Dock", slug="cb-dock", manufacturer=self.manufacturer, tenant=self.tenant
@@ -491,7 +493,7 @@ class OffboardingReportTests(TestCase):
         Membership.objects.create(user=self.user, tenant=self.tenant)
 
     def test_counts_aggregate_by_kind(self):
-        AssetAssignment.objects.create(asset=self.asset, assigned_user=self.holder, is_active=True)
+        checkout_asset(self.asset, holder=self.holder, status=self.deployed_status)
         Membership.objects.create(user=self.user, tenant=self.tenant)
         report = get_offboarding_report(self.holder)
         assert report.counts() == {"asset_assignment": 1, "membership": 1}
@@ -506,7 +508,7 @@ class OffboardingReportTests(TestCase):
             upn="other@other.example.com",
             tenant=self.tenant,
         )
-        AssetAssignment.objects.create(asset=self.asset, assigned_user=other_holder, is_active=True)
+        checkout_asset(self.asset, holder=other_holder, status=self.deployed_status)
         report = get_offboarding_report(self.holder)
         assert report.is_clear
 
@@ -526,15 +528,16 @@ class OffboardingReportTenantScopingTests(TenantTestMixin, TestCase):
         self.tenant_b = Tenant.objects.create(name="OB Beta", slug="ob-beta")
 
         self.status = StatusLabel.objects.create(name="OB TS Deployed", slug="ob-ts-deployed", type="deployable")
+        self.deployed_status = StatusLabel.objects.create(name="OB TS In Use", slug="ob-ts-in-use", type="deployed")
         self.asset_a = Asset.objects.create(
             name="OB Alpha Asset", asset_tag="OB-ALPHA-1", status=self.status, tenant=self.tenant
         )
         self.holder_a = AssetHolder.objects.create(
             first_name="Alpha", last_name="Holder", upn="alpha.holder@ob.example.com", tenant=self.tenant
         )
-        self.assignment_a = AssetAssignment.objects.create(
-            asset=self.asset_a, assigned_user=self.holder_a, is_active=True
-        )
+        with self.tenant_context(self.tenant):
+            checkout_asset(self.asset_a, holder=self.holder_a, status=self.deployed_status)
+        self.assignment_a = AssetAssignment.all_objects.get(asset=self.asset_a, is_active=True)
 
         self.asset_b = Asset.objects.create(
             name="OB Beta Asset", asset_tag="OB-BETA-1", status=self.status, tenant=self.tenant_b
@@ -542,9 +545,9 @@ class OffboardingReportTenantScopingTests(TenantTestMixin, TestCase):
         self.holder_b = AssetHolder.objects.create(
             first_name="Beta", last_name="Holder", upn="beta.holder@ob.example.com", tenant=self.tenant_b
         )
-        self.assignment_b = AssetAssignment.objects.create(
-            asset=self.asset_b, assigned_user=self.holder_b, is_active=True
-        )
+        with self.tenant_context(self.tenant_b):
+            checkout_asset(self.asset_b, holder=self.holder_b, status=self.deployed_status)
+        self.assignment_b = AssetAssignment.all_objects.get(asset=self.asset_b, is_active=True)
 
     def tearDown(self):
         self.clear_tenant_context()

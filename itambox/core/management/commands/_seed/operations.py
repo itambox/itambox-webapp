@@ -21,6 +21,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
 from assets.choices import RequestStatusChoices
+from core.tasks.context import TaskContext
 
 User = get_user_model()
 
@@ -58,13 +59,11 @@ class SeedOperationsMixin:
     def _claimable_asset_for(self, request_instance):
         """Return a free, claimable asset of the requested type in the request's tenant.
 
-        Applies exactly the constraints the product enforces when an approver
-        allocates a unit (``approve_asset_request``): the asset must live in the
-        request's tenant, be of the requested asset type, be in a deployable
-        status, carry no active assignment, and be requestable. ``is_requestable``
-        is a property (per-asset override, else the asset type's flag), so the
-        query filters the two underlying columns. Returns ``None`` when the tenant
-        has no spare unit, which the caller treats as "leave the request pending".
+        Applies the shared issuance rule and the request-specific constraints:
+        tenant, asset type, and requestability. ``is_requestable`` is a property
+        (per-asset override, else the asset type's flag), so the query filters the
+        two underlying columns. Returns ``None`` when the tenant has no spare
+        unit, which the caller treats as "leave the request pending".
         """
         # inline import: app-registry: assets.Asset is queried inside the seed command,
         # where the model import must not happen at module load.
@@ -72,17 +71,16 @@ class SeedOperationsMixin:
 
         if not request_instance.asset_type_id or not request_instance.tenant_id:
             return None
-        candidates = Asset._base_manager.filter(
-            tenant_id=request_instance.tenant_id,
-            asset_type=request_instance.asset_type,
-            status__type="deployable",
-            deleted_at__isnull=True,
-        ).filter(Q(requestable=True) | Q(requestable__isnull=True, asset_type__requestable=True))
-        for asset in candidates.order_by("-in_service_date", "pk"):
-            if asset.assignments.filter(is_active=True).exists():
-                continue
-            return asset
-        return None
+        with TaskContext(tenant_id=request_instance.tenant_id, user_id=self._provisioner.pk):
+            candidates = (
+                Asset.issuable()
+                .filter(
+                    tenant_id=request_instance.tenant_id,
+                    asset_type=request_instance.asset_type,
+                )
+                .filter(Q(requestable=True) | Q(requestable__isnull=True, asset_type__requestable=True))
+            )
+            return candidates.order_by("-in_service_date", "pk").first()
 
     def _request_target_holder(self, tenant):
         """The person a seeded request is for: a tenant holder without a device yet.

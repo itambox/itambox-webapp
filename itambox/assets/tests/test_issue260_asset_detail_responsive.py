@@ -12,6 +12,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from assets.models import Asset, AssetAssignment, AssetRole, AssetType, Manufacturer, StatusLabel
+from assets.services import checkout_asset
 from core.tests.mixins import TenantTestMixin
 from organization.models import AssetHolder
 
@@ -118,6 +119,7 @@ class AssetDetailBannerRemovalTests(TenantTestMixin, TestCase):
         self.setup_tenant_context(slug="i260-detail")
         self.set_active_tenant(self.tenant, self.tenant_membership)
         self.asset = _asset_fixtures(self.tenant, "-d")
+        self.deployed_status = StatusLabel.objects.create(name="I260 Deployed", slug="i260-deployed", type="deployed")
         self.url = reverse("assets:asset_detail", kwargs={"pk": self.asset.pk})
         self.client_login_to_tenant(self.tenant_admin, self.tenant)
 
@@ -138,7 +140,7 @@ class AssetDetailBannerRemovalTests(TenantTestMixin, TestCase):
             upn="assigned-holder-i260@example.test",
             tenant=self.tenant,
         )
-        AssetAssignment.objects.create(asset=self.asset, assigned_user=holder, is_active=True)
+        checkout_asset(self.asset, holder=holder, user=self.tenant_admin, status=self.deployed_status)
         self.assertIsNotNone(self.asset.active_assignment)
         self.assertEqual(self.asset.active_assignment.assigned_user, holder)
 

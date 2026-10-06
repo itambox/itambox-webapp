@@ -29,6 +29,7 @@ from assets.models import (
     StatusLabel,
     Supplier,
 )
+from assets.services import checkin_asset, checkout_asset
 from core.management.commands._seed.access import check_seed_access_invariants
 from core.management.commands._seed.consistency import check_seed_operational_invariants
 from core.management.commands.seed_data import Command as SeedDataCommand
@@ -521,13 +522,9 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
 
     def test_repair_history_on_held_asset_fails(self):
         """A repair recorded while a person still holds the unit is refused."""
-        asset = self._asset(status=self.in_use)
-        assignment = AssetAssignment.objects.create(
-            asset=asset,
-            assigned_user=self.holder,
-            is_active=True,
-            notes="Provisioned.",
-        )
+        asset = self._asset()
+        checkout_asset(asset, holder=self.holder, user=self.requester, status=self.in_use)
+        assignment = AssetAssignment.all_objects.get(asset=asset, is_active=True)
         AssetAssignment._base_manager.filter(pk=assignment.pk).update(
             checked_out_at=timezone.now() - datetime.timedelta(days=200)
         )
@@ -545,24 +542,17 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
         repair, so a closed assignment from January satisfied a June repair even
         though a different holder (assignment B) kept the unit through it.
         """
-        asset = self._asset(status=self.in_use)
-        early = AssetAssignment.objects.create(
-            asset=asset,
-            assigned_user=self.holder,
-            is_active=True,
-            notes="January loan, returned in February.",
-        )
+        asset = self._asset()
+        checkout_asset(asset, holder=self.holder, user=self.requester, status=self.in_use)
+        early = AssetAssignment.all_objects.get(asset=asset, is_active=True)
+        checkin_asset(asset, user=self.requester)
         AssetAssignment._base_manager.filter(pk=early.pk).update(
             is_active=False,
             checked_out_at=timezone.now() - datetime.timedelta(days=200),
             checked_in_at=timezone.now() - datetime.timedelta(days=180),
         )
-        second = AssetAssignment.objects.create(
-            asset=asset,
-            assigned_user=self.second_holder,
-            is_active=True,
-            notes="March issue, still held.",
-        )
+        checkout_asset(asset, holder=self.second_holder, user=self.requester, status=self.in_use)
+        second = AssetAssignment.all_objects.get(asset=asset, is_active=True)
         # Open well before the June repair and never checked back in, so this
         # assignment was open across the whole repair window.
         AssetAssignment._base_manager.filter(pk=second.pk).update(
@@ -575,24 +565,19 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
 
     def test_repair_history_with_checkin_passes(self):
         """The #506 fix: the unit is checked in before repair and handed back after."""
-        asset = self._asset(status=self.in_use)
-        assignment = AssetAssignment.objects.create(
-            asset=asset,
-            assigned_user=self.holder,
-            is_active=True,
-            notes="Provisioned.",
-        )
+        asset = self._asset()
+        checkout_asset(asset, holder=self.holder, user=self.requester, status=self.in_use)
+        assignment = AssetAssignment.all_objects.get(asset=asset, is_active=True)
+        checkin_asset(asset, user=self.requester)
         AssetAssignment._base_manager.filter(pk=assignment.pk).update(
             is_active=False,
             checked_out_at=timezone.now() - datetime.timedelta(days=200),
             checked_in_at=timezone.now() - datetime.timedelta(days=70),
         )
-        AssetAssignment.objects.create(
-            asset=asset,
-            assigned_user=self.holder,
-            is_active=True,
-            checked_out_at=timezone.now() - datetime.timedelta(days=29),
-            notes="Returned after repair.",
+        checkout_asset(asset, holder=self.holder, user=self.requester, status=self.in_use)
+        active = AssetAssignment.all_objects.get(asset=asset, is_active=True)
+        AssetAssignment._base_manager.filter(pk=active.pk).update(
+            checked_out_at=timezone.now() - datetime.timedelta(days=29)
         )
         _log_status_change(asset, self.pending_repair, "update", days_ago=60)
         _log_status_change(asset, self.available, "update", days_ago=30)
@@ -798,12 +783,8 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
         shape: the assignment starts inside the window and never ends.
         """
         asset = self._asset()
-        assignment = AssetAssignment.objects.create(
-            asset=asset,
-            assigned_user=self.holder,
-            is_active=True,
-            notes="Handed out mid-repair.",
-        )
+        checkout_asset(asset, holder=self.holder, user=self.requester, status=self.in_use)
+        assignment = AssetAssignment.all_objects.get(asset=asset, is_active=True)
         AssetAssignment._base_manager.filter(pk=assignment.pk).update(
             checked_out_at=timezone.now() - datetime.timedelta(days=50)
         )

@@ -202,6 +202,13 @@ class SeedHistoryMixin:
         from assets.models import AssetAssignment
 
         engine = self._engine
+        engine.change(
+            asset,
+            when=when,
+            user=user,
+            action="checkout",
+            status=status,
+        )
         AssetAssignment.objects.create(
             asset=asset,
             assigned_user_id=assignment.assigned_user_id,
@@ -210,13 +217,6 @@ class SeedHistoryMixin:
             checked_out_by=user,
             checked_out_at=as_aware_datetime(when),
             notes="Returned to the holder after the repair completed.",
-        )
-        engine.change(
-            asset,
-            when=when,
-            user=user,
-            action="checkout",
-            status=status,
         )
 
     # ──────────────────────────────────────────────────────────────────────────

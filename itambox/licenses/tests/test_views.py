@@ -58,7 +58,8 @@ class LicenseViewTests(TestCase):
         """The ?tab=seats pane renders seat assignments, and the Asset Holder
         column resolves: directly for holder-seats, and via the asset's current
         holder for asset-seats."""
-        from assets.models import Asset, AssetAssignment
+        from assets.models import Asset, AssetAssignment, StatusLabel
+        from assets.services import checkout_asset
         from organization.models import AssetHolder
 
         # 1. Seat assigned directly to a holder.
@@ -68,8 +69,10 @@ class LicenseViewTests(TestCase):
         asset_holder = baker.make(
             AssetHolder, first_name="Asset", last_name="User", upn="asset.holder@example.com", tenant=None
         )
-        asset = baker.make(Asset, name="REPRO-LAPTOP-01", tenant=None)
-        baker.make(AssetAssignment, asset=asset, assigned_user=asset_holder, is_active=True)
+        deployable = baker.make(StatusLabel, type="deployable", name="License View Deployable")
+        deployed = baker.make(StatusLabel, type="deployed", name="License View Deployed")
+        asset = baker.make(Asset, name="REPRO-LAPTOP-01", tenant=None, status=deployable)
+        checkout_asset(asset, holder=asset_holder, status=deployed)
         baker.make("licenses.LicenseSeatAssignment", license=self.license, asset=asset, assigned_holder=None)
 
         url = reverse("licenses:license_detail", kwargs={"pk": self.license.pk}) + "?tab=seats"

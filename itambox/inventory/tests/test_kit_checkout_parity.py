@@ -222,7 +222,7 @@ class KitCheckoutSelectionTests(KitCheckoutParityBase):
         checkout_asset(asset, holder=other_holder, user=self.tenant_user)
         original_assignment = AssetAssignment._base_manager.get(asset=asset, is_active=True)
 
-        with self.assertRaisesMessage(ValidationError, "already assigned"):
+        with self.assertRaisesMessage(ValidationError, "not available for issuance"):
             checkout_kit(
                 self.kit, holder=self.holder, source_location=self.location, selected_assets={item.pk: asset.pk}
             )
@@ -241,7 +241,7 @@ class KitCheckoutSelectionTests(KitCheckoutParityBase):
             )
             asset = self.make_asset(f"KP-1008-{label_type}", status=blocked)
             with self.subTest(status_type=label_type):
-                with self.assertRaisesMessage(ValidationError, "not in a deployable state"):
+                with self.assertRaisesMessage(ValidationError, "not available for issuance"):
                     checkout_kit(
                         self.kit,
                         holder=self.holder,

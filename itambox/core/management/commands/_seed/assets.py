@@ -28,6 +28,7 @@ import random
 from django.utils import timezone
 
 from assets.models import AssetAssignment
+from assets.services import checkout_asset
 from assets.services.specification_writers import apply_asset_specification_patch
 from core.management.commands._seed.engine import as_aware_datetime
 from core.tasks.context import TaskContext
@@ -355,7 +356,9 @@ class SeedAssetsMixin:
                 asset_tag="",
                 asset_type=atype,
                 asset_role=role,
-                status=self._status_labels[status_slug],
+                status=self._status_labels["available"]
+                if status_slug == "in-use"
+                else self._status_labels[status_slug],
                 location=base_location,
                 tenant=tenant,
                 serial_number=f"{code}{random.randint(100000, 999999)}",
@@ -406,22 +409,19 @@ class SeedAssetsMixin:
             self._apply_seed_specifications(asset, cv)
             if tags:
                 asset.tags.add(*[self._tags[t] for t in tags if t in self._tags])
-            if status_slug == "in-use" and holder:
-                AssetAssignment.objects.create(
-                    asset=asset,
-                    assigned_user=holder,
-                    checked_out_by=self._provisioner,
-                    is_active=True,
-                    notes="Provisioned by Northwind service desk.",
-                )
-            elif status_slug == "in-use" and location:
-                AssetAssignment.objects.create(
-                    asset=asset,
-                    assigned_location=location,
-                    checked_out_by=self._provisioner,
-                    is_active=True,
-                    notes="Deployed to site infrastructure.",
-                )
+            if status_slug == "in-use" and (holder or location):
+                with TaskContext(tenant_id=tenant.pk, user_id=self._provisioner.pk):
+                    checkout_asset(
+                        asset,
+                        holder=holder,
+                        location=location,
+                        user=self._provisioner,
+                        notes="Provisioned by Northwind service desk."
+                        if holder
+                        else "Deployed to site infrastructure.",
+                        _suppress_custody_receipt=True,
+                    )
+                asset.refresh_from_db()
             self._assets.append(asset)
             return asset
 

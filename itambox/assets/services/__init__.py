@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import logging
 from collections.abc import Mapping
+from contextlib import contextmanager
 from functools import partial
 from typing import TYPE_CHECKING
 
@@ -37,6 +38,26 @@ from ..models import Asset, AssetAssignment, AssetDisposal, StatusLabel
 logger = logging.getLogger(__name__)
 
 
+@contextmanager
+def _asset_status_operation(asset, operation):
+    sentinel = object()
+    original = getattr(asset, "_asset_status_transition", sentinel)
+    asset._asset_status_transition = operation
+    try:
+        yield
+    finally:
+        if original is sentinel:
+            del asset._asset_status_transition
+        else:
+            asset._asset_status_transition = original
+
+
+def _save_asset_status_transition(asset, operation, update_fields):
+    """Mark status writes that are owned by checkout or check-in services."""
+    with _asset_status_operation(asset, operation):
+        asset.save(update_fields=update_fields)
+
+
 def checkout_asset(
     asset: Asset,
     holder: AssetHolder | None = None,
@@ -50,6 +71,7 @@ def checkout_asset(
     status: StatusLabel | None = None,
     is_loan: bool = False,
     due_date: datetime.date | None = None,
+    _suppress_custody_receipt: bool = False,
 ) -> AssetHolder | Location | Asset:
     target = holder or location or asset_target
     if not target:
@@ -59,23 +81,18 @@ def checkout_asset(
         # Lock the asset row to prevent concurrent overallocation or state issues
         asset = Asset.objects.select_for_update().get(pk=asset.pk)
 
-        # Lifecycle guard: assets on order, in repair, or archived are not
-        # deployable. Archived assets only allow archived->pending, so a checkout
-        # (which targets a deployed status) would raise an illegal-transition
-        # error deeper in save(); reject it here with a clear message.
-        if asset.status and asset.status.type in (
-            StatusTypeChoices.IN_REPAIR,
-            StatusTypeChoices.ON_ORDER,
-            StatusTypeChoices.ARCHIVED,
-        ):
+        if not asset.is_issuable:
+            # Disposal owns the lifecycle independently of the visible status,
+            # including a soft-deleted, uncancelled disposal record.
+            _assert_no_active_disposal(asset)
             raise ValidationError(
-                _("Cannot check out an asset that is %(status)s.") % {"status": asset.status.get_type_display()}
+                _("Cannot check out an asset that is %(status)s.") % {"status": asset.get_status_display()}
             )
 
-        # Disposal guard (#496): the disposal RECORD owns the state, not the
-        # status label. A record whose asset status drifted (or a soft-deleted
-        # evidence row) must still make the asset unassignable.
-        _assert_no_active_disposal(asset)
+        original_status = asset.status
+        resolved_status = status or StatusLabel.objects.filter(type=StatusTypeChoices.DEPLOYED).first()
+        if not resolved_status:
+            raise ValidationError(_("No 'Deployed' Status Label exists. Configure one first."))
 
         # Reservation guard: if the asset is reserved for a *different* holder during
         # the checkout window, block the checkout to preserve the reservation.
@@ -105,17 +122,6 @@ def checkout_asset(
                     % {"holder": blocking.reserved_for, "date": blocking.end_date}
                 )
 
-        if asset.active_assignment:
-            checkin_asset(asset, user=user, notes="Auto-checkin for reassignment")
-
-        original_status = asset.status
-
-        resolved_status = status
-        if not resolved_status:
-            resolved_status = StatusLabel.objects.filter(type=StatusTypeChoices.DEPLOYED).first()
-        if resolved_status:
-            asset.status = resolved_status
-
         update_fields = ["status", "location"]
         if holder:
             # A person assignment changes responsibility, not the base location.
@@ -124,10 +130,6 @@ def checkout_asset(
             asset.location = location
         elif asset_target:
             asset.location = asset_target.location
-
-        asset._changelog_action = "checkout"
-        asset._changelog_message = f"Checked out to {target}"
-        asset.save(update_fields=update_fields)
 
         assignment_kwargs = {
             "asset": asset,
@@ -148,10 +150,15 @@ def checkout_asset(
         if checkout_date:
             assignment_kwargs["checked_out_at"] = _normalized_checkout_datetime(checkout_date)
 
-        AssetAssignment.objects.create(**assignment_kwargs)
+        asset.status = resolved_status
+        asset._changelog_action = "checkout"
+        asset._changelog_message = f"Checked out to {target}"
+        with _asset_status_operation(asset, "checkout"):
+            asset.save(update_fields=update_fields)
+            AssetAssignment.objects.create(**assignment_kwargs)
 
         category = asset.asset_type.category if asset.asset_type else None
-        if holder and category:
+        if holder and category and not _suppress_custody_receipt:
             from compliance.models import CustodyTemplate
 
             resolved_template = None
@@ -353,7 +360,7 @@ def checkin_asset(
                 asset.location = location
             asset._changelog_action = "checkin"
             asset._changelog_message = f"Checked in from {target}"
-            asset.save(update_fields=["status", "location"])
+            _save_asset_status_transition(asset, "checkin", ["status", "location"])
 
             return f"Checked in from: {target}"
     elif asset.location:
@@ -368,7 +375,7 @@ def checkin_asset(
                 asset.location = location
             asset._changelog_action = "checkin"
             asset._changelog_message = f"Checked in from Location: {checked_in_from}"
-            asset.save(update_fields=["status", "location"])
+            _save_asset_status_transition(asset, "checkin", ["status", "location"])
             return f"Checked in from Location: {checked_in_from}"
     else:
         return None
@@ -727,10 +734,8 @@ def _check_kit_hardware_eligibility(asset, item, target_tenant_id):
         raise ValidationError(_("The selected asset does not match hardware item '%(item)s'.") % {"item": item})
     if target_tenant_id is not None and asset.tenant_id != target_tenant_id:
         raise ValidationError(_("The selected asset belongs to another tenant than the checkout target."))
-    if asset.active_assignment:
-        raise ValidationError(_("The selected asset is already assigned and cannot be selected."))
-    if not asset.status or asset.status.type != StatusTypeChoices.DEPLOYABLE:
-        raise ValidationError(_("The selected asset is not in a deployable state."))
+    if not asset.is_issuable:
+        raise ValidationError(_("The selected asset is not available for issuance."))
 
 
 def _lock_kit_hardware(kit_items, selections, target_tenant_id):
