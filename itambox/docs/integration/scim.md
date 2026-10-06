@@ -22,7 +22,7 @@ Authentication uses an HTTP Bearer token. Create a dedicated API token for an ac
 
 Read requests accept any valid token of the scoped owner; write requests additionally require the token's `write_enabled` flag. Expired tokens, inactive owners, and tokens scoped to a different tenant or provider are rejected with `401`, and no error response ever contains credential material.
 
-SCIM never grants permissions. Provisioning creates an identity plus a membership (and, on tenant mounts, links or creates an asset holder profile through the same exact-identity policy as interactive provisioning); roles and permissions are granted in-app, so a provisioned account has no product access until an administrator grants it. A holder is never linked by email alone when its UPN differs, and SCIM updates do not overwrite an existing holder's profile fields.
+SCIM never grants permissions. Provisioning creates an identity plus a membership (and, on tenant mounts, links or creates an asset holder profile through the same exact-identity policy as interactive provisioning); roles and permissions are granted in-app, so a provisioned account has no product access until an administrator grants it. Tenant SCIM treats `userName` as the UPN for holder matching and keeps `emails.value` as a separate email hint: a different UPN is never linked by email alone, and updates do not overwrite an existing holder's profile fields.
 
 ## Supported operations
 
