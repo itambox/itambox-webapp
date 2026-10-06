@@ -12,8 +12,6 @@ from pathlib import Path
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
-from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from rest_framework.test import APIClient
 
@@ -60,28 +58,14 @@ def _fixture_text(name: str) -> str:
     return (FIXTURE_ROOT / name).read_text(encoding="utf-8")
 
 
-def _library_permissions() -> tuple[Permission, Permission]:
-    content_type = ContentType.objects.get(app_label="extras", model="specificationlibrary")
-    return (
-        Permission.objects.get(
-            content_type=ContentType.objects.get_for_model(CustomField), codename="change_customfield"
-        ),
-        Permission.objects.get(content_type=content_type, codename="manage_specification_library"),
-    )
-
-
-def _provision_actor() -> tuple[object, Token, Token]:
-    tenant = Tenant.objects.create(name="Type Library HTTP Tenant", slug="type-library-http")
+def _provision_actor() -> tuple[object, Role, Token, Token]:
+    tenant = Tenant.objects.create(name="Type Library HTTP Tenant", slug="type-library-http", is_provider=True)
     actor = User.objects.create_user(
         username="type-library-http-actor",
         email="type-library-http-actor@example.com",
         password="not-used-by-token-test",
     )
-    role = Role.objects.create(tenant=tenant, name="Type Library HTTP Role", permissions=[])
-    grant(actor, tenant, role)
-    actor.user_permissions.add(*_library_permissions())
-    # Preview/apply require the capability AND the concrete plan's model operations.
-    for model in (
+    models = (
         CustomField,
         CustomFieldChoiceSet,
         CustomFieldChoice,
@@ -89,16 +73,18 @@ def _provision_actor() -> tuple[object, Token, Token]:
         AssetType,
         Category,
         Manufacturer,
-    ):
-        actor.user_permissions.add(
-            *Permission.objects.filter(
-                content_type=ContentType.objects.get_for_model(model),
-                codename__in=[f"{action}_{model._meta.model_name}" for action in ("add", "change", "view")],
-            )
-        )
+    )
+    permissions = {"extras.manage_specification_library"}
+    permissions.update(
+        f"{model._meta.app_label}.{action}_{model._meta.model_name}"
+        for model in models
+        for action in ("add", "change", "view")
+    )
+    role = Role.objects.create(tenant=tenant, name="Type Library HTTP Role", permissions=sorted(permissions))
+    grant(actor, tenant, role)
     write_token = Token.objects.create(user=actor, tenant=tenant, write_enabled=True)
     read_token = Token.objects.create(user=actor, tenant=tenant, write_enabled=False)
-    return actor, write_token, read_token
+    return actor, role, write_token, read_token
 
 
 def _client_for_token(token: Token) -> APIClient:
@@ -129,7 +115,7 @@ def _clear_request_cache():
 
 
 def test_real_http_lifecycle_exports_and_idempotent_import():
-    _actor, write_token, _read_token = _provision_actor()
+    _actor, _role, write_token, _read_token = _provision_actor()
     client = _client_for_token(write_token)
     release_text = _fixture_text("example-laptop-library-v1.json")
 
@@ -195,7 +181,7 @@ def test_real_http_lifecycle_exports_and_idempotent_import():
 
 
 def test_real_http_stale_tampered_plan_and_revoked_permission_preserve_state_and_audit():
-    _actor, write_token, _read_token = _provision_actor()
+    _actor, role, write_token, _read_token = _provision_actor()
     client = _client_for_token(write_token)
     release = json.loads(_fixture_text("example-laptop-library-v1.json"))
     first = _post(client, PREVIEW_URL, {"document": json.dumps(release, ensure_ascii=False)})
@@ -233,8 +219,8 @@ def test_real_http_stale_tampered_plan_and_revoked_permission_preserve_state_and
     assert tampered.data["error"]["code"] == "STALE_PLAN"
     assert _snapshot_rows() == before_rejection
 
-    change_permission, _manage_permission = _library_permissions()
-    _actor.user_permissions.remove(change_permission)
+    role.permissions.remove("extras.change_customfield")
+    role.save(update_fields=["permissions"])
     revoked = _post(
         client,
         APPLY_URL,
@@ -250,7 +236,7 @@ def test_real_http_stale_tampered_plan_and_revoked_permission_preserve_state_and
 
 
 def test_real_token_authentication_rejects_read_only_write_token_without_mutation():
-    _actor, _write_token, read_token = _provision_actor()
+    _actor, _role, _write_token, read_token = _provision_actor()
     client = _client_for_token(read_token)
     before = _snapshot_rows()
 

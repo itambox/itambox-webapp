@@ -11,12 +11,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
-from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 
 from assets.models.catalog import AssetType, Category, Manufacturer
-from assets.services.specifications._command_support import actor_change_context, has_global_model_permission
+from assets.services.specifications._command_support import actor_change_context
 from assets.services.specifications.locking import catalogue_transaction_lock
 from assets.services.specifications.preview_tokens import PreviewTokenError
 from assets.services.type_library.exporting import load_library_state
@@ -38,6 +36,7 @@ from extras.models import (
     SpecificationLibrary,
 )
 from organization.services.access_scope import authentication_revision_for_actor
+from organization.services.catalogue_authorization import has_provider_catalogue_permission
 
 
 class LibraryApplyError(RuntimeError):
@@ -70,9 +69,6 @@ class LibraryApplyResult:
     source_digest: str
     changed_action_ids: tuple[str, ...]
     no_op: bool
-
-
-_LIBRARY_MANAGE_PERMISSION = "manage_specification_library"
 
 
 def prepare_library_apply(
@@ -189,12 +185,7 @@ def _apply_library_plan_locked(
     library = (
         SpecificationLibrary.objects.using(using).select_for_update().filter(namespace=request.plan.namespace).first()
     )
-    if not _has_global_model_permission(
-        fresh_actor,
-        SpecificationLibrary,
-        _LIBRARY_MANAGE_PERMISSION,
-        using=using,
-    ):
+    if not has_provider_catalogue_permission(fresh_actor, "extras.manage_specification_library"):
         raise LibraryApplyError("OBJECT_UNAVAILABLE")
 
     with actor_change_context(fresh_actor):
@@ -211,12 +202,7 @@ def _apply_library_plan_locked(
             request,
             incoming,
             current_state,
-            authorize=lambda: _has_global_model_permission(
-                fresh_actor,
-                SpecificationLibrary,
-                _LIBRARY_MANAGE_PERMISSION,
-                using=using,
-            ),
+            authorize=lambda: has_provider_catalogue_permission(fresh_actor, "extras.manage_specification_library"),
         )
         if not _has_library_plan_permissions(
             fresh_actor,
@@ -264,12 +250,7 @@ def _reauthorize_apply_actor(actor: object, request: LibraryApplyRequest, *, usi
     if authentication_revision_for_actor(fresh_actor) != request.authentication_revision:
         raise LibraryApplyError("STALE_PLAN")
 
-    if not _has_global_model_permission(
-        fresh_actor,
-        SpecificationLibrary,
-        _LIBRARY_MANAGE_PERMISSION,
-        using=using,
-    ):
+    if not has_provider_catalogue_permission(fresh_actor, "extras.manage_specification_library"):
         raise LibraryApplyError("OBJECT_UNAVAILABLE")
     return fresh_actor
 
@@ -282,45 +263,6 @@ def _reload_library_actor(actor: object, *, using: str) -> object | None:
     return get_user_model()._base_manager.using(using).filter(pk=actor_id, is_active=True).first()
 
 
-def _has_library_model_permission(
-    actor: object,
-    model: type,
-    codename: str,
-    *,
-    using: str,
-) -> bool:
-    """Backward-compatible alias for the centralized global check."""
-    return _has_global_model_permission(actor, model, codename, using=using)
-
-
-def _has_global_model_permission(
-    actor: object,
-    model: type,
-    codename: str,
-    *,
-    using: str,
-) -> bool:
-    """Check a fresh actor's real global permission on the requested alias.
-
-    The existing specification-command helper is authoritative on the default
-    alias. The equivalent alias-aware query is kept local so a non-default
-    worker database cannot accidentally consult ``default``.
-    """
-    if using == "default":
-        return has_global_model_permission(actor, model, codename)
-    if getattr(actor, "is_superuser", False):
-        return True
-    content_type = ContentType.objects.db_manager(using).get_for_model(model)
-    permission = Permission.objects.using(using).filter(content_type=content_type, codename=codename).first()
-    if permission is None:
-        return False
-    user_permissions = getattr(actor, "user_permissions", None)
-    if user_permissions is not None and user_permissions.using(using).filter(pk=permission.pk).exists():
-        return True
-    groups = getattr(actor, "groups", None)
-    return groups is not None and groups.using(using).filter(permissions__pk=permission.pk).exists()
-
-
 def _has_library_plan_permissions(
     actor: object,
     library: object | None,
@@ -330,15 +272,10 @@ def _has_library_plan_permissions(
     using: str,
 ) -> bool:
     """Authorize manage plus every model action the canonical writer may use."""
-    if not _has_global_model_permission(
-        actor,
-        SpecificationLibrary,
-        _LIBRARY_MANAGE_PERMISSION,
-        using=using,
-    ):
+    if not has_provider_catalogue_permission(actor, "extras.manage_specification_library"):
         return False
     return all(
-        _has_global_model_permission(actor, model, codename, using=using)
+        has_provider_catalogue_permission(actor, f"{getattr(model, '_meta').app_label}.{codename}")
         for model, codename in _required_library_permissions(library, incoming, plan, using=using)
     )
 

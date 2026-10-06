@@ -22,6 +22,7 @@ class MenuItemButton:
     _url: str | None = field(default=None, init=False)
     permissions: Sequence[str] = ()
     color: str | None = None
+    condition: Callable | None = None
 
     def __post_init__(self):
         if self.link:

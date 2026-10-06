@@ -7,7 +7,6 @@ from dataclasses import FrozenInstanceError
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import connection
@@ -44,6 +43,16 @@ User = get_user_model()
 class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="composition-editor")
+        self.provider = Tenant.objects.create(
+            name="Composition Provider", slug="composition-provider", is_provider=True
+        )
+        self.provider_role = Role.objects.create(
+            tenant=self.provider,
+            name="Composition Editor",
+            permissions=["assets.change_assettype", "assets.change_category"],
+        )
+        self.provider_grant = self.grant(self.user, self.provider, self.provider_role)
+        self.set_active_tenant(self.provider, self.provider_grant.membership)
         self.manufacturer = Manufacturer.objects.create(name="Composition maker", slug="composition-maker")
         self.category = Category.objects.create(name="Composition category", slug="composition-category")
         self.type = AssetType.objects.create(
@@ -84,17 +93,6 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         self.type.custom_field_data = {"first_note": "type value", "legacy_note": "history"}
         self.type.save(update_fields=["custom_field_data"])
 
-        self.user.user_permissions.add(
-            Permission.objects.get(
-                content_type=ContentType.objects.get_for_model(AssetType),
-                codename="change_assettype",
-            ),
-            Permission.objects.get(
-                content_type=ContentType.objects.get_for_model(Category),
-                codename="change_category",
-            ),
-        )
-
         AssetTagSequence.objects.create(
             tenant=None,
             prefix="COMP-",
@@ -110,6 +108,10 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
                 asset_type=self.type,
                 custom_field_data={"asset_note": "asset original", "first_note": "asset history"},
             )
+
+    def tearDown(self):
+        self.clear_tenant_context()
+        super().tearDown()
 
     def _field(self, name, *, target=AssetType, required=False):
         field = CustomField.objects.create(
@@ -502,7 +504,8 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         self.assertEqual([issue.code for issue in stale_definition.issues], ["STALE_DEFINITION"])
 
     def test_staff_authority_cannot_replace_global_type_permission(self):
-        self.user.user_permissions.clear()
+        self.provider_role.permissions = []
+        self.provider_role.save(update_fields=["permissions"])
         self.user.is_staff = True
         self.user.save(update_fields=["is_staff"])
         resource_revision, definition_revision = self._type_plan()
@@ -561,7 +564,8 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         self.assertIsInstance(stale, CommandRejectedDTO)
         self.assertEqual([issue.code for issue in stale.issues], ["STALE_RESOURCE"])
 
-        self.user.user_permissions.clear()
+        self.provider_role.permissions = []
+        self.provider_role.save(update_fields=["permissions"])
         self.user.is_staff = True
         self.user.save(update_fields=["is_staff"])
         current_revision = resource_revision_for_owner(Category.all_objects.get(pk=self.category.pk))
@@ -601,12 +605,8 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         self.assertEqual(self._changes(Category, self.category.pk).count(), before_changes)
 
     def test_category_permission_is_rechecked_after_actor_revocation(self):
-        self.user.user_permissions.remove(
-            Permission.objects.get(
-                content_type=ContentType.objects.get_for_model(Category),
-                codename="change_category",
-            )
-        )
+        self.provider_role.permissions.remove("assets.change_category")
+        self.provider_role.save(update_fields=["permissions"])
         resource_revision = self._category_plan()
 
         result = set_category_defaults(
@@ -737,7 +737,8 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         self.assertEqual(self._changes(Category, self.category.pk).latest("pk").user_id, self.user.pk)
 
     def test_genuine_tenant_role_is_not_global_catalogue_authority(self):
-        self.user.user_permissions.clear()
+        self.provider_role.permissions = []
+        self.provider_role.save(update_fields=["permissions"])
         role = Role.objects.create(
             tenant=self.tenant,
             name="Tenant catalogue editor",

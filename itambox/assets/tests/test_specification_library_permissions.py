@@ -10,8 +10,6 @@ from __future__ import annotations
 import json
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
-from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 
 from assets.models.catalog import AssetType, Category, Manufacturer
@@ -23,7 +21,15 @@ from assets.services.type_library.commands import (
     preview_library,
 )
 from assets.tests.test_type_library_validation import _release_document
+from core.context import (
+    set_current_all_accessible,
+    set_current_membership,
+    set_current_tenant,
+    set_current_tenant_group,
+)
 from core.models import ObjectChange
+from core.navigation.menu import _can_manage_type_libraries, _can_view_type_libraries
+from core.tests.mixins import grant
 from extras.models import (
     CustomField,
     CustomFieldChoice,
@@ -32,6 +38,7 @@ from extras.models import (
     SpecificationLibrary,
     SpecificationLibraryRelease,
 )
+from organization.models import Role, Tenant, TenantGroup
 from organization.services.access_scope import authentication_revision_for_actor
 
 _MANAGE_PERMISSION = "manage_specification_library"
@@ -50,33 +57,42 @@ class LibraryPermissionContractTests(TestCase):
     def setUp(self):
         self.signing_key = b"library-permission-contract-test-key"
         self.document = _release_document()
+        self.provider = Tenant.objects.create(name="Library Provider", slug="library-provider", is_provider=True)
+        set_current_tenant(self.provider)
+        set_current_membership(None)
+        set_current_tenant_group(None)
+        set_current_all_accessible(False)
+
+    def tearDown(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+        set_current_tenant_group(None)
+        set_current_all_accessible(False)
+        super().tearDown()
 
     @staticmethod
     def _raw(document):
         return json.dumps(document, ensure_ascii=False)
 
-    def _permission(self, model, action):
-        content_type = ContentType.objects.get_for_model(model)
-        codename = f"{action}_{model._meta.model_name}"
-        permission, _ = Permission.objects.get_or_create(
-            content_type=content_type,
-            codename=codename,
-            defaults={"name": codename},
-        )
-        return permission
+    def _grant_permissions(self, actor, permissions, name):
+        role = Role.objects.create(tenant=self.provider, name=name, permissions=list(permissions))
+        grant(actor, self.provider, role)
+        return role
 
     def _grant_manage(self, actor):
-        permission, _ = Permission.objects.get_or_create(
-            content_type=ContentType.objects.get_for_model(SpecificationLibrary),
-            codename=_MANAGE_PERMISSION,
-            defaults={"name": "Can manage specification libraries"},
+        return self._grant_permissions(
+            actor,
+            (f"extras.{_MANAGE_PERMISSION}",),
+            f"{actor.username} library manager",
         )
-        actor.user_permissions.add(permission)
 
     def _grant_actions(self, actor):
-        for model in _ACTION_MODELS:
-            actor.user_permissions.add(self._permission(model, "add"))
-            actor.user_permissions.add(self._permission(model, "change"))
+        permissions = (
+            f"{model._meta.app_label}.{action}_{model._meta.model_name}"
+            for model in _ACTION_MODELS
+            for action in ("add", "change")
+        )
+        return self._grant_permissions(actor, permissions, f"{actor.username} library actions")
 
     def _actor(self, username, *, staff=False):
         return get_user_model().objects.create_user(username=username, is_staff=staff)
@@ -137,8 +153,18 @@ class LibraryPermissionContractTests(TestCase):
 
     def test_staff_or_direct_wrong_capability_is_not_a_manage_shortcut(self):
         actor = self._actor("library-staff-with-actions", staff=True)
-        self._grant_actions(actor)
-        actor.user_permissions.add(self._permission(SpecificationLibrary, "change"))
+        self._grant_permissions(
+            actor,
+            (
+                f"extras.change_{SpecificationLibrary._meta.model_name}",
+                *(
+                    f"{model._meta.app_label}.{action}_{model._meta.model_name}"
+                    for model in _ACTION_MODELS
+                    for action in ("add", "change")
+                ),
+            ),
+            "Wrong library capability",
+        )
 
         with self.assertRaises(LibraryCommandError) as denied:
             self._preview(actor)
@@ -153,7 +179,9 @@ class LibraryPermissionContractTests(TestCase):
         baseline_libraries = SpecificationLibrary.objects.count()
         baseline_releases = SpecificationLibraryRelease.objects.count()
 
-        actor.user_permissions.remove(self._permission(AssetType, "add"))
+        actions_role = Role.objects.get(name=f"{actor.username} library actions")
+        actions_role.permissions.remove(f"assets.add_{AssetType._meta.model_name}")
+        actions_role.save(update_fields=["permissions"])
         with self.assertRaises(LibraryApplyError) as denied:
             apply_library(
                 self._raw(self.document),
@@ -175,9 +203,9 @@ class LibraryPermissionContractTests(TestCase):
             self._request(actor, first_preview),
             actor=actor,
         )
-        for model in _ACTION_MODELS:
-            actor.user_permissions.remove(self._permission(model, "add"))
-            actor.user_permissions.remove(self._permission(model, "change"))
+        actions_role = Role.objects.get(name=f"{actor.username} library actions")
+        actions_role.permissions = []
+        actions_role.save(update_fields=["permissions"])
         baseline_changes = ObjectChange._base_manager.count()
         second_preview = self._preview(actor)
         result = apply_library(
@@ -187,3 +215,70 @@ class LibraryPermissionContractTests(TestCase):
         )
         self.assertTrue(result.no_op)
         self.assertEqual(ObjectChange._base_manager.count(), baseline_changes)
+
+    def test_customer_only_catalogue_grant_does_not_authorize_global_library(self):
+        actor = self._actor("library-customer-only")
+        customer = Tenant.objects.create(name="Library Customer", slug="library-customer")
+        role = Role.objects.create(
+            tenant=customer,
+            name="Customer Library Manager",
+            permissions=[f"extras.{_MANAGE_PERMISSION}"],
+        )
+        grant(actor, customer, role)
+
+        with self.assertRaises(LibraryCommandError) as denied:
+            self._preview(actor)
+        self.assertEqual(denied.exception.code, "OBJECT_UNAVAILABLE")
+
+    def test_aggregate_scope_cannot_authorize_even_with_provider_grant(self):
+        actor = self._actor("library-aggregate-only")
+        self._grant_manage(actor)
+        self._grant_actions(actor)
+        group = TenantGroup.objects.create(name="Library aggregate")
+        self.provider.group = group
+        self.provider.save(update_fields=["group"])
+
+        for name, active_group, all_accessible in (
+            ("tenant-group", group, False),
+            ("all-accessible", None, True),
+        ):
+            with self.subTest(scope=name):
+                set_current_tenant(None)
+                set_current_membership(None)
+                set_current_tenant_group(active_group)
+                set_current_all_accessible(all_accessible)
+                with self.assertRaises(LibraryCommandError) as denied:
+                    self._preview(actor)
+                self.assertEqual(denied.exception.code, "OBJECT_UNAVAILABLE")
+
+    def test_type_library_navigation_requires_active_provider_permission(self):
+        actor = self._actor("library-navigation-provider")
+        provider_role = Role.objects.create(
+            tenant=self.provider,
+            name="Provider Library Viewer",
+            permissions=["extras.view_specificationlibrary", f"extras.{_MANAGE_PERMISSION}"],
+        )
+        grant(actor, self.provider, provider_role)
+        self.assertTrue(_can_view_type_libraries(actor))
+        self.assertTrue(_can_manage_type_libraries(actor))
+
+        customer = Tenant.objects.create(name="Navigation Customer", slug="navigation-customer")
+        customer_role = Role.objects.create(
+            tenant=customer,
+            name="Customer Library Viewer",
+            permissions=["extras.view_specificationlibrary", f"extras.{_MANAGE_PERMISSION}"],
+        )
+        grant(actor, customer, customer_role)
+        set_current_tenant(customer)
+        self.assertFalse(_can_view_type_libraries(actor))
+        self.assertFalse(_can_manage_type_libraries(actor))
+
+        set_current_tenant(self.provider)
+        group = TenantGroup.objects.create(name="Navigation aggregate")
+        set_current_tenant_group(group)
+        self.assertFalse(_can_view_type_libraries(actor))
+        self.assertFalse(_can_manage_type_libraries(actor))
+        set_current_tenant_group(None)
+        set_current_all_accessible(True)
+        self.assertFalse(_can_view_type_libraries(actor))
+        self.assertFalse(_can_manage_type_libraries(actor))

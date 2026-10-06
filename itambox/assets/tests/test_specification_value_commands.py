@@ -6,7 +6,6 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -74,12 +73,7 @@ class SpecificationValueCommandTests(TestCase):
             model="Value type",
             slug="value-type",
         )
-        self.user.user_permissions.add(
-            Permission.objects.get(
-                content_type=ContentType.objects.get_for_model(AssetType),
-                codename="change_assettype",
-            )
-        )
+
         AssetTagSequence.objects.create(
             tenant=self.tenant,
             prefix="VALUE-",
@@ -225,7 +219,6 @@ class SpecificationValueCommandTests(TestCase):
         self.assertIn(library.pk, relevant_library_ids((self.type.pk,), "asset"))
 
     def test_staff_and_tenant_permission_cannot_replace_global_type_permission(self):
-        self.user.user_permissions.clear()
         self.user.is_staff = True
         self.user.save(update_fields=["is_staff"])
         role = Role.objects.get(tenant=self.tenant, name="Value editor")

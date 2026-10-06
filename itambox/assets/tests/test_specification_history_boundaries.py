@@ -7,7 +7,6 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.test import TestCase as DjangoTestCase
@@ -27,6 +26,7 @@ from assets.services.specifications.contracts import (
     HistoryCleanupPreviewDTO,
     OwnerChangedDTO,
 )
+from core.context import set_current_tenant
 from core.models import ObjectChange
 from extras.models import (
     CustomField,
@@ -50,23 +50,27 @@ User = get_user_model()
 _HISTORY_KEYS = ("inactive_history", "deprecated_history", "deprecated_choice_history")
 
 
-class HistoryBoundaryFixtureMixin:
+class HistoryBoundaryFixtureMixin(DjangoTestCase):
     def setUp(self):
         super().setUp()
-        self.tenant = Tenant.objects.create(name="History boundary tenant", slug="history-boundary-tenant")
+        self.tenant = Tenant.objects.create(
+            name="History boundary tenant",
+            slug="history-boundary-tenant",
+            is_provider=True,
+        )
         self.other_tenant = Tenant.objects.create(
             name="Other history boundary tenant", slug="other-history-boundary-tenant"
         )
         self.user = User.objects.create_user(username="history-boundary-editor")
         membership = Membership.objects.create(user=self.user, tenant=self.tenant)
-        role = Role.objects.create(
+        self.role = Role.objects.create(
             tenant=self.tenant,
             name="History boundary editor",
-            permissions=["assets.change_asset"],
+            permissions=["assets.change_asset", "assets.change_assettype"],
         )
         self.grant = RoleGrant.objects.create(
             membership=membership,
-            role=role,
+            role=self.role,
             reason="T10 final history boundary authorization",
             valid_until=timezone.now() + timedelta(days=1),
         )
@@ -202,12 +206,8 @@ class HistoryBoundaryFixtureMixin:
         )
         self.other_asset.refresh_from_db()
 
-        self.user.user_permissions.add(
-            Permission.objects.get(
-                content_type=asset_type_ct,
-                codename="change_assettype",
-            )
-        )
+        set_current_tenant(self.tenant)
+        self.addCleanup(set_current_tenant, None)
 
     def _actor(self):
         return ActorContextDTO(
@@ -281,7 +281,7 @@ class HistoryBoundaryFixtureMixin:
         )
 
 
-class SpecificationHistoryBoundaryTests(HistoryBoundaryFixtureMixin, DjangoTestCase):
+class SpecificationHistoryBoundaryTests(HistoryBoundaryFixtureMixin):
     def test_type_cleanup_accepts_all_historical_projection_reasons_and_preserves_active_sibling(self):
         preview = self._preview_type()
         self.assertIsInstance(preview, HistoryCleanupPreviewDTO)

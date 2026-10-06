@@ -10,7 +10,6 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import DEFAULT_DB_ALIAS, IntegrityError
@@ -28,6 +27,7 @@ from extras.models import (
 from extras.services.definition_command_contracts import DefinitionRejectedDTO, DefinitionSuccessDTO
 from extras.services.specifications.contracts import QualifiedIdentity, ResourceRevision
 from organization.services.access_scope import ActorContextDTO, authentication_revision_for_actor
+from organization.services.catalogue_authorization import has_provider_catalogue_permission
 
 _NAMESPACE_RE = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 _FIELD_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
@@ -73,28 +73,10 @@ def reload_actor(actor: ActorContextDTO, *, using: str = DEFAULT_DB_ALIAS):
     return candidate
 
 
-def has_global_model_permission(actor: object, model: type[object], codename: str, *, using: str) -> bool:
-    """Check direct/group model permission without tenant-object aggregation."""
-    if getattr(actor, "is_superuser", False):
-        return True
-    content_type = ContentType.objects.db_manager(using).get_for_model(model)
-    required = Permission.objects.using(using).filter(content_type=content_type, codename=codename).first()
-    if required is None:
-        return False
-    user_permissions = getattr(actor, "user_permissions", None)
-    groups = getattr(actor, "groups", None)
-    return bool(
-        user_permissions is not None
-        and (
-            user_permissions.filter(pk=required.pk).exists()
-            or (groups is not None and groups.filter(permissions__pk=required.pk).exists())
-        )
-    )
-
-
 def authorize_locked(actor: ActorContextDTO, model: type[object], codename: str, *, using: str):
     principal = reload_actor(actor, using=using)
-    if principal is None or not has_global_model_permission(principal, model, codename, using=using):
+    permission = f"{getattr(model, '_meta').app_label}.{codename}"
+    if principal is None or not has_provider_catalogue_permission(principal, permission):
         raise DefinitionCommandError(issue("OBJECT_UNAVAILABLE", message_key="specifications.object_unavailable"))
     return principal
 

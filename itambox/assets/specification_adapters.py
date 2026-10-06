@@ -34,6 +34,7 @@ from assets.services.specifications.contracts import (
     SpecificationPatchDTO,
     StagedImageId,
 )
+from assets.services.specifications.messages import specification_message
 from extras.customfields import is_omitted_optional_single_select
 from extras.models import CustomFieldset
 from organization.services.access_scope import (
@@ -262,7 +263,7 @@ def native_asset_type_create_input(
 
 def command_rejection_message(result: object) -> str:
     if isinstance(result, CommandRejectedDTO):
-        messages = [issue.message_key for issue in result.issues]
+        messages = [specification_message(issue.message_key) for issue in result.issues]
         return "; ".join(messages) or "The specification command was rejected."
     return "The specification command returned an unsupported result."
 

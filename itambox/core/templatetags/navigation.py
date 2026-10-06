@@ -24,7 +24,11 @@ def nav(context):
                 condition = getattr(item, "condition", None)
                 if condition is not None and not condition(user):
                     continue
-                buttons = [button for button in item.buttons if user.has_perms(button.permissions)]
+                buttons = [
+                    button
+                    for button in item.buttons
+                    if user.has_perms(button.permissions) and (button.condition is None or button.condition(user))
+                ]
                 items.append((item, buttons))
             if items:
                 groups.append((group, items))

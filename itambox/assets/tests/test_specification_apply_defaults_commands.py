@@ -5,7 +5,6 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -21,17 +20,27 @@ from assets.services.specifications.contracts import (
     OwnerNoOpDTO,
     SpecificationPatchDTO,
 )
+from core.context import set_current_tenant
 from core.models import ObjectChange
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import grant
 from extras.models import CustomField, CustomFieldset, CustomFieldsetField, Event
+from organization.models import Role, Tenant
 from organization.services.access_scope import ActorContextDTO, authentication_revision_for_actor
 
 User = get_user_model()
 
 
-class SpecificationApplyDefaultsCommandTests(TenantTestMixin, TestCase):
+class SpecificationApplyDefaultsCommandTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="apply-defaults-editor")
+        self.provider = Tenant.objects.create(name="Defaults Provider", slug="defaults-provider", is_provider=True)
+        self.provider_role = Role.objects.create(
+            tenant=self.provider,
+            name="Defaults Editor",
+            permissions=["assets.change_assettype"],
+        )
+        grant(self.user, self.provider, self.provider_role)
+        set_current_tenant(self.provider)
         self.manufacturer = Manufacturer.objects.create(name="Apply maker", slug="apply-maker")
         self.category = Category.objects.create(name="Apply category", slug="apply-category")
         self.first_field = self._field("first_note")
@@ -62,12 +71,9 @@ class SpecificationApplyDefaultsCommandTests(TenantTestMixin, TestCase):
         AssetTypeFieldset.objects.create(asset_type=self.type, fieldset=self.first, position=1)
         CategoryDefaultFieldset.objects.create(category=self.category, fieldset=self.first, position=1)
 
-        self.user.user_permissions.add(
-            Permission.objects.get(
-                content_type=ContentType.objects.get_for_model(AssetType),
-                codename="change_assettype",
-            )
-        )
+    def tearDown(self):
+        set_current_tenant(None)
+        super().tearDown()
 
     def _field(self, name, *, target=AssetType, required=False):
         field = CustomField.objects.create(
@@ -298,7 +304,8 @@ class SpecificationApplyDefaultsCommandTests(TenantTestMixin, TestCase):
         self.assertIsNone(result.safe_owner)
         self.assertEqual(result.issues[0].code, "OBJECT_UNAVAILABLE")
 
-        self.user.user_permissions.clear()
+        self.provider_role.permissions = []
+        self.provider_role.save(update_fields=["permissions"])
         self.user.is_staff = True
         self.user.save(update_fields=["is_staff"])
         denied = apply_category_defaults(

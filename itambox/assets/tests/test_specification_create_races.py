@@ -12,7 +12,6 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.files.storage import FileSystemStorage
 from django.db import close_old_connections, connection, connections, transaction
@@ -49,7 +48,10 @@ from assets.services.specifications.contracts import (
     SpecificationPatchDTO,
 )
 from assets.services.specifications.locking import SPECIFICATION_CATALOGUE_LOCK_KEY, catalogue_transaction_lock
+from core.context import set_current_tenant
+from core.tests.mixins import grant
 from extras.models import CustomField, CustomFieldset, CustomFieldsetField
+from organization.models import Role, Tenant
 from organization.services.access_scope import ActorContextDTO, authentication_revision_for_actor
 
 User = get_user_model()
@@ -73,10 +75,13 @@ def stage_media():
 def create_race_kit():
     assert connection.vendor == "postgresql"
     user = User.objects.create_user(username="create-race-editor")
-    user.user_permissions.add(
-        Permission.objects.get(content_type=ContentType.objects.get_for_model(AssetType), codename="add_assettype"),
-        Permission.objects.get(content_type=ContentType.objects.get_for_model(AssetType), codename="change_assettype"),
+    provider = Tenant.objects.create(name="Create Race Provider", slug="create-race-provider", is_provider=True)
+    role = Role.objects.create(
+        tenant=provider,
+        name="Create Race Editor",
+        permissions=["assets.add_assettype", "assets.change_assettype"],
     )
+    grant(user, provider, role)
     manufacturer = Manufacturer.objects.create(name="Race maker", slug="race-maker")
     category = Category.objects.create(name="Race category", slug="race-category")
     first = CustomFieldset.objects.create(namespace="local", slug="race-first", label="Race first")
@@ -93,7 +98,9 @@ def create_race_kit():
         CustomFieldsetField.objects.create(fieldset=group, custom_field=field, position=1)
     CategoryDefaultFieldset.objects.create(category=category, fieldset=first, position=1)
     actor = ActorContextDTO(actor_id=user.pk, authentication_revision=authentication_revision_for_actor(user))
-    return manufacturer, category, first, second, actor
+    set_current_tenant(provider)
+    yield manufacturer, category, first, second, actor, provider.pk
+    set_current_tenant(None)
 
 
 def _native(manufacturer, category, *, model):
@@ -163,13 +170,14 @@ def _apply(actor, owner, preview):
     )
 
 
-def _start(target):
+def _start(target, provider_id):
     arrived = queue.Queue()
     results, errors = [], []
 
     def worker():
         close_old_connections()
         try:
+            set_current_tenant(Tenant._base_manager.get(pk=provider_id))
             with connection.cursor() as cursor:
                 cursor.execute("SELECT pg_backend_pid()")
                 arrived.put(cursor.fetchone()[0])
@@ -177,6 +185,7 @@ def _start(target):
         except Exception as error:
             errors.append(error)
         finally:
+            set_current_tenant(None)
             connections["default"].close()
 
     thread = threading.Thread(target=worker)
@@ -246,7 +255,7 @@ def _finish(started):
 
 
 def test_two_concurrent_creates_consume_category_defaults_serially(create_race_kit):
-    manufacturer, category, first, _second, actor = create_race_kit
+    manufacturer, category, first, _second, actor, provider_id = create_race_kit
     native_a = _native(manufacturer, category, model="Race model A")
     native_b = _native(manufacturer, category, model="Race model B")
     preview_a = _create_preview(actor, native_a)
@@ -260,7 +269,7 @@ def test_two_concurrent_creates_consume_category_defaults_serially(create_race_k
         with transaction.atomic():
             result_a = _create(actor, native_a, preview_a)
             assert isinstance(result_a, OwnerCreatedDTO)
-            started = _start(lambda: _create(actor, native_b, preview_b))
+            started = _start(lambda: _create(actor, native_b, preview_b), provider_id)
             _assert_waiting(started[1])
     finally:
         if started is not None:
@@ -275,7 +284,7 @@ def test_two_concurrent_creates_consume_category_defaults_serially(create_race_k
 
 @pytest.mark.parametrize("defaults_changed", [False, True])
 def test_concurrent_create_and_category_defaults_change_serialize(create_race_kit, defaults_changed):
-    manufacturer, category, first, second, actor = create_race_kit
+    manufacturer, category, first, second, actor, provider_id = create_race_kit
     native = _native(manufacturer, category, model="Race model")
     preview = _create_preview(actor, native)
 
@@ -284,7 +293,7 @@ def test_concurrent_create_and_category_defaults_change_serialize(create_race_ki
         with transaction.atomic(), catalogue_transaction_lock(exclusive=True):
             if defaults_changed:
                 CategoryDefaultFieldset.objects.create(category=category, fieldset=second, position=2)
-            started = _start(lambda: _create(actor, native, preview))
+            started = _start(lambda: _create(actor, native, preview), provider_id)
             _assert_waiting(started[1])
     finally:
         if started is not None:
@@ -301,7 +310,7 @@ def test_concurrent_create_and_category_defaults_change_serialize(create_race_ki
 
 
 def test_concurrent_apply_defaults_and_composition_change_one_winner(create_race_kit):
-    manufacturer, category, first, second, actor = create_race_kit
+    manufacturer, category, first, second, actor, provider_id = create_race_kit
     owner = AssetType.objects.create(
         manufacturer=manufacturer,
         model="Race apply type",
@@ -315,7 +324,7 @@ def test_concurrent_apply_defaults_and_composition_change_one_winner(create_race
     try:
         with transaction.atomic(), catalogue_transaction_lock(exclusive=True):
             AssetTypeFieldset.objects.create(asset_type=owner, fieldset=second, position=2)
-            started = _start(lambda: _apply(actor, owner, preview))
+            started = _start(lambda: _apply(actor, owner, preview), provider_id)
             _assert_waiting(started[1])
     finally:
         if started is not None:
@@ -352,7 +361,7 @@ def _staged_native(manufacturer, category, *, model, staged_image_id):
 
 
 def test_two_concurrent_creates_serialize_single_stage_consume(create_race_kit, stage_media):
-    manufacturer, category, first, _second, actor = create_race_kit
+    manufacturer, category, first, _second, actor, provider_id = create_race_kit
     stage_id = ingest_staged_image(
         actor=actor, command_kind=CREATE_COMMAND_KIND, content=_TINY_PNG, original_name="race.png"
     )
@@ -365,7 +374,7 @@ def test_two_concurrent_creates_serialize_single_stage_consume(create_race_kit, 
         with transaction.atomic(), catalogue_transaction_lock(exclusive=True):
             result_a = _create(actor, native, preview)
             assert isinstance(result_a, OwnerCreatedDTO)
-            started = _start(lambda: _create(actor, native, preview))
+            started = _start(lambda: _create(actor, native, preview), provider_id)
             _assert_waiting(started[1])
     finally:
         if started is not None:
@@ -381,7 +390,7 @@ def test_two_concurrent_creates_serialize_single_stage_consume(create_race_kit, 
 
 
 def test_cleanup_vs_consume_serialize_on_stage_row_lock(create_race_kit, stage_media):
-    manufacturer, _category, _first, _second, actor = create_race_kit
+    manufacturer, _category, _first, _second, actor, provider_id = create_race_kit
     stage_id = ingest_staged_image(
         actor=actor, command_kind=CREATE_COMMAND_KIND, content=_TINY_PNG, original_name="race.png"
     )
@@ -397,7 +406,7 @@ def test_cleanup_vs_consume_serialize_on_stage_row_lock(create_race_kit, stage_m
             row = lock_stage_for_consume(stage_id, actor, CREATE_COMMAND_KIND)
             assert row is not None
             consume_stage(row, owner.pk)
-            started = _start(lambda: cleanup_expired_stages(now=timezone.now() + timedelta(hours=2)))
+            started = _start(lambda: cleanup_expired_stages(now=timezone.now() + timedelta(hours=2)), provider_id)
             _assert_row_wait(started[1])
     finally:
         if started is not None:
@@ -411,7 +420,7 @@ def test_cleanup_vs_consume_serialize_on_stage_row_lock(create_race_kit, stage_m
 
 
 def test_cleanup_discards_expired_stage_before_create_rejects_it(create_race_kit, stage_media):
-    manufacturer, category, _first, _second, actor = create_race_kit
+    manufacturer, category, _first, _second, actor, provider_id = create_race_kit
     stage_id = ingest_staged_image(
         actor=actor,
         command_kind=CREATE_COMMAND_KIND,

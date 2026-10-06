@@ -19,6 +19,9 @@ msgstr ""
 msgid "Assets"
 msgstr "Assets"
 
+msgid "You cannot perform this operation. Check your role permissions in the active provider tenant."
+msgstr "Du kannst diesen Vorgang nicht ausführen. Prüfe deine Rollenberechtigungen im aktiven Provider-Mandanten."
+
 msgid "The regular expression is invalid."
 msgstr "Der reguläre Ausdruck ist ungültig."
 

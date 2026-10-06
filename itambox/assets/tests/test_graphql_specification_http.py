@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.utils import timezone
@@ -38,6 +37,8 @@ class GraphQLSpecificationHTTPTests(TestCase):
 
     def setUp(self):
         graphql_fixtures.GraphQLTestCase.setUp(self)
+        self.tenant_a.is_provider = True
+        self.tenant_a.save(update_fields=["is_provider"])
         self._grant_specification_permissions()
         self.specification_field = CustomField.objects.create(
             namespace="graphql",
@@ -95,10 +96,7 @@ class GraphQLSpecificationHTTPTests(TestCase):
             "extras.add_customfieldset",
             "extras.change_customfieldset",
         }
-        self.role_admin_a.permissions = sorted(set(self.role_admin_a.permissions) | role_permissions)
-        self.role_admin_a.save(update_fields=["permissions"])
-
-        for model in (
+        models = (
             AssetType,
             Category,
             CustomField,
@@ -107,22 +105,14 @@ class GraphQLSpecificationHTTPTests(TestCase):
             CustomFieldset,
             Manufacturer,
             SpecificationLibrary,
-        ):
-            content_type = ContentType.objects.get_for_model(model)
-            codenames = [f"{action}_{model._meta.model_name}" for action in ("add", "change", "view")]
-            self.staff_a.user_permissions.add(
-                *Permission.objects.filter(content_type=content_type, codename__in=codenames)
-            )
-
-        library_content_type = ContentType.objects.get_for_model(SpecificationLibrary)
-        manage_permission = Permission.objects.get(
-            content_type=library_content_type,
-            codename="manage_specification_library",
         )
-        self.staff_a.user_permissions.add(manage_permission)
-        # HTTP token authentication establishes the request's tenant context.
-        # An ambient has_perm() check here is not that authorization boundary.
-        self.assertTrue(self.staff_a.user_permissions.filter(pk=manage_permission.pk).exists())
+        role_permissions.update(
+            f"{model._meta.app_label}.{action}_{model._meta.model_name}"
+            for model in models
+            for action in ("add", "change", "view")
+        )
+        self.role_admin_a.permissions = sorted(set(self.role_admin_a.permissions) | role_permissions)
+        self.role_admin_a.save(update_fields=["permissions"])
 
     def test_library_export_acknowledgement_schema_contract(self):
         from core.schema import schema
