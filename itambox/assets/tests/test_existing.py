@@ -16,6 +16,7 @@ from model_bakery import baker
 from assets.forms.asset_form import AssetForm
 from assets.models import (
     Asset,
+    AssetAssignment,
     AssetMaintenance,
     AssetRequest,
     AssetRole,
@@ -27,6 +28,7 @@ from assets.models import (
     StatusLabel,
     Supplier,
 )
+from assets.services import checkout_asset
 from compliance.models import CustodyReceipt
 from core.managers import set_current_tenant
 from core.models import ObjectChange
@@ -506,9 +508,14 @@ class ComponentTrackingTestCase(TransactionTestCase):
             user=self.user,
         )
 
+        deployed = StatusLabel.objects.get(slug="in-use")
+        checkout_asset(self.asset, holder=holder, user=self.user, status=deployed)
+        assignment = AssetAssignment.objects.get(asset=self.asset, is_active=True)
+
         receipt = CustodyReceipt.objects.create(
             asset=self.asset,
             holder=holder,
+            assignment=assignment,
         )
         token = receipt.token
 
@@ -549,9 +556,14 @@ class ComponentTrackingTestCase(TransactionTestCase):
             user=self.user,
         )
 
+        deployed = StatusLabel.objects.get(slug="in-use")
+        checkout_asset(self.asset, holder=holder, user=self.user, status=deployed)
+        assignment = AssetAssignment.objects.get(asset=self.asset, is_active=True)
+
         receipt = CustodyReceipt.objects.create(
             asset=self.asset,
             holder=holder,
+            assignment=assignment,
         )
 
         sign_url = reverse("compliance:custody_eula_sign", kwargs={"token": receipt.token})
