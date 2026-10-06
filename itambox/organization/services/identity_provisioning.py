@@ -551,7 +551,8 @@ def _create_holder(
     return holder
 
 
-def _link_or_create_holder(
+@transaction.atomic
+def link_or_create_holder(
     *,
     user: User,
     tenant_id: int,
@@ -559,9 +560,16 @@ def _link_or_create_holder(
     email: str,
     first_name: str,
     last_name: str,
-    candidates: list[AssetHolder],
+    candidates: list[AssetHolder] | None = None,
     source: str,
 ) -> AssetHolder | None:
+    """Apply the shared exact-identity holder policy.
+
+    Callers with an existing aggregate lock plan may pass its locked candidates;
+    standalone callers load and lock the same user/UPN/email candidate set here.
+    """
+    if candidates is None:
+        candidates = _holder_candidates(user_id=user.pk, tenant_id=tenant_id, upn=upn, email=email)
     candidate = _select_holder_candidate(
         user=user,
         tenant_id=tenant_id,
@@ -1039,7 +1047,7 @@ def _provision_customer(
         if scope.role_grant_id in customer_grant_ids
     ]
 
-    holder = _link_or_create_holder(
+    holder = link_or_create_holder(
         user=locked_user,
         tenant_id=customer_id,
         upn=upn,
