@@ -349,7 +349,7 @@ class TenantIsolationTests(TenantTestMixin, TestCase):
 
 
 class SoftwareReconcileMethodTests(TenantTestMixin, TestCase):
-    """Test the Software.reconcile() convenience method."""
+    """Test reconcile_software() on a freshly created software record."""
 
     def setUp(self):
         self.setup_tenant_context(name="Method Test", slug="method-test")
@@ -361,7 +361,7 @@ class SoftwareReconcileMethodTests(TenantTestMixin, TestCase):
             asset = _make_asset(self.tenant)
             _make_install(sw, asset)
 
-            result = sw.reconcile()
+            result = reconcile_software(sw)
 
         self.assertEqual(result["software_id"], sw.pk)
         self.assertEqual(result["installed_count"], 1)
@@ -369,16 +369,16 @@ class SoftwareReconcileMethodTests(TenantTestMixin, TestCase):
         self.assertTrue(result["compliant"])
 
     def test_reconcile_method_reflects_current_state(self):
-        """Calling reconcile() twice returns fresh data, not a cached snapshot."""
+        """Calling reconcile_software() twice returns fresh data, not a cached snapshot."""
         with self.tenant_context(self.tenant):
             sw = _make_software(tenant=self.tenant, name="FreshApp")
             _make_license(sw, self.tenant, seats=3)
 
-            result_before = sw.reconcile()
+            result_before = reconcile_software(sw)
             self.assertEqual(result_before["installed_count"], 0)
 
             asset = _make_asset(self.tenant)
             _make_install(sw, asset)
 
-            result_after = sw.reconcile()
+            result_after = reconcile_software(sw)
             self.assertEqual(result_after["installed_count"], 1)

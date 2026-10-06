@@ -39,7 +39,7 @@ def _manifest(*, layout="transitional"):
         "post_transition_leaf_ids": ["assets.0102_next"],
         "current_leaf_ids": ["assets.0102_next"],
         "transition_release_sha": "b" * 40,
-        "supported_predecessors": [
+        "recognized_states": [
             {
                 "name": "test-pre-squash",
                 "revision": "b" * 40,
@@ -341,7 +341,7 @@ class MigrationBaselineManifestTests(SimpleTestCase):
 
     def test_checked_manifest_declares_the_measured_predecessor_recognition_shapes(self):
         manifest = load_manifest()
-        pre_squash, transition = manifest["supported_predecessors"]
+        pre_squash, transition = manifest["recognized_states"]
 
         self.assertEqual(pre_squash["name"], "issue88-pre-squash")
         self.assertEqual(pre_squash["recognition"]["state"], "supported-predecessor-pre-squash")
@@ -398,47 +398,45 @@ class MigrationBaselineManifestTests(SimpleTestCase):
                 lambda m: m.update(layout="normalized", baseline_ids=["assets.0100_other", "assets.9999_base"]),
             ),
             ("transition_sha", lambda m: m.update(transition_release_sha="z" * 40)),
-            ("no_predecessors", lambda m: m.update(supported_predecessors=[])),
-            ("predecessor_type", lambda m: m.update(supported_predecessors=["bad"])),
-            ("predecessor_name", lambda m: m.update(supported_predecessors=[{"revision": "b" * 40, "state": "old"}])),
+            ("no_predecessors", lambda m: m.update(recognized_states=[])),
+            ("predecessor_type", lambda m: m.update(recognized_states=["bad"])),
+            ("predecessor_name", lambda m: m.update(recognized_states=[{"revision": "b" * 40, "state": "old"}])),
             (
                 "predecessor_revision",
-                lambda m: m.update(supported_predecessors=[{"name": "old", "revision": "bad", "state": "old"}]),
+                lambda m: m.update(recognized_states=[{"name": "old", "revision": "bad", "state": "old"}]),
             ),
             (
                 "predecessor_state",
-                lambda m: m.update(
-                    supported_predecessors=[{"name": "old", "revision": "b" * 40, "state": "unrecognized"}]
-                ),
+                lambda m: m.update(recognized_states=[{"name": "old", "revision": "b" * 40, "state": "unrecognized"}]),
             ),
             (
                 "transition_predecessor",
-                lambda m: m.update(supported_predecessors=[{"name": "old", "revision": "a" * 40, "state": "old"}]),
+                lambda m: m.update(recognized_states=[{"name": "old", "revision": "a" * 40, "state": "old"}]),
             ),
-            ("predecessor_recognition_missing", lambda m: m["supported_predecessors"][0].pop("recognition")),
+            ("predecessor_recognition_missing", lambda m: m["recognized_states"][0].pop("recognition")),
             (
                 "predecessor_recognition_state",
-                lambda m: m["supported_predecessors"][0]["recognition"].update(state="not-a-recognition-state"),
+                lambda m: m["recognized_states"][0]["recognition"].update(state="not-a-recognition-state"),
             ),
             (
                 "predecessor_recognition_duplicate",
-                lambda m: m["supported_predecessors"][1]["recognition"].update(
-                    state=m["supported_predecessors"][0]["recognition"]["state"]
+                lambda m: m["recognized_states"][1]["recognition"].update(
+                    state=m["recognized_states"][0]["recognition"]["state"]
                 ),
             ),
             (
                 "predecessor_recognition_replacement",
-                lambda m: m["supported_predecessors"][0]["recognition"].update(replacement="partial"),
+                lambda m: m["recognized_states"][0]["recognition"].update(replacement="partial"),
             ),
             (
                 "predecessor_recognition_post_ids",
-                lambda m: m["supported_predecessors"][0]["recognition"].update(
+                lambda m: m["recognized_states"][0]["recognition"].update(
                     post_transition_ids=["assets.9999_unmanifested"]
                 ),
             ),
             (
                 "predecessor_recognition_post_duplicate",
-                lambda m: m["supported_predecessors"][1]["recognition"].update(
+                lambda m: m["recognized_states"][1]["recognition"].update(
                     post_transition_ids=["assets.0101_current", "assets.0101_current"]
                 ),
             ),

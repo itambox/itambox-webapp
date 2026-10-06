@@ -28,6 +28,7 @@ from itambox.views.generic.utils import safe_return_url
 
 from . import filters, forms, tables
 from .models import Subscription, SubscriptionAssignment
+from .seat_services import count_assigned_seats
 
 
 def _lifecycle_error_response(request, error):
@@ -66,10 +67,8 @@ class SubscriptionDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         subscription = self.get_object()
 
-        # Resolve seat usage once for the detail template. The template displays it
-        # in both assigned and available values, so passing primitives prevents the
-        # seat usage hook from being evaluated twice.
-        assigned_seats = subscription.assigned_seats
+        # Resolve seat usage once: the template shows it as both assigned and available values.
+        assigned_seats = count_assigned_seats(subscription)
         total_seats = subscription.total_seats
         context["assigned_seats"] = assigned_seats
         context["total_seats"] = total_seats
