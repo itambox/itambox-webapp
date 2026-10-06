@@ -98,7 +98,6 @@ class ManagementCommandsTestCase(TransactionTestCase):
             "migration_baseline_preflight",
             "plugins",
             "validate_role_permissions",
-            "verify_issue445_task_cutover",
         }
         available_commands = get_commands()
         self.assertTrue((mutating_commands | read_only_commands).issubset(available_commands))

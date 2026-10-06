@@ -2,6 +2,7 @@ import datetime
 import json
 
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -9,6 +10,7 @@ from django.utils import timezone
 from assets.choices import RequestStatusChoices
 from assets.models import AssetRequest, AssetType, Manufacturer, StatusLabel, Supplier
 from core.currency import CURRENCY_CHOICES
+from core.models import ObjectChange
 from core.tasks.context import TaskContext
 from inventory.models import Accessory, AccessoryStock, Consumable, ConsumableStock
 from licenses.models import License
@@ -464,12 +466,14 @@ class ProcurementStatusTransitionTests(TestCase):
             qty=2,
             status=RequestStatusChoices.PROCUREMENT,
         )
-        FulfillmentLink.objects.create(
+        link = FulfillmentLink.objects.create(
             tenant=self.tenant,
             asset_request=request,
             purchase_order_line=line,
             qty_allocated=2,
         )
+        line_id = line.pk
+        link_id = link.pk
 
         # Cancel the PO
         from procurement.services import cancel_purchase_order
@@ -482,6 +486,17 @@ class ProcurementStatusTransitionTests(TestCase):
         self.assertEqual(self.po.status, PurchaseOrder.STATUS_CANCELLED)
         self.assertEqual(request.status, RequestStatusChoices.APPROVED)
         self.assertFalse(FulfillmentLink.objects.filter(purchase_order_line=line).exists())
+        for model, object_id in ((PurchaseOrderLine, line_id), (FulfillmentLink, link_id)):
+            with self.subTest(model=model.__name__):
+                self.assertTrue(
+                    ObjectChange._base_manager.filter(
+                        changed_object_type=ContentType.objects.get_for_model(model),
+                        changed_object_id=object_id,
+                        action="delete",
+                        request_id__isnull=False,
+                    ).exists(),
+                    f"{model.__name__} cascade delete was not attributed to an execution context",
+                )
 
     def test_reopen_cancelled_purchase_order(self):
         from procurement.services import cancel_purchase_order, reopen_purchase_order
