@@ -1,6 +1,6 @@
 from django.apps import apps
 from django.core.exceptions import ValidationError
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 from django.db import IntegrityError, connection, transaction
 
 from core.auth.oidc import (
@@ -11,6 +11,7 @@ from core.auth.oidc import (
 from core.auth.providers import _config_mapping, _resolve_oidc_setting, is_usable_oidc_config
 from core.oidc_identity import oidc_sensitive_audit, validate_oidc_identity
 from core.tasks.context import TaskContext
+from core.tasks.management import SystemTaskCommand
 
 
 def configured_oidc_issuers() -> set[str]:
@@ -48,7 +49,7 @@ def validate_oidc_identity_input(issuer: object, subject: object) -> tuple[str, 
     return validated_issuer, validated_subject
 
 
-class Command(BaseCommand):
+class Command(SystemTaskCommand):
     help = "Bind one exact configured OIDC identity to an internal User."
 
     def add_arguments(self, parser):

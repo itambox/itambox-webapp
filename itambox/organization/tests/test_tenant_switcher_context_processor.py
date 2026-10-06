@@ -9,6 +9,7 @@ from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from django.utils.functional import SimpleLazyObject
 
+from core.tasks.context import TaskContext
 from core.tests.mixins import grant
 from organization.models import Role, RoleGrant, RoleGrantScope, Tenant, TenantGroup
 from organization.views.context_processors import tenant_switcher_processor
@@ -98,7 +99,8 @@ class TenantSwitcherContextProcessorTests(TestCase):
         for tenant in (provider, direct, deleted):
             role = Role.objects.create(tenant=tenant, name=f"Own Role {tenant.pk}", permissions=[])
             grant(user, tenant, role)
-        deleted.delete()
+        with TaskContext(operation="test.tenant_switcher.soft_delete_tenant"):
+            deleted.delete()
         inactive_role = Role.objects.create(tenant=inactive, name="Inactive Role", permissions=[])
         inactive_grant = grant(user, inactive, inactive_role)
         inactive_grant.membership.is_active = False

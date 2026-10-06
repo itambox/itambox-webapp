@@ -2892,14 +2892,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/mixins.py",
-      "code": "C901",
-      "message": "'SoftDeleteMixin.delete' is too complex (13)",
-      "source": "    def delete(self, *args, force_hard_delete=False, **kwargs):",
-      "context": "Module:body/ClassDef:SoftDeleteMixin:body/FunctionDef:delete:self",
-      "count": 1
-    },
-    {
       "path": "itambox/core/models.py",
       "code": "C901",
       "message": "'ChangeLoggingMixin._log_change' is too complex (11)",

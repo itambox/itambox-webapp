@@ -5,6 +5,8 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.choices import RequestStatusChoices
 from assets.models import Asset, AssetRequest, StatusLabel
+from core.context import get_current_request_id
+from core.tasks.context import TaskContext
 from inventory.models import AccessoryStock, ComponentStock, ConsumableStock
 from procurement.models import FulfillmentLink, PurchaseOrder, PurchaseOrderLine
 
@@ -542,6 +544,14 @@ def order_purchase_order(po, user=None, request=None):
 
 @transaction.atomic
 def cancel_purchase_order(po, user=None, request=None):
+    """Transition the PO, supplying system audit attribution for non-request callers."""
+    if get_current_request_id() is not None:
+        return _cancel_purchase_order(po)
+    with TaskContext(operation="procurement.purchase_order.cancel"):
+        return _cancel_purchase_order(po)
+
+
+def _cancel_purchase_order(po):
     """Transition PO from draft, approved, or ordered to cancelled status."""
     po = _lock_purchase_order(po)
     _validate_purchase_order_transition(po, "cancel")

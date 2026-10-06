@@ -9,6 +9,7 @@ from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 
 from core.navigation.menu import _msp_layer_active, _user_provider_tenants
+from core.tasks.context import TaskContext
 from core.templatetags.navigation import nav
 from core.tests.mixins import grant
 from organization.models import Role, Tenant
@@ -58,7 +59,8 @@ class TenantNavigationTests(TestCase):
         for tenant in (provider, ordinary, deleted_provider):
             role = Role.objects.create(tenant=tenant, name=f"Role {tenant.pk}", permissions=[])
             grant(user, tenant, role)
-        deleted_provider.delete()
+        with TaskContext(operation="test.navigation_tenancy.soft_delete_provider"):
+            deleted_provider.delete()
 
         self.assertEqual(_user_provider_tenants(user), [provider])
 
