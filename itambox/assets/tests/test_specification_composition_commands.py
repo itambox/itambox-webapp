@@ -143,6 +143,10 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
             authentication_revision=authentication_revision_for_actor(self.user),
         )
 
+    def _asset_snapshot(self):
+        with self.tenant_context(self.tenant):
+            return Asset.all_objects.filter(pk=self.asset.pk).values().get()
+
     def _type_plan(self, fieldsets=None):
         owner = AssetType.all_objects.get(pk=self.type.pk)
         if fieldsets is not None:
@@ -684,7 +688,7 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
 
     def test_type_success_is_once_only_actor_attributed_and_never_propagates_to_asset(self):
         resource_revision, definition_revision = self._type_plan((self.required,))
-        before_asset = Asset.all_objects.filter(pk=self.asset.pk).values().get()
+        before_asset = self._asset_snapshot()
         before_audit = self._changes(AssetType, self.type.pk).count()
         queries = []
 
@@ -702,7 +706,7 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
                 patch=SpecificationPatchDTO(set_values={"required_note": "present"}, clear_keys=()),
             )
         self.assertIsInstance(result, OwnerChangedDTO)
-        self.assertEqual(Asset.all_objects.filter(pk=self.asset.pk).values().get(), before_asset)
+        self.assertEqual(self._asset_snapshot(), before_asset)
         self.assertEqual(self._changes(AssetType, self.type.pk).count(), before_audit + 1)
         self.assertEqual(self._changes(AssetType, self.type.pk).latest("pk").user_id, self.user.pk)
         self.assertEqual(sum(sql.startswith('UPDATE "assets_assettype"') for sql in queries), 1)
@@ -719,7 +723,7 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
 
     def test_category_explicit_empty_is_actor_attributed_and_does_not_propagate(self):
         before_type = AssetType.all_objects.filter(pk=self.type.pk).values().get()
-        before_asset = Asset.all_objects.filter(pk=self.asset.pk).values().get()
+        before_asset = self._asset_snapshot()
         before_memberships = list(self.type.fieldset_memberships.values())
         before_audit = self._changes(Category, self.category.pk).count()
         result = set_category_defaults(
@@ -731,7 +735,7 @@ class SpecificationCompositionCommandTests(TenantTestMixin, TestCase):
         self.assertIsInstance(result, OwnerChangedDTO)
         self.assertFalse(CategoryDefaultFieldset.objects.filter(category=self.category).exists())
         self.assertEqual(AssetType.all_objects.filter(pk=self.type.pk).values().get(), before_type)
-        self.assertEqual(Asset.all_objects.filter(pk=self.asset.pk).values().get(), before_asset)
+        self.assertEqual(self._asset_snapshot(), before_asset)
         self.assertEqual(list(self.type.fieldset_memberships.values()), before_memberships)
         self.assertEqual(self._changes(Category, self.category.pk).count(), before_audit + 1)
         self.assertEqual(self._changes(Category, self.category.pk).latest("pk").user_id, self.user.pk)
