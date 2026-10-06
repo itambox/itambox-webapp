@@ -1789,6 +1789,46 @@
     },
     {
       "dependencies": [
+        "compliance.0105_custodyhandoffdelivery",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "compliance.0106_remove_custodyreceipt_accepted",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/compliance/migrations/0106_remove_custodyreceipt_accepted.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "contenttypes.0002_remove_content_type_name",
         "organization.0100_issue88_shard_07_organization_history_1"
       ],
@@ -4629,6 +4669,48 @@
     },
     {
       "dependencies": [
+        "assets.0121_supplier_scoping_and_commercial_fields",
+        "organization.0103_tenant_resource_grant_expiry",
+        "procurement.0102_fulfillmentlink_qty_received",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "procurement.0103_remove_fulfillmentlink_unique_request_po_line_link_and_more",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/procurement/migrations/0103_remove_fulfillmentlink_unique_request_po_line_link_and_more.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "core.0100_issue88_shard_08_core_schema"
       ],
       "id": "software.0100_issue88_shard_09_software_schema",
@@ -5465,6 +5547,7 @@
     "compliance.0103_alter_custodyreceipt_options",
     "compliance.0104_custodysigningsession",
     "compliance.0105_custodyhandoffdelivery",
+    "compliance.0106_remove_custodyreceipt_accepted",
     "extras.0101_issue88_drop_legacy_webhook_name_like",
     "extras.0102_alter_event_action",
     "extras.0103_remove_reporttemplate_advanced_mode_and_more",
@@ -5494,6 +5577,7 @@
     "organization.0103_tenant_resource_grant_expiry",
     "procurement.0101_alter_purchaseorder_options",
     "procurement.0102_fulfillmentlink_qty_received",
+    "procurement.0103_remove_fulfillmentlink_unique_request_po_line_link_and_more",
     "subscriptions.0101_remove_subscription_auto_renewal_and_more",
     "subscriptions.0102_commercial_vendor_and_terms",
     "subscriptions.0103_unified_vendor_cutover",
@@ -5572,7 +5656,7 @@
     "global_roots": [],
     "missing_replacement_targets": 0,
     "per_app_local_roots_and_leaves": {},
-    "post_transition_migrations": 51,
+    "post_transition_migrations": 53,
     "replacement_shards": 62,
     "replacement_targets": 262
   }
