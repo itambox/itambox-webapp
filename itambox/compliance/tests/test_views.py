@@ -6,6 +6,7 @@ from django.urls import reverse
 from model_bakery import baker
 
 from assets.models import Asset, AssetAssignment, AssetMaintenance, AssetTagSequence, Supplier
+from assets.services import checkout_asset
 from organization.models import AssetHolder, Tenant
 
 from ..models import CustodyReceipt
@@ -117,7 +118,9 @@ class CustodyReceiptViewTests(TestCase):
         self.recipient = baker.make(User, username="recipient@example.test", email="recipient@example.test")
         self.tenant = baker.make(Tenant, name="Recipient Tenant")
         baker.make(AssetTagSequence, tenant=self.tenant, category=None, prefix="CUST-")
-        self.asset = baker.make(Asset, name="LT-02", asset_tag="TAG-LT-02", tenant=self.tenant)
+        deployable = baker.make("assets.StatusLabel", type="deployable", name="Receipt Deployable")
+        deployed = baker.make("assets.StatusLabel", type="deployed", name="Receipt Deployed")
+        self.asset = baker.make(Asset, name="LT-02", asset_tag="TAG-LT-02", tenant=self.tenant, status=deployable)
         self.holder = baker.make(
             AssetHolder,
             first_name="Evelyn",
@@ -127,7 +130,8 @@ class CustodyReceiptViewTests(TestCase):
             user=self.recipient,
             tenant=self.tenant,
         )
-        self.assignment = AssetAssignment.objects.create(asset=self.asset, assigned_user=self.holder, is_active=True)
+        checkout_asset(self.asset, holder=self.holder, status=deployed, _suppress_custody_receipt=True)
+        self.assignment = AssetAssignment.objects.get(asset=self.asset, is_active=True)
         self.receipt = baker.make(
             CustodyReceipt,
             asset=self.asset,

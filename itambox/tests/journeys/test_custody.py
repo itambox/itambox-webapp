@@ -29,7 +29,9 @@ class CustodyReceiptJourneyTests(JourneyMixin, TestCase):
             eula_text="journey eula",
         )
         asset_type = baker.make("assets.AssetType", model="JourneyBook", slug="journey-book", category=category)
-        self.asset = self.make_asset(asset_type=asset_type, asset_tag="JOURNEY-CUSTODY-1")
+        deployable = baker.make("assets.StatusLabel", type="deployable", name="Journey Deployable")
+        baker.make("assets.StatusLabel", type="deployed", name="Journey Deployed")
+        self.asset = self.make_asset(asset_type=asset_type, asset_tag="JOURNEY-CUSTODY-1", status=deployable)
 
     def _sign(self, receipt, **client_kwargs):
         url = reverse("compliance:custody_eula_sign", kwargs={"token": receipt.token})

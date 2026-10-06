@@ -24,7 +24,8 @@ from django.utils import timezone
 from model_bakery import baker
 from rest_framework.test import APITestCase
 
-from assets.models import Asset, AssetAssignment
+from assets.models import Asset, AssetAssignment, StatusLabel
+from assets.services import checkout_asset
 from compliance.models import CustodyHandoffDelivery, CustodyReceipt, CustodySigningSession, CustodyTemplate
 from compliance.services import _custody_handoff_email_content
 from compliance.views import CustodyReceiptPrepareView
@@ -125,17 +126,21 @@ class CustodyRBACFixtureMixin(TenantTestMixin):
             tenant=self.tenant_b,
         )
 
+        deployable = baker.make(StatusLabel, type="deployable", name="Custody Deployable")
+        deployed = baker.make(StatusLabel, type="deployed", name="Custody Deployed")
         self.asset_a = baker.make(
             Asset,
             name="Dummy Custody Asset A",
             asset_tag="DUMMY-CUSTODY-ASSET-A",
             tenant=self.tenant_a,
+            status=deployable,
         )
         self.asset_b = baker.make(
             Asset,
             name="Dummy Custody Asset B",
             asset_tag="DUMMY-CUSTODY-ASSET-B",
             tenant=self.tenant_b,
+            status=deployable,
         )
         self.template_a = CustodyTemplate.objects.create(
             name="Dummy Custody Template A",
@@ -147,12 +152,10 @@ class CustodyRBACFixtureMixin(TenantTestMixin):
             tenant=self.tenant_b,
             eula_text=DUMMY_EULA,
         )
-        self.assignment_a = AssetAssignment.objects.create(
-            asset=self.asset_a, assigned_user=self.recipient_holder, is_active=True
-        )
-        self.assignment_b = AssetAssignment.objects.create(
-            asset=self.asset_b, assigned_user=self.cross_holder, is_active=True
-        )
+        checkout_asset(self.asset_a, holder=self.recipient_holder, status=deployed, _suppress_custody_receipt=True)
+        checkout_asset(self.asset_b, holder=self.cross_holder, status=deployed, _suppress_custody_receipt=True)
+        self.assignment_a = AssetAssignment.objects.get(asset=self.asset_a, is_active=True)
+        self.assignment_b = AssetAssignment.objects.get(asset=self.asset_b, is_active=True)
         self.receipt_a = CustodyReceipt.objects.create(
             asset=self.asset_a,
             assignment=self.assignment_a,

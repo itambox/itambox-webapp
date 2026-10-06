@@ -451,11 +451,16 @@ def _process_custody_post(request, token, receipt, signing_session=None):
                 tenant_id=asset.tenant_id,
             )
         )
-        asset._changelog_action = "audit"
-        asset._changelog_message = f"EULA digital custody receipt accepted. SHA-256 Hash: {verification_hash[:16]}..."
-        # Narrow save: never re-runs tag allocation and cannot write back a stale
-        # copy of the asset row loaded earlier in the request.
-        asset.save(update_fields=["updated_at"])
+        # Journal-style audit write: no asset save, so tag allocation and model
+        # validation never re-run and a stale in-request copy of the asset row can
+        # never overwrite concurrent edits.
+        asset_state = asset._serialize_for_change(asset)
+        asset._log_change(
+            action="audit",
+            prechange_data=asset_state,
+            postchange_data=asset_state,
+            message=f"EULA digital custody receipt accepted. SHA-256 Hash: {verification_hash[:16]}...",
+        )
         return render(
             request,
             "compliance/custody/receipt_success.html",
