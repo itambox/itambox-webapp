@@ -9,6 +9,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
+from django.test import SimpleTestCase
 from django.test import TestCase as DjangoTestCase
 from django.utils import timezone
 
@@ -50,7 +51,7 @@ User = get_user_model()
 _HISTORY_KEYS = ("inactive_history", "deprecated_history", "deprecated_choice_history")
 
 
-class HistoryBoundaryFixtureMixin(DjangoTestCase):
+class HistoryBoundaryFixtureMixin(SimpleTestCase):
     def setUp(self):
         super().setUp()
         self.tenant = Tenant.objects.create(
@@ -281,7 +282,7 @@ class HistoryBoundaryFixtureMixin(DjangoTestCase):
         )
 
 
-class SpecificationHistoryBoundaryTests(HistoryBoundaryFixtureMixin):
+class SpecificationHistoryBoundaryTests(HistoryBoundaryFixtureMixin, DjangoTestCase):
     def test_type_cleanup_accepts_all_historical_projection_reasons_and_preserves_active_sibling(self):
         preview = self._preview_type()
         self.assertIsInstance(preview, HistoryCleanupPreviewDTO)
