@@ -28,6 +28,7 @@ from subscriptions.models import (
     SubscriptionStatusChoices,
     SubscriptionTypeChoices,
 )
+from subscriptions.seat_services import count_assigned_seats
 
 User = get_user_model()
 
@@ -45,13 +46,13 @@ class SubscriptionSeatRollupTests(TestCase):
         baker.make(License, software=software, subscription=None, seats=99, tenant=None)
 
         self.assertEqual(sub.total_seats, 15)
-        self.assertEqual(sub.assigned_seats, 0)
-        self.assertEqual(sub.available_seats, 15)
+        self.assertEqual(count_assigned_seats(sub), 0)
+        self.assertEqual(max(0, sub.total_seats - count_assigned_seats(sub)), 15)
 
         holder = baker.make(AssetHolder, tenant=None)
         baker.make(LicenseSeatAssignment, license=l2, assigned_holder=holder, asset=None)
-        self.assertEqual(sub.assigned_seats, 1)
-        self.assertEqual(sub.available_seats, 14)
+        self.assertEqual(count_assigned_seats(sub), 1)
+        self.assertEqual(max(0, sub.total_seats - count_assigned_seats(sub)), 14)
 
     def test_assigned_seats_is_exactly_one_count_query(self):
         sub = baker.make(Subscription, tenant=None)
@@ -61,7 +62,7 @@ class SubscriptionSeatRollupTests(TestCase):
         baker.make(LicenseSeatAssignment, license=license_obj, assigned_holder=holder, asset=None)
 
         with CaptureQueriesContext(connection) as queries:
-            assigned = sub.assigned_seats
+            assigned = count_assigned_seats(sub)
 
         self.assertEqual(assigned, 1)
         self.assertEqual(len(queries), 1, queries.captured_queries)
@@ -87,23 +88,28 @@ class SubscriptionSeatRollupTests(TestCase):
         baker.make(LicenseSeatAssignment, license=license_obj, assigned_holder=holder, asset=None)
         baker.make(LicenseSeatAssignment, license=license_obj, assigned_holder=None, asset=asset)
 
-        self.assertEqual(sub.assigned_seats, 2)
+        self.assertEqual(count_assigned_seats(sub), 2)
         set_current_tenant(other_tenant)
         try:
-            self.assertEqual((sub.total_seats, sub.assigned_seats, sub.available_seats), (4, 2, 2))
+            self.assertEqual(
+                (sub.total_seats, count_assigned_seats(sub), max(0, sub.total_seats - count_assigned_seats(sub))),
+                (4, 2, 2),
+            )
         finally:
             set_current_tenant(None)
 
         sub.suspend()
-        self.assertEqual((sub.total_seats, sub.assigned_seats, sub.available_seats), (4, 2, 2))
+        self.assertEqual(
+            (sub.total_seats, count_assigned_seats(sub), max(0, sub.total_seats - count_assigned_seats(sub))), (4, 2, 2)
+        )
 
         with TaskContext(operation="test.subscription_seat_rollup.soft_delete_asset"):
             asset.delete()
-        self.assertEqual(sub.assigned_seats, 1)
+        self.assertEqual(count_assigned_seats(sub), 1)
 
         holder.tenant = other_tenant
         holder.save(update_fields=["tenant"])
-        self.assertEqual(sub.assigned_seats, 0)
+        self.assertEqual(count_assigned_seats(sub), 0)
 
 
 class SupplierModelTests(TestCase):

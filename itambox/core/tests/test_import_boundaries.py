@@ -501,10 +501,8 @@ class LicensingBoundaryTests(SimpleTestCase):
     """``software.models`` <-> ``licenses.models`` / ``licenses.reconciliation``.
 
     ``licenses`` owns the FK onto ``software``, so that is the load-bearing
-    direction. ``Software.license_count`` and ``Software.reconcile()`` are the
-    two back edges; both now resolve their models through the app registry, and
-    ``licenses.reconciliation`` is a runtime leaf that ``software.models`` may
-    import at module scope without closing a loop.
+    direction. ``Software.license_count`` is the back edge and resolves its model through
+    the app registry; ``licenses.reconciliation`` is a runtime leaf.
     """
 
     def test_licenses_models_imports_software_models_at_module_scope(self):
@@ -533,12 +531,6 @@ class LicensingBoundaryTests(SimpleTestCase):
             _deferred_imports("software.models", "licenses"),
             "software.models must not defer a licenses import into a function body",
         )
-
-    def test_licenses_config_registers_exact_reconciliation_function(self):
-        from licenses.reconciliation import reconcile_software
-        from software.models_reconciliation import get_software_reconciliation_provider
-
-        self.assertIs(get_software_reconciliation_provider(), reconcile_software)
 
 
 class InventoryStockBoundaryTests(SimpleTestCase):
@@ -575,7 +567,7 @@ class InventoryStockBoundaryTests(SimpleTestCase):
         )
 
     def test_inventory_models_has_no_deferred_first_party_inventory_import(self):
-        for target in ("inventory.services", "inventory.models_stock", "inventory.models_kit_checkout"):
+        for target in ("inventory.services", "inventory.models_stock"):
             with self.subTest(target=target):
                 self.assertFalse(
                     _deferred_imports("inventory.models", target),
@@ -1249,23 +1241,7 @@ class TenantResourceGrantBoundaryTests(SimpleTestCase):
 
 
 class KitCheckoutBoundaryTests(SimpleTestCase):
-    """Keep the inventory-model registration seam acyclic.
-
-    ``assets.services`` imports only ``inventory.services`` for stock-family
-    fulfillment; concrete inventory models stay behind that service boundary.
-    ``Kit.checkout_to_holder`` goes through the leaf ``inventory.models_kit_checkout``,
-    whose implementation ``AssetsConfig.ready()`` registers once the app
-    registry is populated.
-    """
-
-    def test_kit_checkout_module_is_a_leaf(self):
-        for target in ("assets", "inventory.models", "inventory.services"):
-            with self.subTest(target=target):
-                self.assertFalse(
-                    _imports("inventory.models_kit_checkout", target),
-                    f"inventory.models_kit_checkout must not import {target}; it is the seam that keeps "
-                    "inventory.models independent of assets",
-                )
+    """Keep ``inventory.models`` independent of ``assets``."""
 
     def test_assets_services_imports_inventory_at_module_scope(self):
         self.assertFalse(
@@ -1277,17 +1253,6 @@ class KitCheckoutBoundaryTests(SimpleTestCase):
         self.assertFalse(
             _imports("inventory.models", "assets"),
             "inventory.models must not import anything from assets, at module scope or deferred",
-        )
-
-    def test_assets_app_config_registers_the_implementation(self):
-        from assets.services import checkout_kit
-        from inventory.models_kit_checkout import get_kit_checkout
-
-        self.assertIs(
-            get_kit_checkout(),
-            checkout_kit,
-            "AssetsConfig.ready() must register assets.services.checkout_kit as the kit checkout "
-            "implementation, otherwise Kit.checkout_to_holder has no backing callable",
         )
 
 

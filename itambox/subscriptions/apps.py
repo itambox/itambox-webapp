@@ -27,10 +27,7 @@ class SubscriptionsConfig(AppConfig):
         import subscriptions.search  # noqa
         import subscriptions.signals  # noqa
         from subscriptions.feature_views import SUBSCRIPTIONS_GENERIC_PRESENTATION_PROVIDER
-        from subscriptions.models_seat_usage import register_seat_usage
-        from subscriptions.seat_services import count_assigned_seats
 
-        register_seat_usage(count_assigned_seats)
         self._register_capabilities()
         self._register_generic_presentation(SUBSCRIPTIONS_GENERIC_PRESENTATION_PROVIDER)
         post_migrate.connect(self._register_subscription_tasks, sender=self)

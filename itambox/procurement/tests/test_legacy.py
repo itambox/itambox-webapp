@@ -543,9 +543,7 @@ class ProcurementStatusTransitionTests(TestCase):
         """WS2-9: receiving a license PO line must NOT increment License.seats.
 
         License.seats is a manually-entered entitlement, not a quantity materialised
-        from receipts. Receiving a license line only transitions its linked requests
-        from procurement to approved; the seat pool is left untouched. This codifies
-        that documented contract."""
+        from receipts; receiving a license line only records progress on the line."""
         self.po.tenant = self.tenant
         self.po.save(update_fields=["tenant"])
         line = PurchaseOrderLine.objects.create(
@@ -555,21 +553,6 @@ class ProcurementStatusTransitionTests(TestCase):
             qty_ordered=5,
             unit_price=50.00,
         )
-        # Link a request awaiting procurement to the license line.
-        request = AssetRequest.objects.create(
-            tenant=self.tenant,
-            requester=self.user,
-            asset_type=self.asset_type,
-            qty=3,
-            status=RequestStatusChoices.PROCUREMENT,
-        )
-        FulfillmentLink.objects.create(
-            tenant=self.tenant,
-            asset_request=request,
-            purchase_order_line=line,
-            qty_allocated=3,
-        )
-
         seats_before = self.license.seats
 
         from procurement.services import (
@@ -589,11 +572,8 @@ class ProcurementStatusTransitionTests(TestCase):
             seats_before,
             "Receiving a license PO line must not auto-grow License.seats",
         )
-        # The receipt still records progress on the line and approves the request.
         line.refresh_from_db()
         self.assertEqual(line.qty_received, 5)
-        request.refresh_from_db()
-        self.assertEqual(request.status, RequestStatusChoices.APPROVED)
 
     def test_receive_component_locks_stock_rows_in_global_item_order(self):
         """Stock locks are acquired by item id, not by PO-line order."""

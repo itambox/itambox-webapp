@@ -8,6 +8,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from assets.models import Asset, AssetAssignment, AssetType, Category, Manufacturer, StatusLabel
+from assets.services import checkout_kit
 from core.tasks.context import TaskContext
 from core.tests.mixins import TenantTestMixin
 from inventory.models import (
@@ -475,9 +476,10 @@ class CrossTenantActorlessKitFulfillmentTests(TenantTestMixin, TestCase):
                 )
                 for permission in permissions
             }
-            self.kit.checkout_to_holder(
-                self.holder,
-                self.source,
+            checkout_kit(
+                self.kit,
+                holder=self.holder,
+                source_location=self.source,
                 system_authorizations=authorizations,
             )
 

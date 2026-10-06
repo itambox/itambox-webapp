@@ -1,14 +1,16 @@
 """Concrete subscription seat-usage query owned by the subscription service."""
 
+from django.apps import apps
 from django.db.models import Q
-
-from licenses.models import LicenseSeatAssignment
 
 
 def count_assigned_seats(subscription) -> int:
     """Count active seats whose live target belongs to the subscription tenant."""
+    # Resolved through the app registry: licenses.models imports subscriptions.models.
+    seat_assignment = apps.get_model("licenses", "LicenseSeatAssignment")
+    # unscoped: the count is bound explicitly to the subscription and its tenant below, independent of the ambient scope.
     return (
-        LicenseSeatAssignment._base_manager.filter(
+        seat_assignment._base_manager.filter(
             license__subscription=subscription,
             license__deleted_at__isnull=True,
             deleted_at__isnull=True,
