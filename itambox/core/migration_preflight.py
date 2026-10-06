@@ -113,9 +113,9 @@ def _validate_predecessor_recognition(
 def _validate_manifest_predecessors(manifest: Mapping[str, Any]) -> None:
     if not _is_sha(manifest.get("transition_release_sha")):
         raise ValueError("migration preflight manifest transition_release_sha must be a lowercase 40-character Git SHA")
-    predecessors = manifest.get("supported_predecessors")
+    predecessors = manifest.get("recognized_states")
     if not isinstance(predecessors, list) or not predecessors:
-        raise ValueError("migration preflight manifest supported_predecessors must be a non-empty list")
+        raise ValueError("migration preflight manifest recognized_states must be a non-empty list")
     predecessor_names: set[str] = set()
     predecessor_revisions: set[str] = set()
     recognition_states: set[str] = set()
@@ -258,7 +258,7 @@ def _classify_normalized(
             exit_code=0,
             remediation="No migration action is required; continue only after independent release checks pass.",
         )
-    for predecessor in manifest["supported_predecessors"]:
+    for predecessor in manifest["recognized_states"]:
         recognized = _recognized_predecessor(manifest, observed, predecessor)
         if recognized is not None:
             return recognized

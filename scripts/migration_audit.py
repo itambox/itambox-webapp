@@ -910,9 +910,9 @@ def _validate_manifest_predecessors(manifest):
     transition_release_sha = manifest.get("transition_release_sha")
     if not isinstance(transition_release_sha, str) or not _GIT_SHA_RE.fullmatch(transition_release_sha):
         raise ValueError("migration preflight manifest transition_release_sha must be a lowercase 40-character Git SHA")
-    predecessors = manifest.get("supported_predecessors")
+    predecessors = manifest.get("recognized_states")
     if not isinstance(predecessors, list) or not predecessors:
-        raise ValueError("migration preflight manifest supported_predecessors must be a non-empty list")
+        raise ValueError("migration preflight manifest recognized_states must be a non-empty list")
     names = []
     revisions = set()
     recognition_states = set()
@@ -946,7 +946,7 @@ def validate_preflight_manifest_git_objects(manifest, repository_root):
     """Require every declared predecessor identity to resolve to a local commit object."""
 
     revisions = {manifest["transition_release_sha"]}
-    revisions.update(predecessor["revision"] for predecessor in manifest["supported_predecessors"])
+    revisions.update(predecessor["revision"] for predecessor in manifest["recognized_states"])
     for revision in sorted(revisions):
         try:
             result = subprocess.run(
