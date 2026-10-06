@@ -336,8 +336,7 @@ class CustodyRecipientConsentTests(CustodyRBACFixtureMixin, TestCase):
     def test_completed_receipt_cannot_be_accepted_again(self):
         # AC §6: Prepare- und Consent-Semantik — already accepted remains completed.
         self.receipt_a.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
-        self.receipt_a.accepted = True
-        self.receipt_a.save(update_fields=["acceptance_status", "accepted", "updated_at"])
+        self.receipt_a.save(update_fields=["acceptance_status", "updated_at"])
         self._login_to_tenant(self.recipient, self.tenant_a)
 
         response = self.client.post(
@@ -511,7 +510,12 @@ class CustodyConcurrentConsentTests(CustodyRBACFixtureMixin, TransactionTestCase
         self.receipt_a.refresh_from_db()
         self.assertEqual(self.receipt_a.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
         self.assertEqual(sum(response.status_code == 200 for response in responses), 2)
-        self.assertEqual(CustodyReceipt.objects.filter(pk=self.receipt_a.pk, accepted=True).count(), 1)
+        self.assertEqual(
+            CustodyReceipt.objects.filter(
+                pk=self.receipt_a.pk, acceptance_status=CustodyReceipt.STATUS_ACCEPTED
+            ).count(),
+            1,
+        )
 
     def test_concurrent_accept_and_decline_have_one_terminal_state(self):
         # AC §6: Prepare- und Consent-Semantik — concurrent Accept/Decline posts serialize to one terminal state.
@@ -921,8 +925,7 @@ class CustodySigningSessionPrepareTests(CustodyRBACFixtureMixin, TestCase):
 
     def test_completed_receipt_is_rejected_without_creating_session(self):
         self.receipt_a.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
-        self.receipt_a.accepted = True
-        self.receipt_a.save(update_fields=["acceptance_status", "accepted", "updated_at"])
+        self.receipt_a.save(update_fields=["acceptance_status", "updated_at"])
         self._login_to_tenant(self.technician, self.tenant_a)
 
         response = self.client.post(self._prepare_url(), follow=True)
@@ -1074,8 +1077,7 @@ class CustodySigningSessionHandoffTests(CustodyRBACFixtureMixin, TestCase):
         self.assertNotContains(response, "Copy recipient handoff link")
 
         self.receipt_a.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
-        self.receipt_a.accepted = True
-        self.receipt_a.save(update_fields=["acceptance_status", "accepted", "updated_at"])
+        self.receipt_a.save(update_fields=["acceptance_status", "updated_at"])
         response = self.client.get(detail_url)
         self.assertNotContains(response, "Copy recipient handoff link")
 
@@ -1147,8 +1149,7 @@ class CustodySigningSessionHandoffTests(CustodyRBACFixtureMixin, TestCase):
         self.signing_session.expires_at = timezone.now() + timedelta(minutes=30)
         self.signing_session.save(update_fields=["expires_at", "updated_at"])
         self.receipt_a.acceptance_status = CustodyReceipt.STATUS_ACCEPTED
-        self.receipt_a.accepted = True
-        self.receipt_a.save(update_fields=["acceptance_status", "accepted", "updated_at"])
+        self.receipt_a.save(update_fields=["acceptance_status", "updated_at"])
         completed = self.client.get(self._qr_url())
         self.assertEqual(completed.status_code, 410)
         self.assertNotContains(completed, "custody_session_expired_or_used", status_code=410)
@@ -1727,7 +1728,6 @@ class CustodyReceiptExportTests(CustodyRBACFixtureMixin, TestCase):
     def _accept_receipt(self, receipt=None):
         receipt = receipt or self.receipt_a
         signed_at = timezone.now()
-        receipt.accepted = True
         receipt.accepted_date = signed_at
         receipt.acceptance_method = "digital_signature"
         receipt.acceptance_status = CustodyReceipt.STATUS_ACCEPTED

@@ -14,6 +14,7 @@
  * POST submits the whole batch. Success/failure reuse the audit beep events.
  */
 import { AssetScanner } from './scanner';
+import { beepFail, beepOk, createNotifier } from './scan-feedback';
 
 interface ScanPayload {
   found: boolean;
@@ -36,68 +37,7 @@ interface BasketEntry {
   proceeds: string;
 }
 
-function beepOk(): void {
-  document.dispatchEvent(new Event('playAuditSound'));
-}
-function beepFail(): void {
-  document.dispatchEvent(new Event('playAuditFailSound'));
-}
-
-function showToast(message: string, variant: 'warning' | 'danger' = 'warning'): void {
-  const container = document.getElementById('django-messages');
-  if (!container) return;
-  const toast = document.createElement('div');
-  toast.className = `toast show align-items-center text-bg-${variant} border-0 mb-2`;
-  toast.setAttribute('role', 'alert');
-  const row = document.createElement('div');
-  row.className = 'd-flex';
-  const body = document.createElement('div');
-  body.className = 'toast-body';
-  body.textContent = message; // textContent: scanned codes cannot inject markup
-  const close = document.createElement('button');
-  close.type = 'button';
-  close.className = 'btn-close btn-close-white me-2 m-auto';
-  close.setAttribute('data-bs-dismiss', 'toast');
-  row.appendChild(body);
-  row.appendChild(close);
-  toast.appendChild(row);
-  container.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
-}
-
-let feedbackTimer = 0;
-
-function scannerOverlayOpen(): boolean {
-  const m = document.getElementById('basket-scanner-modal');
-  return !!m && getComputedStyle(m).display !== 'none';
-}
-
-function showOverlayFeedback(message: string, state: 'ok' | 'warn' | 'fail'): void {
-  const el = document.getElementById('basket-scan-feedback');
-  if (!el) return;
-  el.textContent = message;
-  el.classList.remove('is-ok', 'is-warn', 'is-fail');
-  el.classList.add('is-visible', `is-${state}`);
-  if (feedbackTimer) clearTimeout(feedbackTimer);
-  feedbackTimer = window.setTimeout(() => el.classList.remove('is-visible'), 1800);
-}
-
-/**
- * Route scan feedback. While the camera overlay is open, show an in-overlay
- * banner — the #django-messages toast container is at z-index 1100, below the
- * 9999 scanner overlay, so corner toasts would be hidden. Otherwise (USB/manual
- * entry, overlay closed) fall back to a toast.
- */
-function notify(message: string, state: 'ok' | 'warn' | 'fail'): void {
-  // Always write the in-overlay banner: it lives inside the 9999 overlay and is
-  // only visible while the camera is open, so this needs no reliable open-check.
-  // Add a corner toast ONLY when the overlay is closed (USB/manual entry), where
-  // toasts at z-index 1100 are actually visible.
-  showOverlayFeedback(message, state);
-  if (!scannerOverlayOpen() && state !== 'ok') {
-    showToast(message, state === 'fail' ? 'danger' : 'warning');
-  }
-}
+const notify = createNotifier('basket-scanner-modal', 'basket-scan-feedback');
 
 function initScanBasket(): void {
   const root = document.getElementById('scan-basket-root');

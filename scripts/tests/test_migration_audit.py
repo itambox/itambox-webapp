@@ -548,7 +548,7 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 51)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 53)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
@@ -568,6 +568,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "compliance.0103_alter_custodyreceipt_options",
                 "compliance.0104_custodysigningsession",
                 "compliance.0105_custodyhandoffdelivery",
+                "compliance.0106_remove_custodyreceipt_accepted",
                 "extras.0101_issue88_drop_legacy_webhook_name_like",
                 "extras.0102_alter_event_action",
                 "extras.0103_remove_reporttemplate_advanced_mode_and_more",
@@ -597,6 +598,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "organization.0103_tenant_resource_grant_expiry",
                 "procurement.0101_alter_purchaseorder_options",
                 "procurement.0102_fulfillmentlink_qty_received",
+                "procurement.0103_remove_fulfillmentlink_unique_request_po_line_link_and_more",
                 "subscriptions.0101_remove_subscription_auto_renewal_and_more",
                 "subscriptions.0102_commercial_vendor_and_terms",
                 "subscriptions.0103_unified_vendor_cutover",

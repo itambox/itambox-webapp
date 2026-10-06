@@ -421,5 +421,9 @@ class FulfillmentLink(BaseModel, ChangeLoggingMixin, SoftDeleteMixin):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["asset_request", "purchase_order_line"], name="unique_request_po_line_link")
+            models.UniqueConstraint(
+                fields=["asset_request", "purchase_order_line"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="unique_request_po_line_link",
+            )
         ]

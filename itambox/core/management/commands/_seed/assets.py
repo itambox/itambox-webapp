@@ -720,7 +720,6 @@ class SeedAssetsMixin:
                     custody_template=tmpl,
                     verification_hash=h,
                     eula_version="1.0",
-                    accepted=True,
                     acceptance_status=CustodyReceipt.STATUS_ACCEPTED,
                     accepted_date=signed_at,
                     signed_at=signed_at,

@@ -11,6 +11,7 @@
  * submits the batch via HTMX to be verified in a single transaction.
  */
 import { AssetScanner } from './scanner';
+import { beepFail, beepOk, createNotifier } from './scan-feedback';
 
 interface AuditScanPayload {
   found: boolean;
@@ -27,58 +28,7 @@ interface AuditScanPayload {
   warning: string | null;
 }
 
-function beepOk(): void {
-  document.dispatchEvent(new Event('playAuditSound'));
-}
-function beepFail(): void {
-  document.dispatchEvent(new Event('playAuditFailSound'));
-}
-
-function showToast(message: string, variant: 'warning' | 'danger' = 'warning'): void {
-  const container = document.getElementById('django-messages');
-  if (!container) return;
-  const toast = document.createElement('div');
-  toast.className = `toast show align-items-center text-bg-${variant} border-0 mb-2`;
-  toast.setAttribute('role', 'alert');
-  const row = document.createElement('div');
-  row.className = 'd-flex';
-  const body = document.createElement('div');
-  body.className = 'toast-body';
-  body.textContent = message;
-  const close = document.createElement('button');
-  close.type = 'button';
-  close.className = 'btn-close btn-close-white me-2 m-auto';
-  close.setAttribute('data-bs-dismiss', 'toast');
-  row.appendChild(body);
-  row.appendChild(close);
-  toast.appendChild(row);
-  container.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
-}
-
-let feedbackTimer = 0;
-
-function scannerOverlayOpen(): boolean {
-  const m = document.getElementById('audit-scanner-modal');
-  return !!m && getComputedStyle(m).display !== 'none';
-}
-
-function showOverlayFeedback(message: string, state: 'ok' | 'warn' | 'fail'): void {
-  const el = document.getElementById('audit-scan-feedback');
-  if (!el) return;
-  el.textContent = message;
-  el.classList.remove('is-ok', 'is-warn', 'is-fail');
-  el.classList.add('is-visible', `is-${state}`);
-  if (feedbackTimer) clearTimeout(feedbackTimer);
-  feedbackTimer = window.setTimeout(() => el.classList.remove('is-visible'), 1800);
-}
-
-function notify(message: string, state: 'ok' | 'warn' | 'fail'): void {
-  showOverlayFeedback(message, state);
-  if (!scannerOverlayOpen() && state !== 'ok') {
-    showToast(message, state === 'fail' ? 'danger' : 'warning');
-  }
-}
+const notify = createNotifier('audit-scanner-modal', 'audit-scan-feedback');
 
 function initAuditBasket(): void {
   const root = document.getElementById('audit-basket-root');
