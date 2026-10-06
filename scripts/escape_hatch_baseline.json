@@ -116,13 +116,6 @@
       "count": 1
     },
     {
-      "rule": "source-text",
-      "path": "itambox/itambox/tests/test_generic_presentation_registry.py",
-      "context": "ClassDef:TestLifecycleAndSnapshots/FunctionDef:test_importing_registry_does_not_populate_apps_or_import_a_domain",
-      "statement": "ast.parse",
-      "count": 1
-    },
-    {
       "rule": "unscoped",
       "path": "itambox/assets/api/serializer_mixins.py",
       "context": "ClassDef:CanonicalSpecificationSerializerMixin/FunctionDef:_persist_native_update",
