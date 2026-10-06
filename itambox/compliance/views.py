@@ -463,6 +463,17 @@ def _process_custody_post(request, token, receipt, signing_session=None):
         )
 
 
+def _pre_sign_response(request, receipt, holder):
+    if receipt.acceptance_status != CustodyReceipt.STATUS_PENDING:
+        if not request.user.is_authenticated:
+            return _signer_error_response(request, holder, require_authenticated=True)
+        return _completed_receipt_response(request, receipt)
+    superseded_response = _superseded_pending_response(request, receipt)
+    if superseded_response is not None:
+        return superseded_response
+    return _external_provider_response(request, receipt, holder)
+
+
 def custody_eula_sign(request, token):
     receipt = _resolve_custody_receipt(token)
     if receipt is None:
@@ -489,18 +500,9 @@ def custody_eula_sign(request, token):
 
         return redirect_to_login(request.get_full_path())
 
-    if receipt.acceptance_status != CustodyReceipt.STATUS_PENDING:
-        if not request.user.is_authenticated:
-            return _signer_error_response(request, holder, require_authenticated=True)
-        return _completed_receipt_response(request, receipt)
-
-    superseded_response = _superseded_pending_response(request, receipt)
-    if superseded_response is not None:
-        return superseded_response
-
-    external_response = _external_provider_response(request, receipt, holder)
-    if external_response is not None:
-        return external_response
+    pre_sign_response = _pre_sign_response(request, receipt, holder)
+    if pre_sign_response is not None:
+        return pre_sign_response
 
     if request.method == "POST":
         signer_error = _signer_error_response(request, holder, require_authenticated=True)
