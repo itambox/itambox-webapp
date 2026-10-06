@@ -215,7 +215,7 @@ This prerelease still supports no arbitrary version skipping. The supported
 starting points for a release are the previously tagged release — the supported
 upgrade-origin chain begins at `v1.0.0-beta.2`, and each release's changelog
 states its declared origin — and, in addition, the two predecessor revisions
-recorded in the checked manifest (`supported_predecessors`): the pre-squash
+recorded in the checked manifest (`recognized_states`): the pre-squash
 revision and the transition release. Databases created by transitional
 development states of the #479 work are explicitly not supported; the executor
 fails closed with a clear recorder inconsistency instead of rewriting their

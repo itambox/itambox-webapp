@@ -15,15 +15,6 @@ class AssetsConfig(AppConfig):
         import assets.search
         import assets.signals
 
-        # inline imports: app-registry: assets.services / inventory.models_kit_checkout pull in
-        # model modules, so they can only be imported once the app registry is ready.
-        # Publishes checkout_kit to inventory.models without inventory depending on
-        # assets.services.
-        from assets.services import checkout_kit
-        from inventory.models_kit_checkout import register_kit_checkout
-
-        register_kit_checkout(checkout_kit)
-
         # inline imports: app-registry: register custom-field validation after all models are loaded.
         from assets.customfields import validate_asset_custom_field_data, validate_asset_type_custom_field_data
 

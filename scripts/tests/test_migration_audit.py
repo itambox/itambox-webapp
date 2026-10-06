@@ -781,30 +781,30 @@ class PreflightManifestAuditTests(unittest.TestCase):
         refreshed = json.loads(render_preflight_manifest(self.inventory, stale))
         self.assertEqual(refreshed["post_transition_ids"], self.manifest["post_transition_ids"])
         self.assertEqual(refreshed["transition_release_sha"], self.manifest["transition_release_sha"])
-        self.assertEqual(refreshed["supported_predecessors"], self.manifest["supported_predecessors"])
+        self.assertEqual(refreshed["recognized_states"], self.manifest["recognized_states"])
         validate_preflight_manifest(self.inventory, refreshed)
 
     def test_unrecognized_predecessor_state_fails_closed(self):
         manifest = json.loads(json.dumps(self.manifest))
-        manifest["supported_predecessors"][0]["state"] = "not-a-real-state"
+        manifest["recognized_states"][0]["state"] = "not-a-real-state"
         with self.assertRaisesRegex(ValueError, "predecessor state"):
             validate_preflight_manifest(self.inventory, manifest)
 
     def test_unrecognized_predecessor_recognition_state_fails_closed(self):
         manifest = json.loads(json.dumps(self.manifest))
-        manifest["supported_predecessors"][0]["recognition"]["state"] = "not-a-recognition-state"
+        manifest["recognized_states"][0]["recognition"]["state"] = "not-a-recognition-state"
         with self.assertRaisesRegex(ValueError, "recognition state"):
             validate_preflight_manifest(self.inventory, manifest)
 
     def test_missing_predecessor_recognition_fails_closed(self):
         manifest = json.loads(json.dumps(self.manifest))
-        manifest["supported_predecessors"][0].pop("recognition")
+        manifest["recognized_states"][0].pop("recognition")
         with self.assertRaisesRegex(ValueError, "recognition must be an object"):
             validate_preflight_manifest(self.inventory, manifest)
 
     def test_predecessor_recognition_with_unmanifested_post_ids_fails_closed(self):
         manifest = json.loads(json.dumps(self.manifest))
-        manifest["supported_predecessors"][1]["recognition"]["post_transition_ids"] = ["assets.9999_unmanifested"]
+        manifest["recognized_states"][1]["recognition"]["post_transition_ids"] = ["assets.9999_unmanifested"]
         with self.assertRaisesRegex(ValueError, "recognition post-transition"):
             validate_preflight_manifest(self.inventory, manifest)
 

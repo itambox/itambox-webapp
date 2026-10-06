@@ -28,7 +28,6 @@ from core.mixins import (
 )
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel
 from extras.models import Tag
-from subscriptions.models_seat_usage import get_assigned_seats
 
 
 class SubscriptionTypeChoices(models.TextChoices):
@@ -259,16 +258,6 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
             )["total"]
             or 0
         )
-
-    @property
-    def assigned_seats(self):
-        """Seats currently assigned across this subscription's licenses."""
-        return get_assigned_seats(self)
-
-    @property
-    def available_seats(self):
-        """Unassigned seats across this subscription's licenses."""
-        return max(0, self.total_seats - self.assigned_seats)
 
     def get_absolute_url(self):
         try:

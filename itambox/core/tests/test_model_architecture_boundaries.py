@@ -69,11 +69,8 @@ class ModelArchitectureBoundaryTests(unittest.TestCase):
         expected = (
             "inventory.models_mixins",
             "inventory.models_stock",
-            "inventory.models_kit_checkout",
             "assets.model_book_value",
-            "software.models_reconciliation",
             "subscriptions.seat_services",
-            "subscriptions.models_seat_usage",
             "compliance.audit_services",
         )
         for module in expected:
@@ -98,9 +95,7 @@ class ModelArchitectureBoundaryTests(unittest.TestCase):
     def test_inventory_models_import_model_support_leaves(self):
         source = _source("inventory/models.py")
         self.assertTrue(_has_import_from(source, "models_stock"))
-        self.assertTrue(_has_import_from(source, "models_kit_checkout"))
         self.assertFalse(_has_import_from(source, "stock"))
-        self.assertFalse(_has_import_from(source, "kit_checkout"))
 
     def test_inventory_model_mixin_is_not_imported_from_presentation(self):
         source = _source("inventory/abstract_models.py")
@@ -111,16 +106,6 @@ class ModelArchitectureBoundaryTests(unittest.TestCase):
         source = _source("assets/models/asset.py")
         self.assertTrue(_has_import_from(source, "assets.model_book_value"))
         self.assertFalse(_has_import_from(source, "assets.depreciation"))
-
-    def test_software_model_uses_model_owned_reconciliation_port(self):
-        source = _source("software/models.py")
-        self.assertTrue(_has_import_from(source, "software.models_reconciliation"))
-        self.assertFalse(_has_import_from(source, "licenses.reconciliation"))
-
-    def test_subscription_model_uses_model_owned_seat_port(self):
-        source = _source("subscriptions/models.py")
-        self.assertTrue(_has_import_from(source, "subscriptions.models_seat_usage"))
-        self.assertFalse(_has_import_from(source, "licenses.models"))
 
     def test_compliance_model_has_no_actorless_expected_assets_property(self):
         source = _source("compliance/models.py")
@@ -158,12 +143,10 @@ class ModelArchitectureBoundaryTests(unittest.TestCase):
                 )  # source-text: architecture policy tests raw report-row access boundaries.
                 self.assertTrue(visitor.offenders)
 
-    def test_license_registration_is_owned_by_licenses_config(self):
-        licenses_source = _source("licenses/apps.py")
-        software_source = _source("software/apps.py")
-        self.assertIn("reconcile_software", licenses_source)
-        self.assertIn("register_software_reconciliation", licenses_source)
-        self.assertNotIn("reconcile_software", software_source)
+    def test_reconciliation_has_no_registration_slot(self):
+        for relative in ("licenses/apps.py", "software/apps.py", "software/models.py"):
+            with self.subTest(path=relative):
+                self.assertNotIn("register_software_reconciliation", _source(relative))
 
 
 if __name__ == "__main__":
