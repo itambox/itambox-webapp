@@ -24,7 +24,7 @@ from django.utils import timezone
 from model_bakery import baker
 from rest_framework.test import APITestCase
 
-from assets.models import Asset, AssetAssignment, StatusLabel
+from assets.models import Asset, AssetAssignment, AssetTagSequence, StatusLabel
 from assets.services import checkout_asset
 from compliance.models import CustodyHandoffDelivery, CustodyReceipt, CustodySigningSession, CustodyTemplate
 from compliance.services import _custody_handoff_email_content
@@ -41,6 +41,7 @@ User = get_user_model()
 
 DUMMY_TOKEN_A = "a" * 64
 DUMMY_TOKEN_B = "b" * 64
+DUMMY_OUTSIDER_TOKEN = "o" * 64
 DUMMY_SESSION_TOKEN = "s" * 64
 DUMMY_SESSION_TOKEN_B = "t" * 64
 DUMMY_SIGNATURE = "dummy-signature-payload"
@@ -549,6 +550,71 @@ class CustodyConcurrentConsentTests(CustodyRBACFixtureMixin, TransactionTestCase
         else:
             self.assertFalse(self.receipt_a.accepted)
             self.assertIsNone(self.receipt_a.signed_at)
+
+    def test_parallel_signing_by_a_holder_without_membership_is_served(self):
+        """#607/#306: parallel accepts by a holder without membership must both be
+        answered. The former full asset save read the global tag sequence through
+        a tenant-scoped manager on the signer's behalf, so both posts crashed."""
+        outsider = User.objects.create_user(username="consent-outsider", password="x")
+        outsider_holder = AssetHolder.objects.create(
+            user=outsider,
+            first_name="Dummy",
+            last_name="Outsider",
+            upn="dummy-outsider@example.test",
+            email="dummy-outsider@example.test",
+            tenant=self.tenant_a,
+        )
+        asset = baker.make(
+            Asset,
+            name="Dummy Outsider Asset",
+            asset_tag="DUMMY-OUTSIDER-ASSET",
+            tenant=self.tenant_a,
+            status=StatusLabel.objects.get(name="Custody Deployable"),
+        )
+        checkout_asset(
+            asset,
+            holder=outsider_holder,
+            status=StatusLabel.objects.get(name="Custody Deployed"),
+            _suppress_custody_receipt=True,
+        )
+        receipt = CustodyReceipt.objects.create(
+            asset=asset,
+            assignment=AssetAssignment.objects.get(asset=asset, is_active=True),
+            holder=outsider_holder,
+            custody_template=self.template_a,
+            token=DUMMY_OUTSIDER_TOKEN,
+            eula_text=DUMMY_EULA,
+        )
+        # The global default sequence exists, as in the reported reproduction; the
+        # signer holds no scope that could see it.
+        AssetTagSequence._base_manager.get_or_create(
+            tenant=None, category=None, prefix="ASSET-", defaults={"next_value": 1}
+        )
+
+        def post(signature):
+            close_old_connections()
+            try:
+                client = self.client_class()
+                client.force_login(outsider)
+                return client.post(
+                    self._sign_url(DUMMY_OUTSIDER_TOKEN),
+                    {"action": "accept", "signature_canvas": signature},
+                )
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(post, "outsider-signature-one"), executor.submit(post, "outsider-signature-two")]
+            responses = [future.result() for future in futures]
+
+        self.assertEqual([response.status_code for response in responses], [200, 200])
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
+        self.assertEqual(
+            AssetTagSequence._base_manager.get(tenant__isnull=True, category__isnull=True, prefix="ASSET-").next_value,
+            1,
+            "signing must not allocate or consume an asset tag",
+        )
 
     def test_sign_post_contains_row_lock(self):
         # AC §6: Prepare- und Consent-Semantik — receipt POST must use a row lock.

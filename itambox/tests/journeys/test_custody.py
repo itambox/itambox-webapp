@@ -6,6 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 from model_bakery import baker
 
+from assets.models import AssetTagSequence
 from assets.services import checkin_asset, checkout_asset
 from compliance.models import CustodyReceipt, CustodyTemplate
 
@@ -71,6 +72,12 @@ class CustodyReceiptJourneyTests(JourneyMixin, TestCase):
         outsider = User.objects.create_user(username="no-membership", password="x")
         holder = self.make_holder(user=outsider)
         receipt = self._checkout(holder)
+        # The reported reproduction has the global default sequence present: the
+        # former full asset save read it through a tenant-scoped manager on the
+        # non-member's behalf and crashed (#607, same class as #306).
+        AssetTagSequence._base_manager.get_or_create(
+            tenant=None, category=None, prefix="ASSET-", defaults={"next_value": 1}
+        )
 
         self.client.force_login(outsider)
         response = self._sign(receipt, raise_request_exception=False)
@@ -78,6 +85,11 @@ class CustodyReceiptJourneyTests(JourneyMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         receipt.refresh_from_db()
         self.assertEqual(receipt.acceptance_status, CustodyReceipt.STATUS_ACCEPTED)
+        self.assertEqual(
+            AssetTagSequence._base_manager.get(tenant__isnull=True, category__isnull=True, prefix="ASSET-").next_value,
+            1,
+            "signing must not allocate or consume an asset tag",
+        )
 
     def test_checkin_supersedes_pending_receipt_and_blocks_signing(self):
         user = self.make_member("superseded-holder", set())
