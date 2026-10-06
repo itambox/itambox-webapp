@@ -261,4 +261,14 @@ A reviewable pull request includes:
 
 Keep generated files in sync with their sources. Do not include unrelated formatting changes, local environment files, credentials, database dumps, build output, or editor state.
 
+## Merging
+
+`main` is protected by a ruleset that requires the 13 status checks (`lint`, `template-lint`, `stylelint`, `inline-style`, `docs`, `frontend`, `test (3.12)`, `Migration & seed qualification`, `Coverage gates`, `policy`, `dependencies`, `secrets`, `E2E / Gate`) and a clean CodeQL code-scanning result. Required checks are strict: a pull request can only be merged when its head contains the current tip of `main`, so what lands has been qualified against the state it lands into.
+
+GitHub's merge queue is not available for this repository (it is owned by a personal account), so freshness is enforced through the up-to-date requirement:
+
+- When another pull request merges first, use **Update branch** on your pull request. The required checks re-run on the updated head.
+- Rebase locally only to resolve real conflicts, not for freshness alone.
+- Merging is done by a maintainer once every required check is green on the current head.
+
 By submitting a contribution, you agree that it is licensed under the repository's [Apache License 2.0](LICENSE), as described by the license's contribution terms.
