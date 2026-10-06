@@ -33,6 +33,7 @@ from assets.services.specifications.contracts import (
     HistoryCleanupPreviewDTO,
     OwnerRefDTO,
     SpecificationGraphLoadRequest,
+    SpecificationPatchDTO,
     SpecificationProjectionRequest,
     SpecificationResolutionRequest,
     StoredSpecificationEntryDTO,
@@ -176,6 +177,21 @@ class ApplyCategoryDefaultsInputSerializer(StrictInputSerializer):
     expected_definition_revision = serializers.CharField(required=False, allow_blank=False)
     expected_category_default_snapshot_revision = serializers.CharField(required=False, allow_blank=False)
     specification_patch = SpecificationPatchInputSerializer(required=False)
+
+
+class ApplyCategoryDefaultsPreviewInputSerializer(StrictInputSerializer):
+    specification_patch = SpecificationPatchInputSerializer(required=False)
+
+
+class AssetTypePreviewResponseSerializer(serializers.Serializer):
+    preview_token = serializers.CharField(allow_null=True)
+    definition = serializers.JSONField()
+    expected_definition_revision = serializers.CharField()
+    expected_resource_revision = serializers.CharField(allow_null=True)
+    expected_category_default_snapshot_revision = serializers.CharField(allow_null=True)
+    consumes_category_defaults = serializers.BooleanField()
+    issues = serializers.ListField(child=serializers.DictField())
+    can_apply = serializers.BooleanField()
 
 
 def _message(message_key: str) -> str:
@@ -677,7 +693,7 @@ def create_fieldset_selection_from_values(
     values: Sequence[str] | None,
     *,
     omitted: bool,
-) -> object:
+) -> FieldsetSelectionDTO:
     """Construct the presence-sensitive create DTO from parsed transport data."""
 
     if omitted:
@@ -689,7 +705,7 @@ def create_fieldset_selection_from_values(
     return FieldsetSelectionDTO(presence="explicit", identities=explicit.identities)
 
 
-def patch_from_validated(value: Mapping[str, object] | None) -> object:
+def patch_from_validated(value: Mapping[str, object] | None) -> SpecificationPatchDTO:
     return patch_from_mapping(None if value is None else {"set": value.get("set", {}), "clear": value.get("clear", [])})
 
 
@@ -739,6 +755,8 @@ def expected_revision_or_missing(
 
 __all__ = [
     "ApplyCategoryDefaultsInputSerializer",
+    "ApplyCategoryDefaultsPreviewInputSerializer",
+    "AssetTypePreviewResponseSerializer",
     "CategoryDefaultFieldsetsInputSerializer",
     "CompositionInputSerializer",
     "HistoryCleanupInputSerializer",

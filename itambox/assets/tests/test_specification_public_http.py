@@ -284,6 +284,78 @@ class T12PublicSpecificationHTTPTests(TenantTestMixin, APITestCase):
         )
         self.assertFalse(AssetType.all_objects.filter(slug="t12-missing-preconditions").exists())
 
+    def test_create_preview_returns_default_consumption_token_and_rejects_invalid_or_unauthorized_requests(self):
+        url = reverse("api:assets_api:assettype-create-preview")
+        response = self.client.post(
+            url,
+            {
+                "manufacturer_id": self.manufacturer.pk,
+                "model": "T12 preview type",
+                "slug": "t12-preview-type",
+                "category": self.category.pk,
+                "specification_patch": {"set": {}, "clear": []},
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertTrue(response.data["consumes_category_defaults"])
+        self.assertTrue(response.data["preview_token"])
+        self.assertEqual(
+            [row["identity"] for row in response.data["definition"]["fieldsets"]],
+            ["local/t12-first"],
+        )
+        self.assertFalse(AssetType.all_objects.filter(slug="t12-preview-type").exists())
+
+        invalid = self.client.post(
+            url,
+            {"manufacturer_id": self.manufacturer.pk, "model": "T12 invalid", "unexpected": True},
+            format="json",
+        )
+        self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST, invalid.data)
+        self.assertIn("unexpected", invalid.data)
+
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+        denied = self.client.post(
+            url,
+            {"manufacturer_id": self.manufacturer.pk, "model": "T12 denied"},
+            format="json",
+        )
+        self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN, denied.data)
+
+    def test_category_defaults_preview_requires_change_permission_and_resource_precondition(self):
+        detail = self.client.get(self._type_detail_url())
+        self.assertEqual(detail.status_code, status.HTTP_200_OK, detail.data)
+        url = reverse("api:assets_api:assettype-apply-category-defaults-preview", args=[self.type.pk])
+        response = self.client.post(
+            url,
+            {"specification_patch": {"set": {}, "clear": []}},
+            format="json",
+            HTTP_IF_MATCH=detail["ETag"],
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertTrue(response.data["preview_token"])
+        self.assertTrue(response.data["consumes_category_defaults"])
+
+        missing_precondition = self.client.post(
+            url,
+            {"specification_patch": {"set": {}, "clear": []}},
+            format="json",
+        )
+        self.assertEqual(missing_precondition.status_code, status.HTTP_428_PRECONDITION_REQUIRED)
+
+        invalid = self.client.post(url, {"unexpected": True}, format="json", HTTP_IF_MATCH=detail["ETag"])
+        self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST, invalid.data)
+        self.assertIn("unexpected", invalid.data)
+
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+        denied = self.client.post(
+            url,
+            {"specification_patch": {"set": {}, "clear": []}},
+            format="json",
+            HTTP_IF_MATCH=detail["ETag"],
+        )
+        self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN, denied.data)
+
     def test_denied_asset_is_indistinguishable_from_missing_before_stale_or_reference_details(self):
         foreign_tenant = Tenant.objects.create(name="T12 foreign tenant", slug="t12-foreign-tenant")
         with self.tenant_context(foreign_tenant):
