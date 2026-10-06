@@ -2,9 +2,12 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
+from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import close_old_connections, connections, transaction
 from django.test import TestCase, TransactionTestCase
@@ -12,8 +15,9 @@ from django.test import TestCase, TransactionTestCase
 from assets.choices import RequestStatusChoices
 from assets.models import Asset, AssetRequest, AssetType, Manufacturer, StatusLabel, Supplier
 from core.context import set_current_tenant
+from core.models import ObjectChange
 from organization.models import Location, Site, Tenant
-from procurement.models import PurchaseOrder, PurchaseOrderLine
+from procurement.models import FulfillmentLink, PurchaseOrder, PurchaseOrderLine
 from procurement.services import (
     cancel_purchase_order,
     link_asset_request_to_purchase_order,
@@ -56,17 +60,37 @@ class PurchaseOrderRelinkJourneyTests(JourneyMixin, TestCase):
             status=RequestStatusChoices.APPROVED,
         )
 
-    @pytest.mark.xfail(strict=True, reason="reopen leaves the old line, relink adds another (#606)")
     def test_cancel_reopen_relink_yields_one_line_per_request_unit(self):
         self.client_login_to_tenant(self.operator, self.tenant)
-        link_asset_request_to_purchase_order(self.po, self.asset_request.pk, user=self.operator)
-        cancel_purchase_order(self.po)
+        first_link = link_asset_request_to_purchase_order(self.po, self.asset_request.pk, user=self.operator)
+        first_line = first_link.purchase_order_line
+        request_id = uuid4()
+        with patch("core.models.get_current_request_id", return_value=request_id):
+            cancel_purchase_order(self.po)
+        first_line.refresh_from_db()
+        first_link.refresh_from_db()
+        self.asset_request.refresh_from_db()
+        self.assertIsNotNone(first_line.deleted_at)
+        self.assertIsNotNone(first_link.deleted_at)
+        self.assertEqual(self.asset_request.status, RequestStatusChoices.APPROVED)
+        for model, obj in ((PurchaseOrderLine, first_line), (FulfillmentLink, first_link)):
+            self.assertTrue(
+                ObjectChange.objects.filter(
+                    request_id=request_id,
+                    changed_object_type=ContentType.objects.get_for_model(model),
+                    changed_object_id=obj.pk,
+                    action="delete",
+                ).exists()
+            )
+        self.assertFalse(PurchaseOrderLine.objects.filter(purchase_order=self.po).exists())
         reopen_purchase_order(self.po)
         self.po.refresh_from_db()
 
         link_asset_request_to_purchase_order(self.po, self.asset_request.pk, user=self.operator)
 
-        self.assertEqual(PurchaseOrderLine.objects.filter(purchase_order=self.po).count(), 1)
+        relinked_lines = list(PurchaseOrderLine.objects.filter(purchase_order=self.po))
+        self.assertEqual(len(relinked_lines), 1)
+        self.assertEqual(relinked_lines[0].qty_ordered, self.asset_request.qty)
 
 
 @pytest.mark.serial_only
@@ -96,7 +120,6 @@ class PurchaseOrderCancelReceiveRaceJourneyTests(TransactionTestCase):
             tenant=self.tenant, purchase_order=self.po, asset_type=asset_type, qty_ordered=1, unit_price="10.00"
         )
 
-    @pytest.mark.xfail(strict=True, reason="cancel and receive do not lock the PO row (#606)")
     def test_concurrent_cancel_and_receive_never_cancel_a_po_with_received_stock(self):
         receipt_written = Event()
         release_receipt = Event()
@@ -121,8 +144,9 @@ class PurchaseOrderCancelReceiveRaceJourneyTests(TransactionTestCase):
             set_current_tenant(self.tenant)
             try:
                 cancel_purchase_order(stale_po)
-            except ValidationError:
-                pass
+                return "success", ""
+            except ValidationError as exc:
+                return "validation_error", str(exc)
             finally:
                 set_current_tenant(None)
                 connections.close_all()
@@ -135,11 +159,11 @@ class PurchaseOrderCancelReceiveRaceJourneyTests(TransactionTestCase):
             Event().wait(1.0)
             release_receipt.set()
             receiving.result(timeout=20)
-            cancelling.result(timeout=20)
+            cancel_result = cancelling.result(timeout=20)
 
         self.po.refresh_from_db()
         received_assets = Asset._base_manager.filter(tenant=self.tenant).count()
-        self.assertFalse(
-            self.po.status == PurchaseOrder.STATUS_CANCELLED and received_assets > 0,
-            f"PO is {self.po.status} yet {received_assets} received asset(s) exist",
-        )
+        self.assertEqual(cancel_result[0], "validation_error", cancel_result)
+        self.assertIn("Received", cancel_result[1])
+        self.assertEqual(self.po.status, PurchaseOrder.STATUS_RECEIVED)
+        self.assertEqual(received_assets, 1)
