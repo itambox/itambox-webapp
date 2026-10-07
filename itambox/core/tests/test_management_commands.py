@@ -675,7 +675,7 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
     def test_seeded_repair_window_links_its_loan_and_disposal(self):
         """The repair maintenance anchors the story; its loan and disposal link to it (#644)."""
         asset = self._asset()
-        loaner = self._asset(name="Invariant Loaner", status=self.in_use)
+        loaner = self._asset(name="Invariant Loaner")
         start = datetime.date.today() - datetime.timedelta(days=30)
         end = datetime.date.today() - datetime.timedelta(days=20)
         maintenance = AssetMaintenance._base_manager.create(
@@ -685,13 +685,12 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
             start_date=start,
             completion_date=end,
         )
-        loan = AssetAssignment.objects.create(
-            asset=loaner,
-            assigned_user=self.holder,
-            is_loan=True,
-            checked_out_at=timezone.now() - datetime.timedelta(days=28),
-            due_date=end,
-            notes="Seeded stand-in loan.",
+        # A seeded stand-in loan is a real checkout, so the unit really wears the
+        # deployed status; its interval is back-dated into the repair window.
+        checkout_asset(loaner, holder=self.holder, user=self.requester, is_loan=True, due_date=end)
+        loan = AssetAssignment.objects.get(asset=loaner, is_active=True)
+        AssetAssignment._base_manager.filter(pk=loan.pk).update(
+            checked_out_at=timezone.now() - datetime.timedelta(days=28)
         )
         disposal = AssetDisposal._base_manager.create(
             asset=asset,
@@ -711,7 +710,7 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
     def test_seeded_links_outside_the_window_stay_unlinked(self):
         """Somebody else's loan and a disposal outside the window are not this repair's."""
         asset = self._asset()
-        loaner = self._asset(name="Invariant Spare", status=self.in_use)
+        loaner = self._asset(name="Invariant Spare")
         start = datetime.date.today() - datetime.timedelta(days=30)
         end = datetime.date.today() - datetime.timedelta(days=20)
         maintenance = AssetMaintenance._base_manager.create(
@@ -721,12 +720,10 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
             start_date=start,
             completion_date=end,
         )
-        foreign_loan = AssetAssignment.objects.create(
-            asset=loaner,
-            assigned_user=self.second_holder,
-            is_loan=True,
-            checked_out_at=timezone.now() - datetime.timedelta(days=28),
-            notes="Somebody else's loan.",
+        checkout_asset(loaner, holder=self.second_holder, user=self.requester, is_loan=True)
+        foreign_loan = AssetAssignment.objects.get(asset=loaner, is_active=True)
+        AssetAssignment._base_manager.filter(pk=foreign_loan.pk).update(
+            checked_out_at=timezone.now() - datetime.timedelta(days=28)
         )
         late_disposal = AssetDisposal._base_manager.create(
             asset=asset,

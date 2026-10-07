@@ -21,7 +21,7 @@ from assets.forms.disposal_form import AssetDisposalForm
 from assets.forms.fields import selectable_repair_maintenances
 from assets.models import Asset, AssetAssignment, AssetMaintenance, AssetReservation, AssetType, StatusLabel, Warranty
 from assets.models.lifecycle import AssetDisposal
-from assets.services import disposal_service_payload, dispose_asset, update_asset_disposal
+from assets.services import checkout_asset, disposal_service_payload, dispose_asset, update_asset_disposal
 from assets.services.timeline import build_asset_timeline
 from core.models import ObjectChange
 from core.tests.mixins import TenantTestMixin
@@ -51,22 +51,34 @@ def _maintenance(asset, start="2026-01-10", maintenance_type="repair", **kwargs)
 
 def _deployed_status():
     """A deployed-type label: an active assignment requires the asset to wear one."""
-    return baker.make(StatusLabel, type="deployed", name="Deployed")
+    return StatusLabel.objects.filter(type="deployed").first() or baker.make(
+        StatusLabel, type="deployed", name="Deployed"
+    )
 
 
 def _holder(**kwargs):
     return baker.make(AssetHolder, **kwargs)
 
 
-def _loan(asset, holder, maintenance=None, checked_out_at=None, **kwargs):
-    return AssetAssignment.objects.create(
-        asset=asset,
-        assigned_user=holder,
+def _loan(asset, holder, maintenance=None, due_date=None, **kwargs):
+    """Issue a real loan: the checkout service owns the deployed status (#644)."""
+    _deployed_status()
+    checkout_asset(
+        asset,
+        holder=holder,
         is_loan=True,
+        due_date=due_date,
         maintenance=maintenance,
-        checked_out_at=checked_out_at or timezone.now(),
         **kwargs,
     )
+    return AssetAssignment.objects.get(asset=asset, is_active=True)
+
+
+def _handover(asset, holder, **kwargs):
+    """A plain checkout, so the timeline has a non-loan assignment to show."""
+    _deployed_status()
+    checkout_asset(asset, holder=holder, **kwargs)
+    return AssetAssignment.objects.get(asset=asset, is_active=True)
 
 
 def _reservation(asset, start="2026-01-20", holder=None, **kwargs):
@@ -98,7 +110,7 @@ def _disposal(asset, maintenance=None, day="2026-02-01", **kwargs):
 class RepairTimelineTests(TestCase):
     def setUp(self):
         self.asset = _asset("Main Laptop")
-        self.loaner = _asset("Loaner Laptop", status=_deployed_status())
+        self.loaner = _asset("Loaner Laptop")
         self.holder = _holder()
 
     def test_empty_timeline_has_no_events(self):
@@ -116,8 +128,7 @@ class RepairTimelineTests(TestCase):
             end_date=datetime.date(2027, 1, 5),
         )
         _reservation(self.asset, start="2026-01-20")
-        handed_out = _asset("Handed Out Laptop", status=_deployed_status())
-        AssetAssignment.objects.create(asset=handed_out, assigned_user=self.holder)
+        _handover(_asset("Handed Out Laptop"), self.holder)
 
         timeline = build_asset_timeline(self.asset)
         self.assertFalse(timeline.has_groups)
@@ -168,7 +179,7 @@ class RepairTimelineTests(TestCase):
 
     def test_a_loan_for_another_asset_is_a_plain_event(self):
         """A loan that belongs to no repair is still an event, in chronological order."""
-        _loan(self.loaner, self.holder, due_date=datetime.date(2026, 3, 1))
+        _loan(self.loaner, self.holder, due_date=datetime.date.today() + datetime.timedelta(days=1))
 
         timeline = build_asset_timeline(self.loaner)
         self.assertFalse(timeline.has_groups)
@@ -367,7 +378,7 @@ class RepairTimelineDetailViewTests(TenantTestMixin, TestCase):
         self.user = baker.make(User, is_superuser=True, is_staff=True)
         self.client.force_login(self.user)
         self.asset = _asset("View Laptop", tenant=self.tenant)
-        self.loaner = _asset("View Loaner", tenant=self.tenant, status=_deployed_status())
+        self.loaner = _asset("View Loaner", tenant=self.tenant)
         self.holder = _holder(tenant=self.tenant)
         self.maintenance = _maintenance(self.asset)
         _loan(self.loaner, self.holder, maintenance=self.maintenance)
