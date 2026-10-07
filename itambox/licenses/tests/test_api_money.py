@@ -26,7 +26,7 @@ class LicensePurchaseCostRestTests(APITestCase):
             username="lic-reader", email="lic-reader@example.com", password="pw"
         )
         self.tenant = Tenant.objects.create(name="Lic Money", slug="lic-money")
-        manufacturer = Manufacturer.objects.create(name="Lic Money Maker", tenant=self.tenant)
+        manufacturer = Manufacturer.objects.create(name="Lic Money Maker")
         self.software = Software.objects.create(name="Lic Money App", manufacturer=manufacturer, tenant=self.tenant)
         grant(
             self.user,
