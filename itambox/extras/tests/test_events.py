@@ -6,8 +6,9 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import connection, transaction
 from django.test import TransactionTestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from assets.models import Manufacturer
@@ -22,6 +23,16 @@ class EventsSystemTestCase(TransactionTestCase):
     def setUp(self):
         super().setUp()
         self.manufacturer_ct = ContentType.objects.get_for_model(Manufacturer)
+
+    def _subscribe(self, events):
+        """Events are only recorded for subscribed models (#621)."""
+        return EventRule.objects.create(
+            name="subscription",
+            model=self.manufacturer_ct,
+            events=events,
+            action_type=EventRule.ACTION_NOTIFICATION,
+            enabled=True,
+        )
 
     @override_settings(Q_CLUSTER={"sync": False})
     def test_webhook_enqueue_waits_for_commit(self):
@@ -42,6 +53,7 @@ class EventsSystemTestCase(TransactionTestCase):
 
     @patch("core.http.request_pinned")
     def test_event_dispatch_on_create_update_delete(self, mock_request_pinned):
+        self._subscribe(["create", "update", "delete"])
         # Create
         mfr = Manufacturer.objects.create(name="Lenovo", slug="lenovo")
 
@@ -63,6 +75,7 @@ class EventsSystemTestCase(TransactionTestCase):
         self.assertIsNotNone(event_delete)
 
     def test_delete_event_preserves_original_object_id_until_commit(self):
+        self._subscribe(["delete"])
         mfr = Manufacturer.objects.create(name="Commit Identity Mfr", slug="commit-identity-mfr")
         object_id = mfr.pk
 
@@ -89,6 +102,7 @@ class EventsSystemTestCase(TransactionTestCase):
 
     @patch("extras.services.events.process_event_rules")
     def test_explicit_object_id_overrides_instance_primary_key(self, process_event_rules):
+        self._subscribe(["delete"])
         mfr = Manufacturer.objects.create(name="Explicit Identity Mfr", slug="explicit-identity-mfr")
         explicit_object_id = mfr.pk + 1000
         process_event_rules.reset_mock()
@@ -626,13 +640,9 @@ class EventsSystemTestCase(TransactionTestCase):
             enabled=True,
         )
         mfr = Manufacturer.objects.create(name="LegacyTest", slug="legacy-test-mfr")
-        # Must not raise; dispatch_event creates and processes a new Event.
+        # Must not raise; a script-only rule can never act, so no Event is recorded (#621).
         dispatch_event(Manufacturer, mfr, "update")
-        dispatched = (
-            Event.objects.filter(model=self.manufacturer_ct, object_id=mfr.pk, action="update").order_by("-pk").first()
-        )
-        self.assertIsNotNone(dispatched)
-        self.assertTrue(dispatched.processed)
+        self.assertFalse(Event.objects.filter(model=self.manufacturer_ct, object_id=mfr.pk, action="update").exists())
 
     @patch("core.http.request_pinned")
     def test_notification_channels(self, mock_request_pinned):
@@ -687,3 +697,92 @@ class EventsSystemTestCase(TransactionTestCase):
         self.assertGreater(Notification.objects.count(), initial_count)
         notif = Notification.objects.filter(user=staff_user).latest("pk")
         self.assertEqual(notif.subject, "Subject In-App")
+
+
+class LeanEventPipelineTests(TransactionTestCase):
+    """No Event row or rule transaction for saves that no rule could act on (#621)."""
+
+    def setUp(self):
+        super().setUp()
+        self.ct = ContentType.objects.get_for_model(Manufacturer)
+
+    def _rule(self, **overrides):
+        values = {
+            "name": "lean rule",
+            "model": self.ct,
+            "events": ["create"],
+            "action_type": EventRule.ACTION_NOTIFICATION,
+            "enabled": True,
+        }
+        values.update(overrides)
+        return EventRule.objects.create(**values)
+
+    def test_no_rules_writes_no_event_and_opens_no_locked_transaction(self):
+        with patch("extras.services.events.process_event_rules") as process:
+            Manufacturer.objects.create(name="Lean None", slug="lean-none")
+        self.assertFalse(Event.objects.filter(model=self.ct).exists())
+        process.assert_not_called()
+
+    def test_rule_for_other_action_writes_no_event(self):
+        self._rule(events=["delete"])
+        Manufacturer.objects.create(name="Lean Other Action", slug="lean-other-action")
+        self.assertFalse(Event.objects.filter(model=self.ct, action="create").exists())
+
+    def test_rule_for_other_model_writes_no_event(self):
+        self._rule(model=ContentType.objects.get_for_model(Location))
+        Manufacturer.objects.create(name="Lean Other Model", slug="lean-other-model")
+        self.assertFalse(Event.objects.filter(model=self.ct).exists())
+
+    def test_disabled_and_soft_deleted_rules_write_no_event(self):
+        self._rule(enabled=False, name="off")
+        self._rule(name="gone").delete()
+        Manufacturer.objects.create(name="Lean Disabled", slug="lean-disabled")
+        self.assertFalse(Event.objects.filter(model=self.ct).exists())
+
+    def test_withdrawn_conditions_write_no_event(self):
+        self._rule(conditions={"rules": [{"field": "model_name", "op": "eq", "value": "manufacturer"}]})
+        Manufacturer.objects.create(name="Lean Withdrawn", slug="lean-withdrawn")
+        self.assertFalse(Event.objects.filter(model=self.ct).exists())
+
+    def test_other_tenant_rule_writes_no_event_but_global_rule_does(self):
+        tenant = Tenant.objects.create(name="Lean Tenant", slug="lean-tenant")
+        self._rule(tenant=tenant, name="tenant rule")
+        Manufacturer.objects.create(name="Lean Tenantless", slug="lean-tenantless")
+        self.assertFalse(Event.objects.filter(model=self.ct).exists())
+
+        self._rule(name="global rule")
+        mfr = Manufacturer.objects.create(name="Lean Global Hit", slug="lean-global-hit")
+        self.assertTrue(Event.objects.filter(model=self.ct, object_id=mfr.pk, action="create").exists())
+
+    def test_rule_writes_invalidate_the_cached_index(self):
+        Manufacturer.objects.create(name="Lean Before", slug="lean-before")
+        self.assertFalse(Event.objects.filter(model=self.ct).exists())
+
+        rule = self._rule()
+        mfr = Manufacturer.objects.create(name="Lean After Create", slug="lean-after-create")
+        self.assertTrue(Event.objects.filter(model=self.ct, object_id=mfr.pk).exists())
+
+        rule.enabled = False
+        rule.save()
+        other = Manufacturer.objects.create(name="Lean After Disable", slug="lean-after-disable")
+        self.assertFalse(Event.objects.filter(model=self.ct, object_id=other.pk).exists())
+
+        rule.enabled = True
+        rule.save()
+        rule.delete()
+        last = Manufacturer.objects.create(name="Lean After Delete", slug="lean-after-delete")
+        self.assertFalse(Event.objects.filter(model=self.ct, object_id=last.pk).exists())
+
+    def test_per_save_event_overhead_is_bounded(self):
+        Manufacturer.objects.create(name="Lean Warm", slug="lean-warm")  # warm ContentType + index caches
+        with CaptureQueriesContext(connection) as queries:
+            dispatch_event(Manufacturer, Manufacturer(pk=1), "create")
+        # Index served from cache: no Event insert, no select_for_update, no rule query.
+        self.assertEqual(len(queries), 0, [q["sql"] for q in queries.captured_queries])
+
+    def test_eligible_save_keeps_the_event_pipeline(self):
+        self._rule()
+        mfr = Manufacturer.objects.create(name="Lean Eligible", slug="lean-eligible")
+        event = Event.objects.get(model=self.ct, object_id=mfr.pk, action="create")
+        self.assertTrue(event.processed)
+        self.assertEqual(event.data, {"app_label": "assets", "model_name": "manufacturer"})
