@@ -17,8 +17,8 @@ from core.change_signals import post_soft_delete_cascade
 from core.mixins import SoftDeleteMixin
 from core.models import ChangeLoggingMixin, Notification
 from core.schedules import SCHEDULED_REPORT_TASK_PATH, remove_schedule
-from extras.models import ObjectWatch, ScheduledReport
-from extras.services.events import dispatch_event
+from extras.models import EventRule, ObjectWatch, ScheduledReport
+from extras.services.events import dispatch_event, invalidate_rule_index
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,8 @@ _PRE_SAVE_UID = "extras.signals.capture_prior_soft_delete_state.v1"
 _POST_SAVE_UID = "extras.signals.event_on_save.v1"
 _POST_DELETE_UID = "extras.signals.event_on_delete.v1"
 _CASCADE_SOFT_DELETE_UID = "extras.signals.event_on_cascade_soft_delete.v1"
+_RULE_SAVE_UID = "extras.signals.invalidate_rule_index_on_save.v1"
+_RULE_DELETE_UID = "extras.signals.invalidate_rule_index_on_delete.v1"
 
 # Models excluded from event dispatch + watcher-notify. Recursion guards
 # (ObjectChange/Event/Notification) plus high-frequency operational/archive rows
@@ -130,15 +132,20 @@ def event_on_save(sender, instance, created, **kwargs):
         return
 
     action, watch_action = _resolve_save_action(instance, created)
-    try:
-        transaction.on_commit(lambda: _safe_dispatch(sender, instance, action, created))
-    except Exception:
-        _safe_dispatch(sender, instance, action, created)
+    transaction.on_commit(lambda: _safe_dispatch(sender, instance, action, created))
 
     # Notify watchers (ObjectWatch subscribers only — bookmarks no longer notify).
     # Deferred to on_commit so a rolled-back save spends no has_perm work and writes
     # no Notification rows.
     _defer_notify_watchers(sender, instance, watch_action)
+
+
+@receiver(post_save, sender=EventRule, dispatch_uid=_RULE_SAVE_UID)
+@receiver(post_delete, sender=EventRule, dispatch_uid=_RULE_DELETE_UID)
+def invalidate_event_rule_index(sender, **kwargs):
+    """Rule writes change which events are worth recording: drop the cached index now and at commit."""
+    invalidate_rule_index()
+    transaction.on_commit(invalidate_rule_index)
 
 
 @receiver(post_delete, dispatch_uid=_POST_DELETE_UID)

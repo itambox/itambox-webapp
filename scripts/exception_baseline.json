@@ -364,14 +364,6 @@
       "count": 1
     },
     {
-      "path": "itambox/extras/signals.py",
-      "scope": "FunctionDef:event_on_save",
-      "handler_type": "Exception",
-      "classification": "silent",
-      "body_sha256": "af1bee26fe579289b6abbd268990c1798c924aedf059e13000ccb196e787621b",
-      "count": 1
-    },
-    {
       "path": "itambox/extras/tables.py",
       "scope": "ClassDef:JournalEntryTable/FunctionDef:render_content_object",
       "handler_type": "Exception",
