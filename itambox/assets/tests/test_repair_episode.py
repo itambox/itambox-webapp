@@ -10,13 +10,12 @@ existed renders as.
 
 import datetime
 import uuid
-
 from unittest.mock import PropertyMock, patch
 
 from django.contrib.auth import get_user_model
-from django.db import connection
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
+from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -444,7 +443,9 @@ class RepairEpisodeViewTests(TenantTestMixin, TestCase):
         recent_activity = response.context["recent_activity"]
         expected_records = list(reversed(records[1:]))
         self.assertEqual(len(recent_activity), 5)
-        self.assertEqual([event.url for event in recent_activity], [record.get_absolute_url() for record in expected_records])
+        self.assertEqual(
+            [event.url for event in recent_activity], [record.get_absolute_url() for record in expected_records]
+        )
         self.assertTrue(response.context["asset_timeline"].has_episodes)
         self.assertContains(response, "Recent activity")
         self.assertContains(response, "Show full timeline")
