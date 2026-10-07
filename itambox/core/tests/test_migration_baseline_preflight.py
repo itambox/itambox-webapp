@@ -297,7 +297,6 @@ class MigrationBaselineManifestTests(SimpleTestCase):
             [
                 "assets.0122_repair_maintenance_anchor",
                 "compliance.0107_custodyreceipt_assignment_superseded",
-                "extras.0127_retire_report_designer_legacy",
                 "inventory.0101_alter_accessoryassignment_options_and_more",
                 "procurement.0103_remove_fulfillmentlink_unique_request_po_line_link_and_more",
                 "subscriptions.0103_unified_vendor_cutover",

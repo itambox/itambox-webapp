@@ -15231,6 +15231,10 @@ msgstr "Der Mandantenfilter wurde zurückgesetzt, da der gewählte Geltungsberei
 # --- Repairs and loaners (#644) ---
 
 #: itambox/itambox/assets/services/__init__.py
+msgid "Returned from repair maintenance %(maintenance)s."
+msgstr "Aus der Reparatur-Wartung %(maintenance)s zurückgenommen."
+
+#: itambox/itambox/assets/services/__init__.py
 msgid "(no target)"
 msgstr "(kein Ziel)"
 

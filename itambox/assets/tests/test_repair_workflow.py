@@ -280,10 +280,11 @@ class AssetMaintenanceRepairFormTests(TestCase):
         self.assertEqual(AssetDisposal.objects.get(asset=self.asset).maintenance_id, maintenance.pk)
 
     def test_a_forged_disposal_without_the_permission_is_refused(self):
+        """The disposal input is refused on its own, even with no completion action."""
         loan = issue_repair_loaner(_maintenance(self.asset), self.loaner, self.user)
         self.request.user = baker.make(User)
         form = AssetMaintenanceForm(
-            data=self._data(repair_action="replace", dispose_original="on", disposal_method="recycle"),
+            data=self._data(dispose_original="on", disposal_method="recycle"),
             instance=loan.maintenance,
             request=self.request,
         )

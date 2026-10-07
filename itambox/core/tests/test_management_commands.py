@@ -675,7 +675,7 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
     def test_seeded_repair_window_links_its_loan_and_disposal(self):
         """The repair maintenance anchors the story; its loan and disposal link to it (#644)."""
         asset = self._asset()
-        loaner = self._asset(name="Invariant Loaner")
+        loaner = self._asset(name="Invariant Loaner", status=self.in_use)
         start = datetime.date.today() - datetime.timedelta(days=30)
         end = datetime.date.today() - datetime.timedelta(days=20)
         maintenance = AssetMaintenance._base_manager.create(
@@ -711,7 +711,7 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
     def test_seeded_links_outside_the_window_stay_unlinked(self):
         """Somebody else's loan and a disposal outside the window are not this repair's."""
         asset = self._asset()
-        loaner = self._asset(name="Invariant Spare")
+        loaner = self._asset(name="Invariant Spare", status=self.in_use)
         start = datetime.date.today() - datetime.timedelta(days=30)
         end = datetime.date.today() - datetime.timedelta(days=20)
         maintenance = AssetMaintenance._base_manager.create(

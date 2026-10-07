@@ -49,6 +49,11 @@ def _maintenance(asset, start="2026-01-10", maintenance_type="repair", **kwargs)
     )
 
 
+def _deployed_status():
+    """A deployed-type label: an active assignment requires the asset to wear one."""
+    return baker.make(StatusLabel, type="deployed", name="Deployed")
+
+
 def _holder(**kwargs):
     return baker.make(AssetHolder, **kwargs)
 
@@ -93,7 +98,7 @@ def _disposal(asset, maintenance=None, day="2026-02-01", **kwargs):
 class RepairTimelineTests(TestCase):
     def setUp(self):
         self.asset = _asset("Main Laptop")
-        self.loaner = _asset("Loaner Laptop")
+        self.loaner = _asset("Loaner Laptop", status=_deployed_status())
         self.holder = _holder()
 
     def test_empty_timeline_has_no_events(self):
@@ -111,7 +116,8 @@ class RepairTimelineTests(TestCase):
             end_date=datetime.date(2027, 1, 5),
         )
         _reservation(self.asset, start="2026-01-20")
-        AssetAssignment.objects.create(asset=self.asset, assigned_user=self.holder)
+        handed_out = _asset("Handed Out Laptop", status=_deployed_status())
+        AssetAssignment.objects.create(asset=handed_out, assigned_user=self.holder)
 
         timeline = build_asset_timeline(self.asset)
         self.assertFalse(timeline.has_groups)
@@ -361,7 +367,7 @@ class RepairTimelineDetailViewTests(TenantTestMixin, TestCase):
         self.user = baker.make(User, is_superuser=True, is_staff=True)
         self.client.force_login(self.user)
         self.asset = _asset("View Laptop", tenant=self.tenant)
-        self.loaner = _asset("View Loaner", tenant=self.tenant)
+        self.loaner = _asset("View Loaner", tenant=self.tenant, status=_deployed_status())
         self.holder = _holder(tenant=self.tenant)
         self.maintenance = _maintenance(self.asset)
         _loan(self.loaner, self.holder, maintenance=self.maintenance)

@@ -338,11 +338,14 @@ def _status_labels(label_ids: set) -> dict:
 def _maintenances_for_asset(asset) -> list[AssetMaintenance]:
     """The repair maintenances of the asset's story (#644).
 
-    Its own repairs, plus the repairs its loans belong to - the loaner of a repair
-    shows the same group as the unit that was under repair.
+    Its own repair maintenances, plus the repairs its loans belong to - the loaner of
+    a repair shows the same group as the unit that was under repair. Work that does
+    not take a unit out of service (an upgrade, a calibration) stays in the plain
+    chronological list.
     """
     return list(
         AssetMaintenance.objects.filter(Q(asset=asset) | Q(assignments__asset=asset))
+        .filter(maintenance_type=AssetMaintenance.MAINTENANCE_TYPE_REPAIR)
         .distinct()
         .select_related("asset")
         .order_by("-start_date")

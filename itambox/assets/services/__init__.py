@@ -455,6 +455,9 @@ def issue_repair_loaner(
     if loaner.tenant_id != maintenance.asset.tenant_id:
         raise ValidationError(_("The loaner must belong to the same tenant as the asset."))
 
+    # The expected completion is the loan's default return date: a stand-in is needed
+    # until the repair is done.
+    resolved_due_date = due_date or maintenance.completion_date
     with transaction.atomic():
         checkout_asset(
             loaner,
@@ -463,7 +466,7 @@ def issue_repair_loaner(
             request=request,
             notes=notes or _("Loaner issued for repair maintenance %(maintenance)s") % {"maintenance": maintenance.pk},
             is_loan=True,
-            due_date=due_date,
+            due_date=resolved_due_date,
             maintenance=maintenance,
         )
         return active_repair_loan(maintenance)
@@ -518,6 +521,14 @@ def _return_repair(maintenance, loan, *, user, request) -> "AssetAssignment":
             loan.asset,
             user=user,
             notes=_("Returned after repair maintenance %(maintenance)s completed.") % {"maintenance": maintenance.pk},
+            request=request,
+        )
+        # The repaired unit may still be recorded as held by that person; close that
+        # stale assignment first, so the hand-back is a clean, auditable checkout.
+        checkin_asset(
+            maintenance.asset,
+            user=user,
+            notes=_("Returned from repair maintenance %(maintenance)s.") % {"maintenance": maintenance.pk},
             request=request,
         )
         checkout_asset(
