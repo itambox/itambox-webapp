@@ -23,6 +23,10 @@ class JourneyMixin(TenantTestMixin):
         self.tenant = Tenant.objects.create(name=f"Journey {slug}", slug=slug)
         return self.tenant
 
+    def make_provider_tenant(self, slug="journey-provider"):
+        """A managing (``is_provider``) tenant -- the scope global catalogue work needs."""
+        return Tenant.objects.create(name=f"Journey {slug}", slug=slug, is_provider=True)
+
     def make_member(self, username, permissions, tenant=None):
         """A tenant member whose ONLY authority is a role carrying ``permissions``."""
         tenant = tenant or self.tenant
