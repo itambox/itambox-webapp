@@ -194,7 +194,9 @@ test.describe('GraphQL API Specs', () => {
       data: { query: mutation },
       headers: { 'X-CSRFToken': csrfToken },
     });
-    expect(response.status()).toBe(200);
+    // The GraphQL view answers an unresolvable operation with 400 and a JSON
+    // errors array (same contract as the journey GraphQL suite).
+    expect(response.status()).toBe(400);
     const json = await response.json();
     expect(json).toHaveProperty('errors');
     expect(json.errors.length).toBeGreaterThan(0);
