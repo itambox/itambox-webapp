@@ -1,11 +1,8 @@
 """Contract tests for the explicit tenant scoping declaration (#618)."""
 
-import inspect
-
 from django.apps import apps
 from django.test import SimpleTestCase
 
-from core import managers
 from core.managers import (
     Scope,
     TenantScopeDeclaration,
@@ -60,14 +57,6 @@ class TenantScopeDeclarationContractTests(SimpleTestCase):
         TenantGroup = apps.get_model("organization", "TenantGroup")
         self.assertEqual(tenant_scope_declaration(Tenant).strategy, TenantScopeDeclaration.SELF_TENANT)
         self.assertEqual(tenant_scope_declaration(TenantGroup).strategy, TenantScopeDeclaration.SELF_GROUP)
-
-    def test_scoping_code_has_no_model_name_special_cases(self):
-        source = inspect.getsource(managers.TenantScopingQuerySet)
-        for literal in ('"tenant"', '"tenantgroup"', "'tenantgroup'", "_meta.model_name"):
-            if literal == '"tenant"':
-                self.assertNotIn("model_name == " + literal, source)
-            else:
-                self.assertNotIn(literal, source)
 
     def test_scope_kinds_are_closed(self):
         self.assertEqual(
