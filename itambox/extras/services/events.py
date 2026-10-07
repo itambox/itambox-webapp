@@ -12,7 +12,8 @@ from uuid import UUID, uuid4
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.db import transaction
+from django.core.cache import cache
+from django.db import connection, transaction
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django_q.tasks import async_task
@@ -56,8 +57,72 @@ def _resolve_instance_tenant_id(instance):
     return None
 
 
+_RULE_INDEX_CACHE_KEY = "extras:event_rule_index:v1"
+_RULE_INDEX_TTL = 300
+
+
+def _actionable(rule):
+    """Whether a rule can ever act: the same gates ``_eligible_rules`` applies per event."""
+    return rule.action_type in (EventRule.ACTION_WEBHOOK, EventRule.ACTION_NOTIFICATION) and _check_conditions(
+        rule.conditions, None
+    )
+
+
+def _build_rule_index():
+    """Return ``{(content_type_id, tenant_id | None, action)}`` for every actionable live rule."""
+    index = set()
+    # unscoped: the index spans every tenant by design; it is keyed by tenant and never read ambiently
+    rules = EventRule._base_manager.filter(enabled=True, deleted_at__isnull=True).only(
+        "model_id", "tenant_id", "events", "action_type", "conditions"
+    )
+    for rule in rules:
+        if not _actionable(rule):
+            continue
+        for action in rule.events or []:
+            index.add((rule.model_id, rule.tenant_id, action))
+    return frozenset(index)
+
+
+def _rule_index():
+    try:
+        index = cache.get(_RULE_INDEX_CACHE_KEY)
+    # broad except: availability-tradeoff: a cache outage falls back to reading the rules from the database
+    except Exception:
+        index = None
+    if index is not None:
+        return index
+    index = _build_rule_index()
+    # Inside an open transaction the rows read may still roll back; cache only committed state.
+    if not connection.in_atomic_block:
+        try:
+            cache.set(_RULE_INDEX_CACHE_KEY, index, timeout=_RULE_INDEX_TTL)
+        # broad except: availability-tradeoff: an unwritable cache only costs one query per dispatch
+        except Exception:
+            logger.warning("Could not cache the event rule index")
+    return index
+
+
+def invalidate_rule_index():
+    """Drop the cached rule index; called on every EventRule write (and again at commit)."""
+    try:
+        cache.delete(_RULE_INDEX_CACHE_KEY)
+    # broad except: availability-tradeoff: the short TTL bounds staleness if the cache is unreachable
+    except Exception:
+        logger.warning("Could not invalidate the event rule index")
+
+
+def has_eligible_rules(content_type_id, tenant_id, action):
+    """Whether any rule could act on this (model, tenant, action): tenant-owned or global."""
+    index = _rule_index()
+    return (content_type_id, tenant_id, action) in index or (content_type_id, None, action) in index
+
+
 def dispatch_event(sender, instance, action, created=None, *, object_id=None):
-    """Dispatch an event when a ChangeLoggingMixin model is created, updated, or deleted."""
+    """Dispatch an event when a ChangeLoggingMixin model is created, updated, or deleted.
+
+    No ``Event`` row is written (and no rule transaction opened) unless at least one
+    eligible rule exists for the model, the object's own tenant and the action.
+    """
 
     if not issubclass(sender, ChangeLoggingMixin):
         return
@@ -68,6 +133,10 @@ def dispatch_event(sender, instance, action, created=None, *, object_id=None):
         logger.error("Skipping event with missing object id for %s:%s", sender.__name__, action)
         return
 
+    instance_tenant_id = _resolve_instance_tenant_id(instance)
+    if not has_eligible_rules(ct.pk, instance_tenant_id, action):
+        return
+
     event = Event.objects.create(
         model=ct,
         object_id=event_object_id,
@@ -75,7 +144,7 @@ def dispatch_event(sender, instance, action, created=None, *, object_id=None):
         data={"app_label": ct.app_label, "model_name": ct.model},
     )
 
-    process_event_rules(event, _resolve_instance_tenant_id(instance))
+    process_event_rules(event, instance_tenant_id)
 
 
 def _eligible_rules(event, instance_tenant_id):

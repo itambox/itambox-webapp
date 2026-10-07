@@ -8,7 +8,7 @@ from django.test import TestCase
 from assets.models import AssetReservation, ReservationStatusChoices
 from core.context import _request_id, set_current_user
 from core.models import ObjectChange
-from extras.models import Event
+from extras.models import Event, EventRule
 
 from .support import JourneyMixin, today
 
@@ -19,6 +19,14 @@ class CascadedSoftDeleteEventJourneyTests(JourneyMixin, TestCase):
         self.actor = self.make_member("event-actor", set())
 
     def test_cascaded_soft_delete_emits_a_delete_event_for_each_logged_child(self):
+        # Events are only recorded for models some rule subscribes to (#621).
+        EventRule.objects.create(
+            name="reservation lifecycle",
+            model=ContentType.objects.get_for_model(AssetReservation),
+            events=["delete", "restore"],
+            action_type=EventRule.ACTION_NOTIFICATION,
+            enabled=True,
+        )
         asset = self.make_asset()
         reservation = AssetReservation.objects.create(
             asset=asset,

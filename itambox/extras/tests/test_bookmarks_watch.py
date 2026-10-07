@@ -331,6 +331,16 @@ class SoftDeleteEventActionTests(TransactionTestCase):
 
         self.ct = ContentType.objects.get_for_model(Tag)
         _set_user_context(_make_user("sde_actor"))
+        # Events are only recorded for models some rule subscribes to (#621).
+        from extras.models import EventRule
+
+        EventRule.objects.create(
+            name="Tag lifecycle",
+            model=self.ct,
+            events=["create", "update", "delete", "restore"],
+            action_type=EventRule.ACTION_NOTIFICATION,
+            enabled=True,
+        )
         self.tag = Tag.objects.create(name="Lifecycle", slug="lifecycle")
 
     def tearDown(self):
