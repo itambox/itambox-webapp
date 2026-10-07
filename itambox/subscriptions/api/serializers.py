@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from assets.api.nested_serializers import NestedSupplierSerializer
 from assets.models import Supplier
-from core.managers import get_current_tenant
+from core.managers import Scope, get_current_tenant
 from extras.api.serializers import TagSerializer
 from itambox.api.base import BaseModelSerializer
 from itambox.api.fields import validate_gfk_target_tenant
@@ -120,7 +120,7 @@ class SubscriptionSerializer(BaseModelSerializer):
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
         self.fields["supplier_id"].queryset = Supplier.objects.filter(is_active=True)
-        self.fields["linked_contract_id"].queryset = Contract.objects.all()
+        self.fields["linked_contract_id"].queryset = Contract.objects.for_scope(Scope.current())
         if "owner_id" in self.fields:
             self.fields["owner_id"].queryset = _tenant_member_user_queryset()
 

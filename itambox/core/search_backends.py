@@ -7,6 +7,7 @@ from django.core.exceptions import EmptyResultSet, FieldError
 from django.db.models import F, Q, Value
 
 logger = logging.getLogger(__name__)
+from core.managers import Scope
 from itambox.utils import get_content_type_by_natural_key
 
 from .search import SEARCH_INDEXES
@@ -77,7 +78,10 @@ class DatabaseBackend:
             if empty_scope or not q_objects:
                 continue
 
-            queryset = model.objects.filter(q_objects)
+            queryset = model.objects.all()
+            if hasattr(queryset, "for_scope"):
+                queryset = queryset.for_scope(Scope.current())
+            queryset = queryset.filter(q_objects)
 
             capped_queryset = queryset[:MAX_SEARCH_RESULTS_PER_MODEL]
             try:

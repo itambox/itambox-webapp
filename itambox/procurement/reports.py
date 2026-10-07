@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
+from core.managers import Scope
 from core.reports.charts import generate_bar_chart
 from core.reports.contracts import ReportDefinition, ReportRequest, ReportResult, record_window_state
 from core.reports.formatting import _format_per_currency, _money, _record_currency
@@ -143,7 +144,8 @@ class ContractRenewalsReportProvider(ReportDefinition):
         # select_related 'tenant' avoids an N+1 when a contract's own currency
         # field is blank and the tenant's currency is the fallback.
         queryset = (
-            Contract.objects.filter(deleted_at__isnull=True)
+            Contract.objects.for_scope(Scope.current())
+            .filter(deleted_at__isnull=True)
             .select_related("supplier", "tenant")
             .prefetch_related("assets")
         )
