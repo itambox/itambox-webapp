@@ -52,6 +52,9 @@ error is raised anywhere.
    The `Failure` table is pruned by `prune_changelog` per
    `ITAMBOX_QTASK_FAILED_RETENTION_DAYS` (see [Data Retention](data-retention.md)).
 
+For a one-shot summary of worker, scheduler, queue and failure state run
+`python manage.py operational_health` (see [Operational health](operational-health.md)).
+
 If a worker was down, jobs that should have run are not replayed — run the
 underlying management command ad hoc if the effect matters (for example
 `python manage.py prune_changelog`).
