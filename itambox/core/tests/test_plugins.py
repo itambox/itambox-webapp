@@ -1,3 +1,4 @@
+import importlib
 import runpy
 import sys
 import types
@@ -52,6 +53,21 @@ def _api_compatible_config(plugin_name, **attrs):
             **attrs,
         },
     )
+
+
+def _raise_for_plugin_schema_import(name, *args, **kwargs):
+    """Fail only the plugin schema module import under test.
+
+    The core schema resolves cross-module GraphQL types lazily at build time, so
+    a blanket ``importlib.import_module`` failure would also break the core
+    schema instead of isolating the plugin failure.
+    """
+    if name == "test_mock_plugin.graphql":
+        raise RuntimeError("schema secret")
+    return _ORIGINAL_IMPORT_MODULE(name, *args, **kwargs)
+
+
+_ORIGINAL_IMPORT_MODULE = importlib.import_module
 
 
 class PluginLoaderTestCase(SimpleTestCase):
@@ -199,7 +215,7 @@ class PluginLoaderTestCase(SimpleTestCase):
                 "django.apps.apps.get_app_config",
                 return_value=types.SimpleNamespace(graphql_schema="test_mock_plugin.graphql"),
             ),
-            patch("importlib.import_module", side_effect=RuntimeError("schema secret")),
+            patch("importlib.import_module", side_effect=_raise_for_plugin_schema_import),
             self.settings(PLUGINS=[dummy_name]),
         ):
             namespace = runpy.run_path(str(module_path), run_name="issue99_core_schema")

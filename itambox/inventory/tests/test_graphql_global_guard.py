@@ -83,7 +83,7 @@ class GraphQLInventoryMutationsRemovedTests(TestCase):
         for user in (self.user, self.superuser):
             ctx = self._ctx(user)
             for document in documents:
-                result = schema.execute(document, context_value=ctx)
+                result = schema.execute_sync(document, context_value=ctx)
                 self.assertIsNotNone(result.errors, document)
         self.assertEqual(Kit.objects.filter(name="Global Kit").count(), 1)
         self.assertEqual(Accessory.objects.filter(name="Global Accessory").count(), 1)

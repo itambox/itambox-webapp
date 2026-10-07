@@ -1,23 +1,23 @@
-"""Explicit Graphene read types backed by specification DTOs.
+"""Explicit Strawberry read types backed by specification DTOs.
 
 These types intentionally expose only the frozen specification vocabulary.  They
 do not inherit Django model fields and they never perform ORM work from a Field
-or Choice resolver.
+or Choice resolver.  Roots are plain DTOs, so resolvers read DTO attributes
+directly and the value union converts DTOs explicitly.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
+from typing import Annotated
 
-import graphene
+import strawberry
 
 from extras.services.specifications.contracts import (
     FieldDefinitionDTO,
     PersistedFieldsetDTO,
     ResolvedFieldDTO,
-    ResolvedSectionDTO,
-    SpecificationDefinitionDTO,
-    SpecificationProjectionEntryDTO,
 )
 
 from .readers import (
@@ -35,32 +35,27 @@ from .readers import (
 from .scalars import CursorScalar, DateScalar, DecimalScalar, JSONScalar, SafeInteger
 
 
-class SpecificationTargetEnum(graphene.Enum):
+@strawberry.enum(name="SpecificationTarget")
+class SpecificationTargetEnum(Enum):
     ASSET_TYPE = "asset_type"
     ASSET = "asset"
 
-    class Meta:
-        name = "SpecificationTarget"
 
-
-class ScopeModeEnum(graphene.Enum):
+@strawberry.enum(name="ScopeMode")
+class ScopeModeEnum(Enum):
     TENANT = "tenant"
     TENANT_GROUP = "tenant_group"
     ALL_ACCESSIBLE = "all_accessible"
 
-    class Meta:
-        name = "ScopeMode"
 
-
-class LibraryExportModeEnum(graphene.Enum):
+@strawberry.enum(name="LibraryExportMode")
+class LibraryExportModeEnum(Enum):
     ORIGINAL_RELEASE = "original_release"
     EFFECTIVE_SNAPSHOT = "effective_snapshot"
 
-    class Meta:
-        name = "LibraryExportMode"
 
-
-class SpecificationFieldTypeEnum(graphene.Enum):
+@strawberry.enum(name="SpecificationFieldType")
+class SpecificationFieldTypeEnum(Enum):
     TEXT = "text"
     INTEGER = "integer"
     DECIMAL = "decimal"
@@ -69,109 +64,88 @@ class SpecificationFieldTypeEnum(graphene.Enum):
     SINGLE_SELECT = "single_select"
     MULTI_SELECT = "multi_select"
 
-    class Meta:
-        name = "SpecificationFieldType"
 
-
-class DefinitionLifecycleEnum(graphene.Enum):
+@strawberry.enum(name="DefinitionLifecycle")
+class DefinitionLifecycleEnum(Enum):
     ACTIVE = "active"
     DEPRECATED = "deprecated"
 
-    class Meta:
-        name = "DefinitionLifecycle"
 
-
-class FieldActivationEnum(graphene.Enum):
+@strawberry.enum(name="FieldActivation")
+class FieldActivationEnum(Enum):
     COMPOSED = "composed"
     GLOBAL = "global"
 
-    class Meta:
-        name = "FieldActivation"
 
-
-class SpecificationEntryStateEnum(graphene.Enum):
+@strawberry.enum(name="SpecificationEntryState")
+class SpecificationEntryStateEnum(Enum):
     CURRENT = "current"
     HISTORICAL = "historical"
     INVALID = "invalid"
     UNKNOWN = "unknown"
 
-    class Meta:
-        name = "SpecificationEntryState"
 
-
-class LibraryReconciliationStateEnum(graphene.Enum):
+@strawberry.enum(name="LibraryReconciliationState")
+class LibraryReconciliationStateEnum(Enum):
     UNCHANGED = "unchanged"
     LOCALLY_MODIFIED = "locally_modified"
     UNRECONCILED = "unreconciled"
     RETAINED_HISTORY = "retained_history"
 
-    class Meta:
-        name = "LibraryReconciliationState"
+
+@strawberry.type(name="Choice")
+class ChoiceType:
+    key: str
+    label: str
+    lifecycle: DefinitionLifecycleEnum
 
 
-class ChoiceType(graphene.ObjectType):
-    class Meta:
-        name = "Choice"
-
-    key = graphene.String(required=True)
-    label = graphene.String(required=True)
-    lifecycle = graphene.Field(DefinitionLifecycleEnum, required=True)
-
-
-class ChoiceSetType(graphene.ObjectType):
-    class Meta:
-        name = "ChoiceSet"
-
-    identity = graphene.String(required=True)
-    label = graphene.String(required=True)
-    resource_revision = graphene.String(required=True)
-    lifecycle = graphene.Field(DefinitionLifecycleEnum, required=True)
-    choices = graphene.List(graphene.NonNull(ChoiceType), required=True)
+@strawberry.type(name="ChoiceSet")
+class ChoiceSetType:
+    identity: str
+    label: str
+    resource_revision: str
+    lifecycle: DefinitionLifecycleEnum
+    choices: list[ChoiceType]
 
 
-class SpecificationValidationType(graphene.ObjectType):
-    class Meta:
-        name = "SpecificationValidation"
-
-    minimum = graphene.Field(DecimalScalar)
-    maximum = graphene.Field(DecimalScalar)
-    scale = graphene.Int()
-    max_length = graphene.Int()
-    max_values = graphene.Int()
-    regex = graphene.String()
-    rule = graphene.String()
+@strawberry.type(name="SpecificationValidation")
+class SpecificationValidationType:
+    minimum: DecimalScalar | None
+    maximum: DecimalScalar | None
+    scale: int | None
+    max_length: int | None
+    max_values: int | None
+    regex: str | None
+    rule: str | None
 
 
-class SpecificationFieldNode(graphene.ObjectType):
-    class Meta:
-        name = "SpecificationField"
+@strawberry.type(name="SpecificationField")
+class SpecificationFieldNode:
+    resource_revision: str
+    key: str
+    identity: str
+    label: str
+    help_text: str
 
-    resource_revision = graphene.String(required=True)
-    key = graphene.String(required=True)
-    identity = graphene.String(required=True)
-    label = graphene.String(required=True)
-    help_text = graphene.String(required=True)
-    targets = graphene.List(graphene.NonNull(SpecificationTargetEnum), required=True)
-    activation = graphene.Field(FieldActivationEnum, required=True)
-    field_type = graphene.Field(SpecificationFieldTypeEnum, required=True)
-    required = graphene.Boolean(required=True)
-    nullable = graphene.Boolean(required=True)
-    quantity_kind = graphene.String()
-    canonical_unit = graphene.String()
-    validation = graphene.Field(SpecificationValidationType, required=True)
-    lifecycle = graphene.Field(DefinitionLifecycleEnum, required=True)
-    choice_set = graphene.Field(ChoiceSetType)
-    sources = graphene.List(graphene.NonNull(graphene.String), required=True)
+    @strawberry.field
+    def targets(self) -> list[SpecificationTargetEnum]:
+        # ``self`` is the DTO root, not an instance of this class.
+        return [SpecificationTargetEnum(value) for value in sorted(self.targets)]  # type: ignore[attr-defined]
 
-    @staticmethod
-    def resolve_targets(field: FieldDefinitionDTO | ResolvedFieldDTO, info):
-        del info
-        return tuple(sorted(field.targets))
+    activation: FieldActivationEnum
+    field_type: SpecificationFieldTypeEnum
+    required: bool
+    nullable: bool
+    quantity_kind: str | None
+    canonical_unit: str | None
+    validation: SpecificationValidationType
+    lifecycle: DefinitionLifecycleEnum
+    choice_set: ChoiceSetType | None
 
-    @staticmethod
-    def resolve_sources(field: FieldDefinitionDTO | ResolvedFieldDTO, info):
-        del info
-        return tuple(str(identity) for identity in getattr(field, "contributing_section_identities", ()))
+    @strawberry.field
+    def sources(self) -> list[str]:
+        return [str(i) for i in getattr(self, "contributing_section_identities", ())]
 
 
 @dataclass(frozen=True)
@@ -180,198 +154,151 @@ class FieldsetView:
     fields: tuple[FieldDefinitionDTO | ResolvedFieldDTO, ...]
 
 
-class SpecificationFieldsetType(graphene.ObjectType):
-    class Meta:
-        name = "SpecificationFieldset"
+@strawberry.type(name="SpecificationFieldset")
+class SpecificationFieldsetType:
+    @strawberry.field
+    def resource_revision(self) -> str:
+        return self.definition.resource_revision  # type: ignore[attr-defined]
 
-    resource_revision = graphene.String(required=True)
-    identity = graphene.String(required=True)
-    label = graphene.String(required=True)
-    description = graphene.String(required=True)
-    lifecycle = graphene.Field(DefinitionLifecycleEnum, required=True)
-    fields = graphene.List(graphene.NonNull(SpecificationFieldNode), required=True)
+    @strawberry.field
+    def identity(self) -> str:
+        return self.definition.identity  # type: ignore[attr-defined]
 
-    @staticmethod
-    def resolve_resource_revision(fieldset: FieldsetView, info):
-        del info
-        return fieldset.definition.resource_revision
+    @strawberry.field
+    def label(self) -> str:
+        return self.definition.label  # type: ignore[attr-defined]
 
-    @staticmethod
-    def resolve_identity(fieldset: FieldsetView, info):
-        del info
-        return fieldset.definition.identity
+    @strawberry.field
+    def description(self) -> str:
+        return self.definition.description  # type: ignore[attr-defined]
 
-    @staticmethod
-    def resolve_label(fieldset: FieldsetView, info):
-        del info
-        return fieldset.definition.label
+    @strawberry.field
+    def lifecycle(self) -> DefinitionLifecycleEnum:
+        return DefinitionLifecycleEnum(self.definition.lifecycle)  # type: ignore[attr-defined]
 
-    @staticmethod
-    def resolve_description(fieldset: FieldsetView, info):
-        del info
-        return fieldset.definition.description
-
-    @staticmethod
-    def resolve_lifecycle(fieldset: FieldsetView, info):
-        del info
-        return fieldset.definition.lifecycle
-
-    @staticmethod
-    def resolve_fields(fieldset: FieldsetView, info):
-        del info
-        return fieldset.fields
+    @strawberry.field
+    def fields(self) -> list[SpecificationFieldNode]:
+        return list(self.fields)  # type: ignore[arg-type]
 
 
-class SpecificationSectionType(graphene.ObjectType):
-    class Meta:
-        name = "SpecificationSection"
+@strawberry.type(name="SpecificationSection")
+class SpecificationSectionType:
+    identity: str | None
+    label: str
 
-    identity = graphene.String()
-    label = graphene.String(required=True)
-    fields = graphene.List(graphene.NonNull(SpecificationFieldNode), required=True)
-
-    @staticmethod
-    def resolve_fields(section: ResolvedSectionDTO, info):
-        del info
-        return section.fields
+    @strawberry.field
+    def fields(self) -> list[SpecificationFieldNode]:
+        return list(self.fields)  # type: ignore[arg-type]
 
 
-class SpecificationDefinitionType(graphene.ObjectType):
-    class Meta:
-        name = "SpecificationDefinition"
+@strawberry.type(name="SpecificationDefinition")
+class SpecificationDefinitionType:
+    revision: str
 
-    revision = graphene.String(required=True)
-    target = graphene.Field(SpecificationTargetEnum, required=True)
-    sections = graphene.List(graphene.NonNull(SpecificationSectionType), required=True)
+    @strawberry.field
+    def target(self) -> SpecificationTargetEnum:
+        return SpecificationTargetEnum(self.target_kind)  # type: ignore[attr-defined]
 
-    @staticmethod
-    def resolve_target(definition: SpecificationDefinitionDTO, info):
-        del info
-        return definition.target_kind
-
-    @staticmethod
-    def resolve_sections(definition: SpecificationDefinitionDTO, info):
-        del info
-        return definition.rendered_sections
+    @strawberry.field
+    def sections(self) -> list[SpecificationSectionType]:
+        return list(self.rendered_sections)  # type: ignore[attr-defined,arg-type]
 
 
-class TextSpecificationValueType(graphene.ObjectType):
-    class Meta:
-        name = "TextSpecificationValue"
-
-    text = graphene.String(required=True)
+@strawberry.type(name="TextSpecificationValue")
+class TextSpecificationValueType:
+    text: str
 
 
-class IntegerSpecificationValueType(graphene.ObjectType):
-    class Meta:
-        name = "IntegerSpecificationValue"
-
-    integer = graphene.Field(SafeInteger, required=True)
+@strawberry.type(name="IntegerSpecificationValue")
+class IntegerSpecificationValueType:
+    integer: SafeInteger
 
 
-class DecimalSpecificationValueType(graphene.ObjectType):
-    class Meta:
-        name = "DecimalSpecificationValue"
-
-    decimal = graphene.Field(DecimalScalar, required=True)
+@strawberry.type(name="DecimalSpecificationValue")
+class DecimalSpecificationValueType:
+    decimal: DecimalScalar
 
 
-class BooleanSpecificationValueType(graphene.ObjectType):
-    class Meta:
-        name = "BooleanSpecificationValue"
-
-    boolean = graphene.Boolean(required=True)
+@strawberry.type(name="BooleanSpecificationValue")
+class BooleanSpecificationValueType:
+    boolean: bool
 
 
-class DateSpecificationValueType(graphene.ObjectType):
-    class Meta:
-        name = "DateSpecificationValue"
-
-    date = graphene.Field(DateScalar, required=True)
+@strawberry.type(name="DateSpecificationValue")
+class DateSpecificationValueType:
+    date: DateScalar
 
 
-class ChoiceSpecificationValueType(graphene.ObjectType):
-    class Meta:
-        name = "ChoiceSpecificationValue"
-
-    choice = graphene.String(required=True)
+@strawberry.type(name="ChoiceSpecificationValue")
+class ChoiceSpecificationValueType:
+    choice: str
 
 
-class MultiChoiceSpecificationValueType(graphene.ObjectType):
-    class Meta:
-        name = "MultiChoiceSpecificationValue"
-
-    choices = graphene.List(graphene.NonNull(graphene.String), required=True)
+@strawberry.type(name="MultiChoiceSpecificationValue")
+class MultiChoiceSpecificationValueType:
+    choices: list[str]
 
 
-class NullSpecificationValueType(graphene.ObjectType):
-    class Meta:
-        name = "NullSpecificationValue"
-
-    is_null = graphene.Boolean(required=True)
+@strawberry.type(name="NullSpecificationValue")
+class NullSpecificationValueType:
+    is_null: bool
 
 
-class UninterpretedSpecificationValueType(graphene.ObjectType):
-    class Meta:
-        name = "UninterpretedSpecificationValue"
-
-    json = graphene.Field(JSONScalar, required=True)
+@strawberry.type(name="UninterpretedSpecificationValue")
+class UninterpretedSpecificationValueType:
+    json: JSONScalar
 
 
-class SpecificationValueUnion(graphene.Union):
-    class Meta:
-        name = "SpecificationValue"
-        types = (
-            TextSpecificationValueType,
-            IntegerSpecificationValueType,
-            DecimalSpecificationValueType,
-            BooleanSpecificationValueType,
-            DateSpecificationValueType,
-            ChoiceSpecificationValueType,
-            MultiChoiceSpecificationValueType,
-            NullSpecificationValueType,
-            UninterpretedSpecificationValueType,
-        )
-
-    @classmethod
-    def resolve_type(cls, instance, info):
-        del info
-        type_map = {
-            TextSpecificationValue: TextSpecificationValueType,
-            IntegerSpecificationValue: IntegerSpecificationValueType,
-            DecimalSpecificationValue: DecimalSpecificationValueType,
-            BooleanSpecificationValue: BooleanSpecificationValueType,
-            DateSpecificationValue: DateSpecificationValueType,
-            ChoiceSpecificationValue: ChoiceSpecificationValueType,
-            MultiChoiceSpecificationValue: MultiChoiceSpecificationValueType,
-            NullSpecificationValue: NullSpecificationValueType,
-            UninterpretedSpecificationValue: UninterpretedSpecificationValueType,
-        }
-        for python_type, graphql_type in type_map.items():
-            if isinstance(instance, python_type):
-                return graphql_type
-        return None
+SpecificationValueUnion = Annotated[
+    TextSpecificationValueType
+    | IntegerSpecificationValueType
+    | DecimalSpecificationValueType
+    | BooleanSpecificationValueType
+    | DateSpecificationValueType
+    | ChoiceSpecificationValueType
+    | MultiChoiceSpecificationValueType
+    | NullSpecificationValueType
+    | UninterpretedSpecificationValueType,
+    strawberry.union("SpecificationValue"),
+]
 
 
-class SpecificationEntryType(graphene.ObjectType):
-    class Meta:
-        name = "SpecificationEntry"
+def _value_type_for(instance: object):
+    """Convert a reader value dataclass into the matching GraphQL object."""
+    if isinstance(instance, TextSpecificationValue):
+        return TextSpecificationValueType(text=instance.text)
+    if isinstance(instance, IntegerSpecificationValue):
+        return IntegerSpecificationValueType(integer=instance.integer)
+    if isinstance(instance, DecimalSpecificationValue):
+        return DecimalSpecificationValueType(decimal=instance.decimal)
+    if isinstance(instance, BooleanSpecificationValue):
+        return BooleanSpecificationValueType(boolean=instance.boolean)
+    if isinstance(instance, DateSpecificationValue):
+        return DateSpecificationValueType(date=instance.date)
+    if isinstance(instance, ChoiceSpecificationValue):
+        return ChoiceSpecificationValueType(choice=instance.choice)
+    if isinstance(instance, MultiChoiceSpecificationValue):
+        return MultiChoiceSpecificationValueType(choices=list(instance.choices))
+    if isinstance(instance, NullSpecificationValue):
+        return NullSpecificationValueType(is_null=instance.is_null)
+    if isinstance(instance, UninterpretedSpecificationValue):
+        return UninterpretedSpecificationValueType(json=instance.json)
+    return None
 
-    key = graphene.String(required=True)
-    definition = graphene.Field(SpecificationFieldNode)
-    state = graphene.Field(SpecificationEntryStateEnum, required=True)
-    reason_codes = graphene.List(graphene.NonNull(graphene.String), required=True)
-    value = graphene.Field(SpecificationValueUnion, required=True)
 
-    @staticmethod
-    def resolve_reason_codes(entry: SpecificationProjectionEntryDTO, info):
-        del info
-        return tuple(entry.reason_codes)
+@strawberry.type(name="SpecificationEntry")
+class SpecificationEntryType:
+    key: str
+    definition: SpecificationFieldNode | None
+    state: SpecificationEntryStateEnum
 
-    @staticmethod
-    def resolve_value(entry: SpecificationProjectionEntryDTO, info):
-        del info
-        return specification_value_for_entry(entry)
+    @strawberry.field
+    def reason_codes(self) -> list[str]:
+        return list(self.reason_codes)  # type: ignore[arg-type]
+
+    @strawberry.field
+    def value(self) -> SpecificationValueUnion:
+        return _value_type_for(specification_value_for_entry(self))  # type: ignore[arg-type]
 
 
 @dataclass(frozen=True)
@@ -381,31 +308,25 @@ class LibraryOriginView:
     state: str
 
 
-class LibraryOriginType(graphene.ObjectType):
-    class Meta:
-        name = "LibraryOrigin"
-
-    identity = graphene.String(required=True)
-    accepted_release = graphene.Field(SafeInteger)
-    state = graphene.Field(LibraryReconciliationStateEnum, required=True)
+@strawberry.type(name="LibraryOrigin")
+class LibraryOriginType:
+    identity: str
+    accepted_release: SafeInteger | None
+    state: LibraryReconciliationStateEnum
 
 
-class UserErrorType(graphene.ObjectType):
-    class Meta:
-        name = "UserError"
-
-    code = graphene.String(required=True)
-    path = graphene.List(graphene.NonNull(graphene.String), required=True)
-    field_key = graphene.String()
-    message = graphene.String(required=True)
+@strawberry.type(name="UserError")
+class UserErrorType:
+    code: str
+    path: list[str]
+    field_key: str | None
+    message: str
 
 
-class PageInfoType(graphene.ObjectType):
-    class Meta:
-        name = "PageInfo"
-
-    end_cursor = graphene.Field(CursorScalar)
-    has_next_page = graphene.Boolean(required=True)
+@strawberry.type(name="PageInfo")
+class PageInfoType:
+    end_cursor: CursorScalar | None
+    has_next_page: bool
 
 
 @dataclass(frozen=True)
@@ -432,20 +353,16 @@ class SpecificationFieldConnectionView:
     page_info: PageInfoType
 
 
-class SpecificationFieldEdgeType(graphene.ObjectType):
-    class Meta:
-        name = "SpecificationFieldEdge"
-
-    cursor = graphene.Field(CursorScalar, required=True)
-    node = graphene.Field(SpecificationFieldNode, required=True)
+@strawberry.type(name="SpecificationFieldEdge")
+class SpecificationFieldEdgeType:
+    cursor: CursorScalar
+    node: SpecificationFieldNode
 
 
-class SpecificationFieldConnectionType(graphene.ObjectType):
-    class Meta:
-        name = "SpecificationFieldConnection"
-
-    edges = graphene.List(graphene.NonNull(SpecificationFieldEdgeType), required=True)
-    page_info = graphene.Field(PageInfoType, required=True)
+@strawberry.type(name="SpecificationFieldConnection")
+class SpecificationFieldConnectionType:
+    edges: list[SpecificationFieldEdgeType]
+    page_info: PageInfoType
 
 
 __all__ = [

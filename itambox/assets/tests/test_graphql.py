@@ -268,7 +268,7 @@ class GraphQLTestCase(TestCase):
         self.assertNotIn("data", payload)
         self.assertEqual(
             payload["errors"][0]["message"],
-            "Field 'assets' argument 'requestedScope' of type 'RequestedScopeSelector!' is required, but it was not provided.",
+            "Argument 'Query.assets(requestedScope:)' of type 'RequestedScopeSelector!' is required, but it was not provided.",
         )
 
     def test_asset_lookup_requires_explicit_scope(self):
@@ -285,7 +285,7 @@ class GraphQLTestCase(TestCase):
         self.assertNotIn("data", payload)
         self.assertEqual(
             payload["errors"][0]["message"],
-            "Field 'asset' argument 'requestedScope' of type 'RequestedScopeSelector!' is required, but it was not provided.",
+            "Argument 'Query.asset(requestedScope:)' of type 'RequestedScopeSelector!' is required, but it was not provided.",
         )
 
     def test_tenant_isolation_boundary_query(self):

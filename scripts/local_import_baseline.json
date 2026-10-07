@@ -1151,12 +1151,6 @@
     },
     {
       "path": "itambox/core/views/graphql.py",
-      "context": "ClassDef:PrivateGraphQLView/FunctionDef:__init__",
-      "statement": "from graphene.validation import depth_limit_validator",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/views/graphql.py",
       "context": "ClassDef:PrivateGraphQLView/FunctionDef:dispatch",
       "statement": "from django.middleware.csrf import CsrfViewMiddleware",
       "count": 1
@@ -1164,25 +1158,7 @@
     {
       "path": "itambox/core/views/graphql.py",
       "context": "ClassDef:PrivateGraphQLView/FunctionDef:dispatch",
-      "statement": "from django.shortcuts import resolve_url",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/views/graphql.py",
-      "context": "ClassDef:PrivateGraphQLView/FunctionDef:dispatch",
       "statement": "from rest_framework.throttling import AnonRateThrottle, UserRateThrottle",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/views/graphql.py",
-      "context": "FunctionDef:field_count_limit_validator",
-      "statement": "from graphql.error import GraphQLError",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/views/graphql.py",
-      "context": "FunctionDef:field_count_limit_validator",
-      "statement": "from graphql.validation import ValidationRule",
       "count": 1
     },
     {

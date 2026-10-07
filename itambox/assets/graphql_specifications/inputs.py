@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-import graphene
+import strawberry
 
 from .types import ScopeModeEnum
 
 
-class RequestedScopeSelectorInput(graphene.InputObjectType):
-    class Meta:
-        name = "RequestedScopeSelector"
-
-    mode = ScopeModeEnum(required=True)
-    tenant_id = graphene.ID()
-    tenant_group_id = graphene.ID()
+@strawberry.input(name="RequestedScopeSelector")
+class RequestedScopeSelectorInput:
+    mode: ScopeModeEnum
+    tenant_id: strawberry.ID | None = None
+    tenant_group_id: strawberry.ID | None = None
 
 
 __all__ = ["RequestedScopeSelectorInput"]
