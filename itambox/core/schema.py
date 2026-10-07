@@ -1,7 +1,14 @@
+"""Root GraphQL schema for the read-only API.
+
+The per-app query types are merged into one root type; plugins may contribute
+their own Strawberry ``Query``/``Mutation`` types through the Experimental
+plugin API (``PluginConfig.graphql_schema``).
+"""
+
 import importlib
 import logging
 
-import graphene
+import strawberry
 from django.apps import apps
 from django.conf import settings
 
@@ -10,6 +17,8 @@ import inventory.schema
 import licenses.schema
 import software.schema
 import subscriptions.schema
+from assets.graphql_specifications.scalars import SCALAR_OVERRIDES
+from core.views.graphql import schema_extensions
 from itambox.plugins.utils import is_plugin_active, record_plugin_failure
 
 logger = logging.getLogger(__name__)
@@ -42,10 +51,25 @@ for plugin_name in getattr(settings, "PLUGINS", []):
         record_plugin_failure(plugin_name, exc, stage="graphql")
         logger.warning("GraphQL contribution disabled for plugin %s (%s)", plugin_name, type(exc).__name__)
 
-query_bases.append(graphene.ObjectType)
-
-Query = type("Query", tuple(query_bases), {})
+# Strawberry merges the fields of every base type into one root type.
+Query = strawberry.type(type("Query", tuple(query_bases), {}), name="Query")
 # No mutation root unless a plugin contributes one (core apps are REST-only for writes).
-Mutation = type("Mutation", (*mutation_bases, graphene.ObjectType), {}) if mutation_bases else None
+Mutation = strawberry.type(type("Mutation", tuple(mutation_bases), {}), name="Mutation") if mutation_bases else None
 
-schema = graphene.Schema(query=Query, mutation=Mutation)
+
+def build_schema(*, extensions=None) -> strawberry.Schema:
+    """Build the composed schema.
+
+    ``extensions`` defaults to the endpoint operation budgets; callers that
+    exercise resolution without the HTTP contract (reader tests, tooling) pass
+    an explicit empty sequence.
+    """
+    return strawberry.Schema(
+        query=Query,
+        mutation=Mutation,
+        extensions=schema_extensions() if extensions is None else extensions,
+        scalar_overrides=SCALAR_OVERRIDES,
+    )
+
+
+schema = build_schema()

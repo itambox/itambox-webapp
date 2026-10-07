@@ -3,45 +3,24 @@ from urllib.parse import quote
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import redirect
+from django.shortcuts import redirect, resolve_url
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
-from graphene_django.views import GraphQLView
-from graphql.validation import specified_rules
 from rest_framework import exceptions
+from strawberry.django.views import GraphQLView
+from strawberry.extensions import AddValidationRules, MaxAliasesLimiter, MaxTokensLimiter, QueryDepthLimiter
 
 from core.context import set_current_user
 from users.api.authentication import TokenAuthentication
 
-
-def field_count_limit_validator(max_fields=500, max_aliases=50):
-    """Bound total field selections and aliases in a single operation.
-
-    Depth limiting alone does not stop *breadth*: a query can stay within the
-    depth cap while aliasing the same expensive root field hundreds of times
-    (`a1: assets(...) a2: assets(...) ...`) to amplify DB load. This rule rejects
-    operations whose field/alias counts exceed sane limits.
-    """
-    from graphql.error import GraphQLError
-    from graphql.validation import ValidationRule
-
-    class FieldCountLimitRule(ValidationRule):
-        def __init__(self, context):
-            super().__init__(context)
-            self._fields = 0
-            self._aliases = 0
-
-        def enter_field(self, node, *_args):
-            self._fields += 1
-            if node.alias:
-                self._aliases += 1
-            if self._fields > max_fields:
-                self.report_error(GraphQLError(f"Query exceeds the maximum of {max_fields} field selections.", node))
-            elif self._aliases > max_aliases:
-                self.report_error(GraphQLError(f"Query exceeds the maximum of {max_aliases} aliases.", node))
-
-    return FieldCountLimitRule
+# Breadth budget for a single operation document. Strawberry's own
+# ``MaxAliasesLimiter`` covers alias amplification and ``QueryDepthLimiter``
+# covers nesting; this bounds the overall document size, standing in for the
+# previous 500-field-selection cap.
+MAX_OPERATION_TOKENS = 2000
+MAX_OPERATION_ALIASES = 50
+MAX_QUERY_DEPTH = 10
 
 
 def query_complexity_validator(max_complexity=1000, fan_out=10):
@@ -188,44 +167,54 @@ def query_complexity_validator(max_complexity=1000, fan_out=10):
     return QueryComplexityValidator
 
 
+def _has_pathless_errors(response_data):
+    """True when the payload carries an operation error raised before execution.
+
+    Parse and validation failures (including the depth, alias, document-size and
+    complexity budgets) carry no ``path``; resolver failures do. The Graphene
+    view this replaces answered the former with HTTP 400.
+    """
+    entries = response_data if isinstance(response_data, list) else [response_data]
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        for error in entry.get("errors") or ():
+            if not error.get("path"):
+                return True
+    return False
+
+
+def schema_extensions():
+    """Operation budgets applied to every request.
+
+    Depth, alias and document size use Strawberry's built-in limiters; the
+    estimated *cost* of nested list fan-out has no built-in equivalent, so the
+    custom complexity rule is kept alongside them.
+    """
+    return [
+        lambda: QueryDepthLimiter(max_depth=MAX_QUERY_DEPTH),
+        lambda: MaxAliasesLimiter(max_alias_count=MAX_OPERATION_ALIASES),
+        lambda: MaxTokensLimiter(max_token_count=MAX_OPERATION_TOKENS),
+        lambda: AddValidationRules([query_complexity_validator(max_complexity=2000, fan_out=10)]),
+    ]
+
+
 @method_decorator(csrf_exempt, name="dispatch")
 class PrivateGraphQLView(GraphQLView):
-    graphiql_template = "graphql/graphiql.html"
+    """Token-authenticated GraphQL endpoint with the interactive GraphiQL shell."""
 
-    def __init__(self, *args, **kwargs):
-        from graphene.validation import depth_limit_validator
-
-        rules = list(specified_rules)
-        rules.append(depth_limit_validator(max_depth=10))
-        rules.append(field_count_limit_validator(max_fields=500, max_aliases=50))
-        # Budget sized to admit legitimate two-list-deep reads (e.g. the
-        # adversarial-suite query assets->...->softwareProducts->...->
-        # softwareProducts->name, cost ~1231) while still rejecting egregious
-        # fan-out such as many aliased copies of an expensive list-over-list path.
-        rules.append(query_complexity_validator(max_complexity=2000, fan_out=10))
-
-        # Schema introspection is available to authenticated users in every
-        # environment, including production: the schema is not a secret and the
-        # endpoint stays auth-gated, and GraphiQL needs introspection for its
-        # docs explorer and autocompletion (NetBox follows the same model). The
-        # depth/field/complexity budgets above protect the endpoint regardless.
-        kwargs["validation_rules"] = rules
-        super().__init__(*args, **kwargs)
-
-    @property
-    def graphiql(self):
-        # GET authentication is enforced in dispatch(). Keep the interactive
-        # GraphiQL shell available to authenticated users in production too.
-        return True
-
-    @graphiql.setter
-    def graphiql(self, value):
-        pass
+    # Schema introspection is available to authenticated users in every
+    # environment, including production: the schema is not a secret and the
+    # endpoint stays auth-gated, and GraphiQL needs introspection for its
+    # docs explorer and autocompletion (NetBox follows the same model). The
+    # depth/alias/document/complexity budgets protect the endpoint regardless.
+    # GET authentication is enforced in dispatch(); the interactive shell
+    # (templates/graphql/graphiql.html) stays available to authenticated users.
+    graphql_ide = "graphiql"
+    allow_queries_via_get = True
 
     def dispatch(self, request, *args, **kwargs):
         if request.method == "GET" and not request.user.is_authenticated:
-            from django.shortcuts import resolve_url
-
             return redirect(f"{resolve_url(settings.LOGIN_URL)}?next={quote(request.get_full_path())}")
         elif request.method == "POST":
             if request.user.is_authenticated:
@@ -276,3 +265,15 @@ class PrivateGraphQLView(GraphQLView):
                     )
 
         return super().dispatch(request, *args, **kwargs)
+
+    def create_response(self, response_data, sub_response):
+        # Keep the HTTP contract of the previous Graphene view: an operation
+        # rejected before execution answers 400 and carries no ``data`` member.
+        if _has_pathless_errors(response_data):
+            for entry in response_data if isinstance(response_data, list) else [response_data]:
+                if isinstance(entry, dict):
+                    entry.pop("data", None)
+            response = super().create_response(response_data, sub_response)
+            response.status_code = 400
+            return response
+        return super().create_response(response_data, sub_response)

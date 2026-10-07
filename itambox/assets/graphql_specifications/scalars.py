@@ -10,10 +10,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import date
+from decimal import Decimal
+from typing import NewType
 
-import graphene
+import strawberry
 from graphql import GraphQLError
-from graphql.language import ast
+from strawberry.scalars import JSON
 
 from extras.services.specifications.codecs import SAFE_INTEGER_MAX, SAFE_INTEGER_MIN
 
@@ -30,138 +32,46 @@ def _safe_integer(value: object) -> int:
     return value
 
 
-class SafeInteger(graphene.Scalar):
-    """An integer representable exactly by JavaScript clients."""
-
-    class Meta:
-        name = "SafeInteger"
-        description = "An integer in the JavaScript safe-integer range."
-
-    @staticmethod
-    def serialize(value: object) -> int:
-        return _safe_integer(value)
-
-    @staticmethod
-    def parse_value(value: object) -> int:
-        return _safe_integer(value)
-
-    @staticmethod
-    def parse_literal(node: ast.ValueNode, _variables: Mapping[str, object] | None = None) -> int:
-        if not isinstance(node, ast.IntValueNode):
-            raise _scalar_error("SafeInteger", getattr(node, "value", node))
-        return _safe_integer(int(node.value))
+def _decimal_text(value: object) -> str:
+    if type(value) is not str:
+        raise _scalar_error("Decimal", value)
+    return value
 
 
-class DecimalScalar(graphene.Scalar):
-    """A fixed-scale decimal transported as its exact string representation."""
-
-    class Meta:
-        name = "Decimal"
-        description = "A decimal transported as a string to preserve fixed scale."
-
-    @staticmethod
-    def serialize(value: object) -> str:
-        if type(value) is not str:
-            raise _scalar_error("Decimal", value)
-        return value
-
-    @staticmethod
-    def parse_value(value: object) -> str:
-        if type(value) is not str:
-            raise _scalar_error("Decimal", value)
-        return value
-
-    @staticmethod
-    def parse_literal(node: ast.ValueNode, _variables: Mapping[str, object] | None = None) -> str:
-        if not isinstance(node, ast.StringValueNode):
-            raise _scalar_error("Decimal", getattr(node, "value", node))
-        return node.value
+def _decimal_serialize(value: object) -> str:
+    # Model Decimal columns (costs) serialize as their exact string; specification
+    # values are already strings.
+    if isinstance(value, Decimal):
+        return str(value)
+    return _decimal_text(value)
 
 
-class DateScalar(graphene.Scalar):
-    """An ISO-8601 calendar date transported without a datetime coercion."""
-
-    class Meta:
-        name = "Date"
-        description = "An ISO-8601 calendar date."
-
-    @staticmethod
-    def _parse(value: object) -> str:
-        if type(value) is not str:
-            raise _scalar_error("Date", value)
-        try:
-            date.fromisoformat(value)
-        except ValueError as exc:
-            raise _scalar_error("Date", value) from exc
-        return value
-
-    @staticmethod
-    def serialize(value: object) -> str:
-        if isinstance(value, date):
-            return value.isoformat()
-        return DateScalar._parse(value)
-
-    @staticmethod
-    def parse_value(value: object) -> str:
-        return DateScalar._parse(value)
-
-    @staticmethod
-    def parse_literal(node: ast.ValueNode, _variables: Mapping[str, object] | None = None) -> str:
-        if not isinstance(node, ast.StringValueNode):
-            raise _scalar_error("Date", getattr(node, "value", node))
-        return DateScalar._parse(node.value)
+def _date_text(value: object) -> str:
+    if type(value) is not str:
+        raise _scalar_error("Date", value)
+    try:
+        date.fromisoformat(value)
+    except ValueError as exc:
+        raise _scalar_error("Date", value) from exc
+    return value
 
 
-class CategoryDefaultSnapshotRevision(graphene.Scalar):
-    """Opaque non-empty Category-default snapshot revision."""
-
-    class Meta:
-        name = "CategoryDefaultSnapshotRevision"
-
-    @staticmethod
-    def _parse(value: object) -> str:
-        if type(value) is not str or not value:
-            raise _scalar_error("CategoryDefaultSnapshotRevision", value)
-        return value
-
-    @staticmethod
-    def serialize(value: object) -> str:
-        return CategoryDefaultSnapshotRevision._parse(value)
-
-    @staticmethod
-    def parse_value(value: object) -> str:
-        return CategoryDefaultSnapshotRevision._parse(value)
-
-    @staticmethod
-    def parse_literal(node: ast.ValueNode, _variables: Mapping[str, object] | None = None) -> str:
-        if not isinstance(node, ast.StringValueNode):
-            raise _scalar_error("CategoryDefaultSnapshotRevision", getattr(node, "value", node))
-        return CategoryDefaultSnapshotRevision._parse(node.value)
+def _date_serialize(value: object) -> str:
+    if isinstance(value, date):
+        return value.isoformat()
+    return _date_text(value)
 
 
-class CursorScalar(graphene.Scalar):
-    """Opaque, non-empty cursor text used by bounded connections."""
+def _revision_text(value: object) -> str:
+    if type(value) is not str or not value:
+        raise _scalar_error("CategoryDefaultSnapshotRevision", value)
+    return value
 
-    class Meta:
-        name = "Cursor"
 
-    @staticmethod
-    def serialize(value: object) -> str:
-        if type(value) is not str or not value:
-            raise _scalar_error("Cursor", value)
-        return value
-
-    @staticmethod
-    def parse_value(value: object) -> str:
-        if type(value) is not str or not value:
-            raise _scalar_error("Cursor", value)
-        return value
-
-    @staticmethod
-    def parse_literal(node: ast.ValueNode, _variables: Mapping[str, object] | None = None) -> str:
-        if not isinstance(node, ast.StringValueNode):
-            raise _scalar_error("Cursor", getattr(node, "value", node))
-        return CursorScalar.parse_value(node.value)
+def _cursor_text(value: object) -> str:
+    if type(value) is not str or not value:
+        raise _scalar_error("Cursor", value)
+    return value
 
 
 def _json_value(value: object) -> object:
@@ -174,39 +84,53 @@ def _json_value(value: object) -> object:
     raise _scalar_error("JSON", value)
 
 
-class JSONScalar(graphene.Scalar):
-    """Read-only JSON value transport for uninterpreted history."""
+SafeInteger = strawberry.scalar(
+    NewType("SafeInteger", int),
+    name="SafeInteger",
+    description="An integer in the JavaScript safe-integer range.",
+    serialize=_safe_integer,
+    parse_value=_safe_integer,
+)
+DecimalScalar = strawberry.scalar(
+    NewType("DecimalScalar", str),
+    name="Decimal",
+    description="A decimal transported as a string to preserve fixed scale.",
+    serialize=_decimal_serialize,
+    parse_value=_decimal_text,
+)
+DateScalar = strawberry.scalar(
+    NewType("DateScalar", str),
+    name="Date",
+    description="An ISO-8601 calendar date.",
+    serialize=_date_serialize,
+    parse_value=_date_text,
+)
+CategoryDefaultSnapshotRevision = strawberry.scalar(
+    NewType("CategoryDefaultSnapshotRevision", str),
+    name="CategoryDefaultSnapshotRevision",
+    description="Opaque non-empty Category-default snapshot revision.",
+    serialize=_revision_text,
+    parse_value=_revision_text,
+)
+CursorScalar = strawberry.scalar(
+    NewType("CursorScalar", str),
+    name="Cursor",
+    description="Opaque, non-empty cursor text used by bounded connections.",
+    serialize=_cursor_text,
+    parse_value=_cursor_text,
+)
+JSONScalar = strawberry.scalar(
+    NewType("JSONScalar", object),
+    name="JSON",
+    description="Read-only JSON value transport for uninterpreted history.",
+    serialize=_json_value,
+    parse_value=_json_value,
+)
 
-    class Meta:
-        name = "JSON"
-
-    @staticmethod
-    def serialize(value: object) -> object:
-        return _json_value(value)
-
-    @staticmethod
-    def parse_value(value: object) -> object:
-        return _json_value(value)
-
-    @staticmethod
-    def parse_literal(node: ast.ValueNode, variables: Mapping[str, object] | None = None) -> object:
-        del variables
-        if isinstance(node, ast.NullValueNode):
-            return None
-        if isinstance(node, ast.StringValueNode):
-            return node.value
-        if isinstance(node, ast.IntValueNode):
-            return int(node.value)
-        if isinstance(node, ast.FloatValueNode):
-            return float(node.value)
-        if isinstance(node, ast.BooleanValueNode):
-            return node.value
-        if isinstance(node, ast.ListValueNode):
-            return [JSONScalar.parse_literal(item) for item in node.values]
-        if isinstance(node, ast.ObjectValueNode):
-            return {field.name.value: JSONScalar.parse_literal(field.value) for field in node.fields}
-        raise _scalar_error("JSON", node)
-
+# Python types the schema maps onto the transport scalars above.
+# ``JSON`` replaces Strawberry's built-in JSON scalar so the read-only
+# transport keeps rejecting values the GraphQL JSON model cannot carry.
+SCALAR_OVERRIDES = {date: DateScalar, Decimal: DecimalScalar, JSON: JSONScalar}
 
 __all__ = [
     "CategoryDefaultSnapshotRevision",
@@ -216,5 +140,6 @@ __all__ = [
     "JSONScalar",
     "SAFE_INTEGER_MAX",
     "SAFE_INTEGER_MIN",
+    "SCALAR_OVERRIDES",
     "SafeInteger",
 ]

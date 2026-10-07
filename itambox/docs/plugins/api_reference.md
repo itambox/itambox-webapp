@@ -33,7 +33,7 @@ The following metadata and configuration attributes are supported:
 | `max_version` | `str` or `None` | **ITAMbox product** maximum version. Existing product-version semantics are unchanged. |
 | `min_plugin_api_version` | `str` | Minimum ITAMbox plugin API version supported by the plugin. Required for activation. |
 | `max_plugin_api_version` | `str` | Maximum ITAMbox plugin API version supported by the plugin. Required for activation. |
-| `graphql_schema` | `str` or `None` | Dotted module path containing optional Graphene `Query` and/or `Mutation` object types. |
+| `graphql_schema` | `str` or `None` | Dotted module path containing optional Strawberry `Query` and/or `Mutation` types. |
 
 `ready()` is the startup composition hook. It may use only the extension points listed below. A failure from `ready()` disables this plugin and is isolated from other plugins and Stable core.
 
@@ -103,7 +103,7 @@ A plugin package may also expose an optional `urls.py` module when `base_url` is
 
 ## GraphQL extension
 
-Set `PluginConfig.graphql_schema` to a module path. The module may export a Graphene `Query` class, a `Mutation` class, or both. ITAMbox composes those types into the existing schema. Plugin schema fields remain subject to the normal authentication, tenant middleware, permission, query-complexity, and zero-diagnostics contracts.
+Set `PluginConfig.graphql_schema` to a module path. The module may export a Strawberry `Query` class, a `Mutation` class, or both; ITAMbox composes their fields into the root schema. Plugin schema fields remain subject to the normal authentication, tenant middleware, permission, and operation-budget (depth, alias, document-size, complexity) contracts. Resolvers receive the Strawberry `Info`, whose `context.request` is the Django request.
 
 ## Private and unstable surface
 

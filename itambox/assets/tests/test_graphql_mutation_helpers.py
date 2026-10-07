@@ -11,10 +11,10 @@ class AssetGraphQLMutationHelperRemovalTests(SimpleTestCase):
         self.assertFalse(hasattr(assets_schema, "Mutation"))
 
     def test_composed_schema_does_not_expose_asset_write_fields(self):
-        mutation_type = schema.graphql_schema.mutation_type
-        if mutation_type is None:
+        if schema.mutation is None:
             return
 
+        sdl = schema.as_str()
         for field_name in ("createAsset", "updateAsset", "deleteAsset"):
             with self.subTest(field=field_name):
-                self.assertNotIn(field_name, mutation_type.fields)
+                self.assertNotIn(f"{field_name}(", sdl)

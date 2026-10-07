@@ -145,23 +145,26 @@ This viewset is mounted at `/api/plugins/itambox_esign/`.
 
 ## 5. GraphQL Schema Extension
 
-To extend the GraphQL schema, set `graphql_schema` in your config class and define standard Query/Mutation graphene ObjectTypes.
+To extend the GraphQL schema, set `graphql_schema` in your config class and define Strawberry `Query` and/or `Mutation` types.
 
 ### Example Schema
 
 Create `itambox_esign/graphql/schema.py`:
 
 ```python
-import graphene
+import strawberry
 
-class DocuSignStatusType(graphene.ObjectType):
-    status = graphene.String()
 
-class Query(graphene.ObjectType):
-    docusign_status = graphene.Field(DocuSignStatusType)
+@strawberry.type
+class DocuSignStatusType:
+    status: str
 
-    def resolve_docusign_status(self, info):
+
+@strawberry.type
+class Query:
+    @strawberry.field
+    def docusign_status(self) -> DocuSignStatusType:
         return DocuSignStatusType(status="Sent")
 ```
 
-ITAMbox will dynamically merge this query alongside all core GraphQL queries at setup time.
+ITAMbox merges this query alongside all core GraphQL queries at setup time; a Graphene contribution is rejected and logged as a plugin failure rather than aborting core startup.

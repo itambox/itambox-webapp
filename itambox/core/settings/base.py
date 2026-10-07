@@ -104,7 +104,6 @@ INSTALLED_APPS = [
     "drf_spectacular_sidecar",
     "users",
     "django_q",
-    "graphene_django",
     "mozilla_django_oidc",
 ]
 
@@ -616,9 +615,10 @@ from itambox.plugins.utils import load_plugins
 
 load_plugins(sys.modules[__name__])
 
-GRAPHENE = {
-    "SCHEMA": "core.schema.schema",
-    "MIDDLEWARE": [],
+# Strawberry-Django exposes model ``help_text`` as the GraphQL field description,
+# matching the descriptions the Graphene schema published before the port.
+STRAWBERRY_DJANGO = {
+    "FIELD_DESCRIPTION_FROM_HELP_TEXT": True,
 }
 
 # ==============================================================================

@@ -4,7 +4,7 @@ import { createClient } from 'graphql-ws';
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
-const settings = window.GRAPHENE_SETTINGS || {};
+const settings = window.GRAPHIQL_SETTINGS || {};
 const parameters = new URLSearchParams(window.location.hash.slice(1));
 const fetchURL = `${window.location.pathname}${window.location.search}`;
 const subscriptionPath = settings.subscriptionPath || window.location.pathname;
