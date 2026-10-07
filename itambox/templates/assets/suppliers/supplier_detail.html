@@ -121,7 +121,7 @@
                     {% elif assignment.priority == 'inactive' %}
                       <span class="badge bg-secondary text-secondary-fg">{% translate "Inactive" %}</span>
                     {% else %}
-                      <span class="badge bg-light text-dark">{{ assignment.get_priority_display }}</span>
+                      <span class="badge bg-surface-secondary text-body">{{ assignment.get_priority_display }}</span>
                     {% endif %}
                   </td>
                   <td>{% if assignment.contact.phone %}{{ assignment.contact.phone }}{% else %}{% translate "Not set" %}{% endif %}</td>
