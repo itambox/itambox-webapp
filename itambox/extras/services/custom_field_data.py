@@ -25,7 +25,7 @@ class CustomFieldDataOwner(Protocol):
     _state: _ModelState
 
     def save(self, *, using: str | None = None, update_fields: Sequence[str] | None = None) -> None:
-        pass  # pragma: no cover - Protocol declaration only
+        pass
 
 
 OwnerT = TypeVar("OwnerT", bound=CustomFieldDataOwner)
