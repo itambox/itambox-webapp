@@ -27,8 +27,21 @@ def paginate_queryset(qs, limit=None, offset=None, max_limit=MAX_PAGINATION_LIMI
     return qs[offset : offset + limit]
 
 
+def request_from_info(info):
+    """Return the Django request behind a Strawberry ``Info`` or plain context."""
+    context = info.context
+    request = getattr(context, "request", None)
+    if request is None and isinstance(context, dict):
+        request = context.get("request")
+    return request if request is not None else context
+
+
+def active_tenant_from_info(info):
+    return getattr(request_from_info(info), "active_tenant", None)
+
+
 def check_permission(info, perm, obj=None):
-    user = info.context.user
+    user = getattr(request_from_info(info), "user", None)
     if not user or not user.is_authenticated:
         raise PermissionDenied(_("Authentication credentials were not provided."))
     if not user.has_perm(perm, obj=obj):

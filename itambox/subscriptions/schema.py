@@ -1,82 +1,80 @@
-import graphene
-from django.contrib.contenttypes.models import ContentType
-from graphene_django import DjangoObjectType
+from __future__ import annotations
 
-from core.graphql_utils import check_permission, paginate_queryset
+import strawberry
+import strawberry_django
+from django.contrib.contenttypes.models import ContentType
+
+from assets.schema import SupplierNode, TenantNode
+from core.graphql_choice_enums import choice_enum
+from core.graphql_scalars import BigInt
+from core.graphql_utils import active_tenant_from_info, check_permission, paginate_queryset
 
 from .models import Subscription, SubscriptionAssignment
 
-# Node definitions
+
+@strawberry_django.type(ContentType, name="ContentTypeNode", fields=["id", "app_label", "model"])
+class ContentTypeNode:
+    pass
 
 
-class ContentTypeNode(DjangoObjectType):
-    class Meta:
-        model = ContentType
-        fields = ("id", "app_label", "model")
+SubscriptionTypeChoices = choice_enum(Subscription, "type")
+SubscriptionStatusChoices = choice_enum(Subscription, "status")
+SubscriptionCurrencyChoices = choice_enum(Subscription, "currency")
+SubscriptionBillingCycleChoices = choice_enum(Subscription, "billing_cycle")
 
 
-class SubscriptionNode(DjangoObjectType):
-    cost_center_id = graphene.ID()
-    cost_center_name = graphene.String()
-    auto_renewal = graphene.Boolean(deprecation_reason="Use vendorContractAutoRenews; autoRenewal is removed in 2.0.")
+@strawberry_django.type(
+    Subscription,
+    name="SubscriptionNode",
+    fields=[
+        "id",
+        "name",
+        "slug",
+        "start_date",
+        "renewal_date",
+        "renewal_cost",
+        "term_months",
+        "vendor_contract_auto_renews",
+        "licensed_quantity",
+        "contract_reference",
+        "cancellation_date",
+        "description",
+        "notes",
+        "created_at",
+        "updated_at",
+    ],
+)
+class SubscriptionNode:
+    supplier: SupplierNode
+    type: SubscriptionTypeChoices
+    status: SubscriptionStatusChoices
+    currency: SubscriptionCurrencyChoices | None
+    billing_cycle: SubscriptionBillingCycleChoices | None
+    tenant: TenantNode | None
 
-    class Meta:
-        model = Subscription
-        fields = (
-            "id",
-            "name",
-            "slug",
-            "supplier",
-            "type",
-            "status",
-            "start_date",
-            "renewal_date",
-            "renewal_cost",
-            "currency",
-            "billing_cycle",
-            "term_months",
-            "vendor_contract_auto_renews",
-            "licensed_quantity",
-            "contract_reference",
-            "linked_contract",
-            "cancellation_date",
-            "owner",
-            "description",
-            "notes",
-            "tenant",
-            "created_at",
-            "updated_at",
-        )
-
-    def resolve_cost_center_id(self, info):
+    @strawberry.field
+    def cost_center_id(self) -> strawberry.ID | None:
         return self.cost_center_id
 
-    def resolve_cost_center_name(self, info):
+    @strawberry.field
+    def cost_center_name(self) -> str | None:
         return str(self.cost_center) if self.cost_center_id else None
 
-    def resolve_auto_renewal(self, info):
+    @strawberry.field(deprecation_reason="Use vendorContractAutoRenews; autoRenewal is removed in 2.0.")
+    def auto_renewal(self) -> bool | None:
         return self.vendor_contract_auto_renews
 
 
-class SubscriptionAssignmentNode(DjangoObjectType):
-    content_type = graphene.Field(ContentTypeNode)
+@strawberry_django.type(
+    SubscriptionAssignment,
+    name="SubscriptionAssignmentNode",
+    fields=["id", "assigned_date", "notes", "created_at", "updated_at"],
+)
+class SubscriptionAssignmentNode:
+    subscription: SubscriptionNode
+    content_type: ContentTypeNode | None
+    object_id: BigInt
 
-    class Meta:
-        model = SubscriptionAssignment
-        fields = (
-            "id",
-            "subscription",
-            "content_type",
-            "object_id",
-            "assigned_date",
-            "assigned_by",
-            "notes",
-            "created_at",
-            "updated_at",
-        )
-
-
-# Sortable fields configuration
 
 SUBSCRIPTION_SORTABLE_FIELDS = {
     "name",
@@ -91,68 +89,64 @@ SUBSCRIPTION_SORTABLE_FIELDS = {
     "-updated_at",
 }
 
-# Queries
+_ASSIGNMENT_RELATED = ("subscription", "subscription__supplier", "assigned_by", "content_type")
 
 
-class Query(graphene.ObjectType):
-    subscriptions = graphene.List(
-        SubscriptionNode,
-        limit=graphene.Int(),
-        offset=graphene.Int(),
-        sort_by=graphene.String(),
-        name=graphene.String(),
-        status=graphene.String(),
-        type=graphene.String(),
-    )
-    subscription = graphene.Field(SubscriptionNode, id=graphene.ID(required=True))
-
-    subscription_assignments = graphene.List(
-        SubscriptionAssignmentNode,
-        limit=graphene.Int(),
-        offset=graphene.Int(),
-        subscription_id=graphene.ID(),
-    )
-    subscription_assignment = graphene.Field(SubscriptionAssignmentNode, id=graphene.ID(required=True))
-
-    def resolve_subscriptions(self, info, limit=None, offset=None, sort_by=None, **kwargs):
+@strawberry.type
+class Query:
+    @strawberry.field
+    def subscriptions(
+        self,
+        info: strawberry.Info,
+        limit: int | None = None,
+        offset: int | None = None,
+        sort_by: str | None = None,
+        name: str | None = None,
+        status: str | None = None,
+        type: str | None = None,  # noqa: A002 - public argument name
+    ) -> list[SubscriptionNode | None] | None:
         check_permission(info, "subscriptions.view_subscription")
         # TenantScopingSoftDeleteManager handles tenant scoping and active filtering.
         qs = Subscription.objects.select_related("supplier", "linked_contract", "tenant", "owner").all()
-        for key, val in kwargs.items():
+        for key, val in (("name", name), ("status", status), ("type", type)):
             if val is not None:
                 qs = qs.filter(**{key: val})
         if sort_by and sort_by in SUBSCRIPTION_SORTABLE_FIELDS:
             qs = qs.order_by(sort_by)
-        return paginate_queryset(qs, limit, offset)
+        return list(paginate_queryset(qs, limit, offset))
 
-    def resolve_subscription(self, info, id):
+    @strawberry.field
+    def subscription(self, info: strawberry.Info, id: strawberry.ID) -> SubscriptionNode | None:
         check_permission(info, "subscriptions.view_subscription")
         try:
             return Subscription.objects.select_related("supplier", "linked_contract", "tenant", "owner").get(pk=id)
         except Subscription.DoesNotExist:
             return None
 
-    def resolve_subscription_assignments(self, info, limit=None, offset=None, **kwargs):
+    @strawberry.field
+    def subscription_assignments(
+        self,
+        info: strawberry.Info,
+        limit: int | None = None,
+        offset: int | None = None,
+        subscription_id: strawberry.ID | None = None,
+    ) -> list[SubscriptionAssignmentNode | None] | None:
         check_permission(info, "subscriptions.view_subscriptionassignment")
-        active_tenant = getattr(info.context, "active_tenant", None)
         # SubscriptionAssignment has no direct tenant field, scope via its subscription
-        qs = SubscriptionAssignment.objects.select_related(
-            "subscription", "subscription__supplier", "assigned_by", "content_type"
-        ).filter(subscription__tenant=active_tenant)
-        for key, val in kwargs.items():
-            if val is not None:
-                qs = qs.filter(**{key: val})
-        return paginate_queryset(qs, limit, offset)
+        qs = SubscriptionAssignment.objects.select_related(*_ASSIGNMENT_RELATED).filter(
+            subscription__tenant=active_tenant_from_info(info)
+        )
+        if subscription_id is not None:
+            qs = qs.filter(subscription_id=subscription_id)
+        return list(paginate_queryset(qs, limit, offset))
 
-    def resolve_subscription_assignment(self, info, id):
+    @strawberry.field
+    def subscription_assignment(self, info: strawberry.Info, id: strawberry.ID) -> SubscriptionAssignmentNode | None:
         check_permission(info, "subscriptions.view_subscriptionassignment")
-        active_tenant = getattr(info.context, "active_tenant", None)
         try:
             return (
-                SubscriptionAssignment.objects.select_related(
-                    "subscription", "subscription__supplier", "assigned_by", "content_type"
-                )
-                .filter(subscription__tenant=active_tenant)
+                SubscriptionAssignment.objects.select_related(*_ASSIGNMENT_RELATED)
+                .filter(subscription__tenant=active_tenant_from_info(info))
                 .get(pk=id)
             )
         except SubscriptionAssignment.DoesNotExist:

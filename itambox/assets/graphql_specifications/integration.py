@@ -102,6 +102,8 @@ def authenticated_user(info: object) -> object:
         user = context.get("user")
     else:
         user = getattr(context, "user", None)
+        if user is None:
+            user = getattr(getattr(context, "request", None), "user", None)
     if user is None or not getattr(user, "is_authenticated", False):
         raise GraphQLError(
             "Authentication credentials were not provided.",

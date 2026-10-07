@@ -1,11 +1,9 @@
-<!--
-The request to this GraphQL server provided the header "Accept: text/html"
-and as a result has been presented GraphiQL - an in-browser IDE for
-exploring GraphQL.
-If you wish to receive JSON, provide the header "Accept: application/json" or
-add "&raw" to the end of the URL within a browser.
--->
 {% load static %}
+<!--
+GraphiQL - the in-browser GraphQL IDE served for browsers that request
+text/html from the token-authenticated /graphql/ endpoint. Request the endpoint
+with "Accept: application/json" (or append "&raw") to receive plain JSON.
+-->
 <!DOCTYPE html>
 <html>
   <head>
@@ -26,13 +24,8 @@ add "&raw" to the end of the URL within a browser.
     <div id="editor"></div>
     {% csrf_token %}
     <script type="application/javascript" nonce="{{ request.csp_nonce }}">
-      window.GRAPHENE_SETTINGS = {
-      {% if subscription_path %}
-        subscriptionPath: "{{ subscription_path }}",
-      {% endif %}
-        graphiqlHeaderEditorEnabled: {{ graphiql_header_editor_enabled|yesno:"true,false" }},
-        graphiqlShouldPersistHeaders: {{ graphiql_should_persist_headers|yesno:"true,false" }},
-        graphiqlInputValueDeprecation: {{ graphiql_input_value_deprecation|yesno:"true,false" }},
+      window.GRAPHIQL_SETTINGS = {
+        subscriptionPath: "{{ request.path }}",
       };
     </script>
     <script src="{% static 'dist/vendor/graphiql/graphiql-ui.js' %}"

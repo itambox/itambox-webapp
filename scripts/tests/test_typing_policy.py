@@ -1015,11 +1015,13 @@ class CommittedRecordTests(unittest.TestCase):
             sorted(
                 [
                     "itambox/assets/api/serializers.py",
+                    "itambox/assets/graphql_specifications/scalars.py",
                     "itambox/assets/model_book_value.py",
                     "itambox/compliance/audit_services.py",
                     "itambox/inventory/models_stock.py",
                     "itambox/core/auth/oidc.py",
                     "itambox/core/context.py",
+                    "itambox/core/graphql_scalars.py",
                     "itambox/core/identity_provisioning.py",
                     "itambox/core/management/commands/bind_oidc_identity.py",
                     "itambox/core/models.py",
@@ -1083,6 +1085,7 @@ class CommittedRecordTests(unittest.TestCase):
         self.assertEqual(
             {entry["path"]: (entry["scope"], entry["symbols"]) for entry in self.record["checked"]},
             {
+                "itambox/assets/graphql_specifications/scalars.py": ("module", []),
                 "itambox/assets/api/serializers.py": (
                     "symbols",
                     [
@@ -1129,6 +1132,7 @@ class CommittedRecordTests(unittest.TestCase):
                     ["configured_oidc_issuers", "validate_oidc_identity_input"],
                 ),
                 "itambox/core/models.py": ("symbols", ["write_object_change"]),
+                "itambox/core/graphql_scalars.py": ("module", []),
                 "itambox/core/identity_provisioning.py": ("module", []),
                 "itambox/core/oidc_identity.py": ("module", []),
                 "itambox/core/provider_slot.py": ("module", []),

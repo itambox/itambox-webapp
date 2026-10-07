@@ -389,9 +389,9 @@ class GraphQLAdversarialTestCase(TestCase):
         original_resolve_access_scope = graphql_integration.resolve_access_scope
 
         def capture_scope(info, requested_scope):
-            observed["request_active_tenant"] = info.context.active_tenant
+            observed["request_active_tenant"] = info.context.request.active_tenant
             observed["tenant_context"] = get_current_tenant()
-            observed["request_active_membership"] = info.context.active_membership
+            observed["request_active_membership"] = info.context.request.active_membership
             observed["membership_context"] = get_current_membership()
             observed["resolver_permission_boundary_reached"] = True
             return original_resolve_read_scope(info, requested_scope)
