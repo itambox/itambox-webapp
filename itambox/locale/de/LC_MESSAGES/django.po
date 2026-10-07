@@ -6767,12 +6767,6 @@ msgstr "Zugewiesen von"
 msgid "Subscription Assignment"
 msgstr "Abonnementszuweisung"
 
-msgid "Owner must be a member of the active tenant."
-msgstr "Der Eigentümer muss Mitglied des aktiven Mandanten sein."
-
-msgid "CostCenter model is not yet available."
-msgstr "Das CostCenter-Modell ist noch nicht verfügbar."
-
 msgid "Contact Email"
 msgstr "Kontakt-E-Mail"
 
@@ -11552,54 +11546,6 @@ msgstr "Diese Zuweisung kann hier nicht geändert werden. Verwenden Sie die auto
 msgid "Assignment hard purge requires the authorized purge service."
 msgstr "Das endgültige Löschen einer Zuweisung erfordert den autorisierten Löschdienst."
 
-#: itambox/inventory/schema.py:274
-msgid "Only superusers can create global accessories."
-msgstr "Nur Superuser können globales Zubehör erstellen."
-
-#: itambox/inventory/schema.py:321
-msgid "Only superusers can modify global accessories."
-msgstr "Nur Superuser können globales Zubehör ändern."
-
-#: itambox/inventory/schema.py:360
-msgid "Only superusers can delete global accessories."
-msgstr "Nur Superuser können globales Zubehör löschen."
-
-#: itambox/inventory/schema.py:390
-msgid "Only superusers can create global consumables."
-msgstr "Nur Superuser können globale Verbrauchsmaterialien erstellen."
-
-#: itambox/inventory/schema.py:430
-msgid "Only superusers can modify global consumables."
-msgstr "Nur Superuser können globale Verbrauchsmaterialien ändern."
-
-#: itambox/inventory/schema.py:467
-msgid "Only superusers can delete global consumables."
-msgstr "Nur Superuser können globale Verbrauchsmaterialien löschen."
-
-#: itambox/inventory/schema.py:491
-msgid "Only superusers can create global kits."
-msgstr "Nur Superuser können globale Kits erstellen."
-
-#: itambox/inventory/schema.py:522
-msgid "Only superusers can modify global kits."
-msgstr "Nur Superuser können globale Kits ändern."
-
-#: itambox/inventory/schema.py:552
-msgid "Only superusers can delete global kits."
-msgstr "Nur Superuser können globale Kits löschen."
-
-#: itambox/inventory/schema.py:583
-msgid "Only superusers can create global components."
-msgstr "Nur Superuser können globale Komponenten erstellen."
-
-#: itambox/inventory/schema.py:624
-msgid "Only superusers can modify global components."
-msgstr "Nur Superuser können globale Komponenten ändern."
-
-#: itambox/inventory/schema.py:666
-msgid "Only superusers can delete global components."
-msgstr "Nur Superuser können globale Komponenten löschen."
-
 #: itambox/inventory/services.py:119
 msgid "Checkout is not authorized in the active tenant."
 msgstr "Die Herausgabe ist im aktiven Mandanten nicht autorisiert."
@@ -11704,10 +11650,6 @@ msgstr "Dieses Asset belegt bereits einen Platz dieser Lizenz."
 #: itambox/licenses/forms.py:220
 msgid "No seats available on this license."
 msgstr "Für diese Lizenz sind keine Plätze verfügbar."
-
-#: itambox/licenses/schema.py:111
-msgid "Only superusers can create global licenses."
-msgstr "Nur Superuser können globale Lizenzen erstellen."
 
 #: itambox/licenses/services.py:42
 #, python-format
@@ -11830,18 +11772,6 @@ msgstr "Position bearbeiten"
 msgid "Delete line item"
 msgstr "Position löschen"
 
-#: itambox/software/schema.py:101
-msgid "Only superusers can create global software."
-msgstr "Nur Superuser können globale Software erstellen."
-
-#: itambox/software/schema.py:137
-msgid "Only superusers can modify global software."
-msgstr "Nur Superuser können globale Software ändern."
-
-#: itambox/software/schema.py:172
-msgid "Only superusers can delete global software."
-msgstr "Nur Superuser können globale Software löschen."
-
 #: itambox/software/tables.py:28
 msgid "Installs"
 msgstr "Installationen"
@@ -11866,10 +11796,6 @@ msgstr "Das Zuweisungsziel existiert nicht."
 #: itambox/subscriptions/models.py:616
 msgid "The assignment target must belong to the subscription tenant."
 msgstr "Das Zuweisungsziel muss zum Mandanten des Abonnements gehören."
-
-#: itambox/subscriptions/schema.py:481
-msgid "Only superusers can create global subscriptions."
-msgstr "Nur Superuser können globale Abonnements erstellen."
 
 #: itambox/templates/core/reports/report_template_form.html:48
 msgid "Preparing report preview..."
