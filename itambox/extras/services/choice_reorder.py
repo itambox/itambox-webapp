@@ -6,7 +6,7 @@ from collections.abc import Sequence
 
 from django.db import DEFAULT_DB_ALIAS, transaction
 
-from extras.models import CustomFieldChoiceSet
+from extras.models import CustomFieldChoice, CustomFieldChoiceSet
 from extras.services._definition_command_support import issue, reject_for, resource_revision_for_definition
 from extras.services.definition_command_contracts import (
     CustomFieldChoiceSetUpdateInputDTO,
@@ -34,11 +34,16 @@ def _check_reorder(choice_set, choices, keys, expected_resource_revision, using)
 
 
 def _set_position(actor, choice, position, using):
-    """Persist one new position through the definition command."""
+    """Persist one new position through the definition command.
+
+    The command locks and writes its own instance, so the caller's copy keeps the
+    pre-write version; re-read the row to send the revision the command expects.
+    """
+    fresh = CustomFieldChoice.objects.using(using).get(pk=choice.pk)
     return update_custom_field_choice(
         actor=actor,
         choice_id=choice.pk,
-        expected_resource_revision=ResourceRevision(str(resource_revision_for_definition(choice, using=using))),
+        expected_resource_revision=ResourceRevision(str(resource_revision_for_definition(fresh, using=using))),
         changes=CustomFieldChoiceUpdateInputDTO(position=position),
         using=using,
     )
