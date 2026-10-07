@@ -12994,9 +12994,665 @@ paths:
               schema:
                 $ref: '#/components/schemas/APIError'
       x-itambox-maturity: stable
+  /api/extras/custom-field-choice-sets/:
+    get:
+      operationId: extras_custom_field_choice_sets_list
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      - name: start
+        required: false
+        in: query
+        description: 'Keyset/cursor pagination: return results with pk >= start, ordered
+          by pk. Skips the (capped) row count and stays O(page) regardless of table
+          size — use this instead of offset/limit for bulk export or iterating large
+          collections. Follow the `next` link to walk subsequent pages.'
+        schema:
+          type: integer
+      tags:
+      - extras
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedChoiceSetReadList'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+    post:
+      operationId: extras_custom_field_choice_sets_create
+      tags:
+      - extras
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChoiceSetCreateInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChoiceSetCreateInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChoiceSetCreateInputRequest'
+        required: true
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoiceSetRead'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/extras/custom-field-choice-sets/{id}/:
+    get:
+      operationId: extras_custom_field_choice_sets_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this custom field choice set.
+        required: true
+      tags:
+      - extras
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoiceSetRead'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+    patch:
+      operationId: extras_custom_field_choice_sets_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this custom field choice set.
+        required: true
+      tags:
+      - extras
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedLabelInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedLabelInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedLabelInputRequest'
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoiceSetRead'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/extras/custom-field-choice-sets/{id}/choices/:
+    post:
+      operationId: extras_custom_field_choice_sets_choices_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this custom field choice set.
+        required: true
+      tags:
+      - extras
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChoiceEntryInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChoiceEntryInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChoiceEntryInputRequest'
+        required: true
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoiceRead'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/extras/custom-field-choice-sets/{id}/deprecate/:
+    post:
+      operationId: extras_custom_field_choice_sets_deprecate_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this custom field choice set.
+        required: true
+      tags:
+      - extras
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoiceSetRead'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/extras/custom-field-choice-sets/{id}/reorder/:
+    post:
+      operationId: extras_custom_field_choice_sets_reorder_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this custom field choice set.
+        required: true
+      tags:
+      - extras
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReorderInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReorderInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ReorderInputRequest'
+        required: true
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoiceSetRead'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/extras/custom-field-choices/:
+    get:
+      operationId: extras_custom_field_choices_list
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      - name: start
+        required: false
+        in: query
+        description: 'Keyset/cursor pagination: return results with pk >= start, ordered
+          by pk. Skips the (capped) row count and stays O(page) regardless of table
+          size — use this instead of offset/limit for bulk export or iterating large
+          collections. Follow the `next` link to walk subsequent pages.'
+        schema:
+          type: integer
+      tags:
+      - extras
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedChoiceReadList'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/extras/custom-field-choices/{id}/:
+    get:
+      operationId: extras_custom_field_choices_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this custom field choice.
+        required: true
+      tags:
+      - extras
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoiceRead'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+    patch:
+      operationId: extras_custom_field_choices_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this custom field choice.
+        required: true
+      tags:
+      - extras
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedLabelInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedLabelInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedLabelInputRequest'
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoiceRead'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '401':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/extras/custom-field-choices/{id}/deprecate/:
+    post:
+      operationId: extras_custom_field_choices_deprecate_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this custom field choice.
+        required: true
+      tags:
+      - extras
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoiceRead'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
   /api/extras/custom-fields/:
     get:
       operationId: extras_custom_fields_list
+      description: Replace the generic model write path with definition-command calls.
       parameters:
       - in: query
         name: field_type
@@ -13089,19 +13745,20 @@ paths:
                 $ref: '#/components/schemas/APIError'
     post:
       operationId: extras_custom_fields_create
+      description: Replace the generic model write path with definition-command calls.
       tags:
       - extras
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CustomFieldRequest'
+              $ref: '#/components/schemas/CustomFieldCreateInputRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/CustomFieldRequest'
+              $ref: '#/components/schemas/CustomFieldCreateInputRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/CustomFieldRequest'
+              $ref: '#/components/schemas/CustomFieldCreateInputRequest'
         required: true
       security:
       - TokenAuth: []
@@ -13152,6 +13809,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     put:
       operationId: extras_custom_fields_update_bulk
+      description: Replace the generic model write path with definition-command calls.
       tags:
       - extras
       requestBody:
@@ -13215,6 +13873,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     patch:
       operationId: extras_custom_fields_partial_update_bulk
+      description: Replace the generic model write path with definition-command calls.
       tags:
       - extras
       requestBody:
@@ -13277,6 +13936,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     delete:
       operationId: extras_custom_fields_destroy_bulk
+      description: Replace the generic model write path with definition-command calls.
       tags:
       - extras
       security:
@@ -13319,6 +13979,7 @@ paths:
   /api/extras/custom-fields/{id}/:
     get:
       operationId: extras_custom_fields_retrieve
+      description: Replace the generic model write path with definition-command calls.
       parameters:
       - in: path
         name: id
@@ -13365,6 +14026,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     put:
       operationId: extras_custom_fields_update
+      description: Replace the generic model write path with definition-command calls.
       parameters:
       - in: path
         name: id
@@ -13378,14 +14040,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CustomFieldRequest'
+              $ref: '#/components/schemas/CustomFieldUpdateInputRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/CustomFieldRequest'
+              $ref: '#/components/schemas/CustomFieldUpdateInputRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/CustomFieldRequest'
-        required: true
+              $ref: '#/components/schemas/CustomFieldUpdateInputRequest'
       security:
       - TokenAuth: []
       - cookieAuth: []
@@ -13441,6 +14102,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     patch:
       operationId: extras_custom_fields_partial_update
+      description: Replace the generic model write path with definition-command calls.
       parameters:
       - in: path
         name: id
@@ -13454,13 +14116,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedCustomFieldRequest'
+              $ref: '#/components/schemas/PatchedCustomFieldUpdateInputRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedCustomFieldRequest'
+              $ref: '#/components/schemas/PatchedCustomFieldUpdateInputRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedCustomFieldRequest'
+              $ref: '#/components/schemas/PatchedCustomFieldUpdateInputRequest'
       security:
       - TokenAuth: []
       - cookieAuth: []
@@ -13516,6 +14178,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     delete:
       operationId: extras_custom_fields_destroy
+      description: Replace the generic model write path with definition-command calls.
       parameters:
       - in: path
         name: id
@@ -13571,6 +14234,7 @@ paths:
   /api/extras/custom-fieldsets/:
     get:
       operationId: extras_custom_fieldsets_list
+      description: Replace the generic model write path with definition-command calls.
       parameters:
       - in: query
         name: label
@@ -13643,19 +14307,20 @@ paths:
                 $ref: '#/components/schemas/APIError'
     post:
       operationId: extras_custom_fieldsets_create
+      description: Replace the generic model write path with definition-command calls.
       tags:
       - extras
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CustomFieldsetRequest'
+              $ref: '#/components/schemas/CustomFieldsetCreateInputRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/CustomFieldsetRequest'
+              $ref: '#/components/schemas/CustomFieldsetCreateInputRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/CustomFieldsetRequest'
+              $ref: '#/components/schemas/CustomFieldsetCreateInputRequest'
         required: true
       security:
       - TokenAuth: []
@@ -13706,6 +14371,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     put:
       operationId: extras_custom_fieldsets_update_bulk
+      description: Replace the generic model write path with definition-command calls.
       tags:
       - extras
       requestBody:
@@ -13769,6 +14435,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     patch:
       operationId: extras_custom_fieldsets_partial_update_bulk
+      description: Replace the generic model write path with definition-command calls.
       tags:
       - extras
       requestBody:
@@ -13831,6 +14498,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     delete:
       operationId: extras_custom_fieldsets_destroy_bulk
+      description: Replace the generic model write path with definition-command calls.
       tags:
       - extras
       security:
@@ -13873,6 +14541,7 @@ paths:
   /api/extras/custom-fieldsets/{id}/:
     get:
       operationId: extras_custom_fieldsets_retrieve
+      description: Replace the generic model write path with definition-command calls.
       parameters:
       - in: path
         name: id
@@ -13919,6 +14588,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     put:
       operationId: extras_custom_fieldsets_update
+      description: Replace the generic model write path with definition-command calls.
       parameters:
       - in: path
         name: id
@@ -13932,14 +14602,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CustomFieldsetRequest'
+              $ref: '#/components/schemas/CustomFieldsetUpdateInputRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/CustomFieldsetRequest'
+              $ref: '#/components/schemas/CustomFieldsetUpdateInputRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/CustomFieldsetRequest'
-        required: true
+              $ref: '#/components/schemas/CustomFieldsetUpdateInputRequest'
       security:
       - TokenAuth: []
       - cookieAuth: []
@@ -13995,6 +14664,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     patch:
       operationId: extras_custom_fieldsets_partial_update
+      description: Replace the generic model write path with definition-command calls.
       parameters:
       - in: path
         name: id
@@ -14008,13 +14678,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedCustomFieldsetRequest'
+              $ref: '#/components/schemas/PatchedCustomFieldsetUpdateInputRequest'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedCustomFieldsetRequest'
+              $ref: '#/components/schemas/PatchedCustomFieldsetUpdateInputRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedCustomFieldsetRequest'
+              $ref: '#/components/schemas/PatchedCustomFieldsetUpdateInputRequest'
       security:
       - TokenAuth: []
       - cookieAuth: []
@@ -14070,6 +14740,7 @@ paths:
                 $ref: '#/components/schemas/APIError'
     delete:
       operationId: extras_custom_fieldsets_destroy
+      description: Replace the generic model write path with definition-command calls.
       parameters:
       - in: path
         name: id
@@ -41029,6 +41700,118 @@ components:
         * `in_app` - In-App
         * `slack` - Slack
         * `teams` - Microsoft Teams
+    ChoiceEntryInputRequest:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        key:
+          type: string
+          minLength: 1
+        label:
+          type: string
+      required:
+      - key
+      - label
+    ChoiceRead:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        choice_set:
+          type: integer
+          readOnly: true
+        key:
+          type: string
+          readOnly: true
+        label:
+          type: string
+          readOnly: true
+        position:
+          type: integer
+          readOnly: true
+        lifecycle:
+          allOf:
+          - $ref: '#/components/schemas/LifecycleEnum'
+          readOnly: true
+        replaced_by:
+          type: string
+          readOnly: true
+          nullable: true
+        resource_revision:
+          type: string
+          readOnly: true
+      required:
+      - choice_set
+      - id
+      - key
+      - label
+      - lifecycle
+      - position
+      - replaced_by
+      - resource_revision
+    ChoiceSetCreateInputRequest:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        namespace:
+          type: string
+          minLength: 1
+        slug:
+          type: string
+          minLength: 1
+        label:
+          type: string
+        choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChoiceEntryInputRequest'
+      required:
+      - label
+      - namespace
+      - slug
+    ChoiceSetRead:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        namespace:
+          type: string
+          readOnly: true
+        slug:
+          type: string
+          readOnly: true
+        label:
+          type: string
+          readOnly: true
+        lifecycle:
+          allOf:
+          - $ref: '#/components/schemas/LifecycleEnum'
+          readOnly: true
+        replaced_by:
+          type: string
+          readOnly: true
+          nullable: true
+        choices:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChoiceRead'
+          readOnly: true
+        resource_revision:
+          type: string
+          readOnly: true
+      required:
+      - choices
+      - id
+      - label
+      - lifecycle
+      - namespace
+      - replaced_by
+      - resource_revision
+      - slug
     Component:
       type: object
       properties:
@@ -42454,7 +43237,7 @@ components:
           type: string
           maxLength: 4096
         field_type:
-          $ref: '#/components/schemas/FieldTypeEnum'
+          $ref: '#/components/schemas/CustomFieldFieldTypeEnum'
         field_type_display:
           type: string
           readOnly: true
@@ -42530,6 +43313,121 @@ components:
       - label
       - name
       - updated_at
+    CustomFieldCreateInputFieldTypeEnum:
+      enum:
+      - text
+      - integer
+      - decimal
+      - date
+      - boolean
+      - single-select
+      - multi-select
+      type: string
+      description: |-
+        * `text` - text
+        * `integer` - integer
+        * `decimal` - decimal
+        * `date` - date
+        * `boolean` - boolean
+        * `single-select` - single-select
+        * `multi-select` - multi-select
+    CustomFieldCreateInputRequest:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        namespace:
+          type: string
+          minLength: 1
+        local_key:
+          type: string
+          minLength: 1
+        label:
+          type: string
+        object_types:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        field_type:
+          $ref: '#/components/schemas/CustomFieldCreateInputFieldTypeEnum'
+        activation:
+          $ref: '#/components/schemas/ActivationEnum'
+        help_text:
+          type: string
+        quantity_kind:
+          type: string
+          nullable: true
+          minLength: 1
+        canonical_unit:
+          type: string
+          nullable: true
+          minLength: 1
+        minimum_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,36}(?:\.\d{0,12})?$
+          nullable: true
+        maximum_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,36}(?:\.\d{0,12})?$
+          nullable: true
+        regex:
+          type: string
+          nullable: true
+          minLength: 1
+        decimal_scale:
+          type: integer
+          nullable: true
+        max_values:
+          type: integer
+          nullable: true
+        text_max_length:
+          type: integer
+          nullable: true
+        validation_rule:
+          type: string
+          nullable: true
+          minLength: 1
+        required:
+          type: boolean
+        nullable:
+          type: boolean
+        mappings:
+          type: array
+          items: {}
+        choice_set:
+          type: integer
+          minimum: 1
+          nullable: true
+        replaced_by:
+          type: string
+          nullable: true
+          minLength: 1
+      required:
+      - label
+      - local_key
+      - namespace
+      - object_types
+    CustomFieldFieldTypeEnum:
+      enum:
+      - text
+      - integer
+      - decimal
+      - date
+      - boolean
+      - single-select
+      - multi-select
+      type: string
+      description: |-
+        * `text` - Text
+        * `integer` - Integer
+        * `decimal` - Decimal
+        * `date` - Date
+        * `boolean` - Boolean
+        * `single-select` - Single select
+        * `multi-select` - Multi select
     CustomFieldRequest:
       type: object
       properties:
@@ -42554,7 +43452,7 @@ components:
           type: string
           maxLength: 4096
         field_type:
-          $ref: '#/components/schemas/FieldTypeEnum'
+          $ref: '#/components/schemas/CustomFieldFieldTypeEnum'
         activation:
           $ref: '#/components/schemas/ActivationEnum'
         quantity_kind:
@@ -42616,6 +43514,30 @@ components:
       - activation
       - label
       - name
+    CustomFieldUpdateInputRequest:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        label:
+          type: string
+        help_text:
+          type: string
+        activation:
+          $ref: '#/components/schemas/ActivationEnum'
+        required:
+          type: boolean
+        mappings:
+          type: array
+          items: {}
+        object_types:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        replaced_by:
+          type: string
+          minLength: 1
     CustomFieldset:
       type: object
       properties:
@@ -42656,6 +43578,33 @@ components:
       - id
       - slug
       - updated_at
+    CustomFieldsetCreateInputRequest:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        namespace:
+          type: string
+          minLength: 1
+        slug:
+          type: string
+          minLength: 1
+        label:
+          type: string
+        description:
+          type: string
+        field_identities:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        replaced_by:
+          type: string
+          nullable: true
+          minLength: 1
+      required:
+      - namespace
+      - slug
     CustomFieldsetRequest:
       type: object
       properties:
@@ -42678,6 +43627,18 @@ components:
           maxLength: 4096
       required:
       - slug
+    CustomFieldsetUpdateInputRequest:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        label:
+          type: string
+        description:
+          type: string
+        replaced_by:
+          type: string
+          minLength: 1
     Dashboard:
       type: object
       properties:
@@ -42939,24 +43900,6 @@ components:
       - action_type
       - model
       - name
-    FieldTypeEnum:
-      enum:
-      - text
-      - integer
-      - decimal
-      - date
-      - boolean
-      - single-select
-      - multi-select
-      type: string
-      description: |-
-        * `text` - Text
-        * `integer` - Integer
-        * `decimal` - Decimal
-        * `date` - Date
-        * `boolean` - Boolean
-        * `single-select` - Single select
-        * `multi-select` - Multi select
     GenericObject:
       type: object
       properties:
@@ -43998,6 +44941,14 @@ components:
           type: string
       required:
       - license_id
+    LifecycleEnum:
+      enum:
+      - active
+      - deprecated
+      type: string
+      description: |-
+        * `active` - Active
+        * `deprecated` - Deprecated
     Location:
       type: object
       properties:
@@ -45317,6 +46268,64 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Category'
+        count_capped:
+          type: boolean
+          description: True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP
+            and the real total is larger. Use `start` (keyset cursor) pagination to
+            iterate the full result set.
+    PaginatedChoiceReadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+          nullable: true
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChoiceRead'
+        count_capped:
+          type: boolean
+          description: True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP
+            and the real total is larger. Use `start` (keyset cursor) pagination to
+            iterate the full result set.
+    PaginatedChoiceSetReadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+          nullable: true
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChoiceSetRead'
         count_capped:
           type: boolean
           description: True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP
@@ -47758,7 +48767,7 @@ components:
           type: string
           maxLength: 4096
         field_type:
-          $ref: '#/components/schemas/FieldTypeEnum'
+          $ref: '#/components/schemas/CustomFieldFieldTypeEnum'
         activation:
           $ref: '#/components/schemas/ActivationEnum'
         quantity_kind:
@@ -47816,6 +48825,30 @@ components:
             type: string
             minLength: 1
             title: Python model class name
+    PatchedCustomFieldUpdateInputRequest:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        label:
+          type: string
+        help_text:
+          type: string
+        activation:
+          $ref: '#/components/schemas/ActivationEnum'
+        required:
+          type: boolean
+        mappings:
+          type: array
+          items: {}
+        object_types:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        replaced_by:
+          type: string
+          minLength: 1
     PatchedCustomFieldsetRequest:
       type: object
       properties:
@@ -47836,6 +48869,18 @@ components:
         description:
           type: string
           maxLength: 4096
+    PatchedCustomFieldsetUpdateInputRequest:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        label:
+          type: string
+        description:
+          type: string
+        replaced_by:
+          type: string
+          minLength: 1
     PatchedDashboardRequest:
       type: object
       properties:
@@ -47950,6 +48995,13 @@ components:
           type: integer
           writeOnly: true
           nullable: true
+    PatchedLabelInputRequest:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        label:
+          type: string
     PatchedLicenseRequest:
       type: object
       properties:
@@ -49052,6 +50104,18 @@ components:
       required:
       - name
       - slug
+    ReorderInputRequest:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        keys:
+          type: array
+          items:
+            type: string
+            minLength: 1
+      required:
+      - keys
     SCIMAuthenticationScheme:
       type: object
       properties:

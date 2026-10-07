@@ -9,6 +9,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
+from extras.api.definition_writes import CustomFieldsetWriteMixin, CustomFieldWriteMixin
 from extras.filters import (
     AlertLogFilterSet,
     AlertRuleFilterSet,
@@ -147,14 +148,14 @@ class TagViewSet(ITAMBoxModelViewSet):
     filterset_class = TagFilter
 
 
-class CustomFieldViewSet(ITAMBoxModelViewSet):
+class CustomFieldViewSet(CustomFieldWriteMixin, ITAMBoxModelViewSet):
     queryset = CustomField.objects.all()
     serializer_class = CustomFieldSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = CustomFieldFilterSet
 
 
-class CustomFieldsetViewSet(ITAMBoxModelViewSet):
+class CustomFieldsetViewSet(CustomFieldsetWriteMixin, ITAMBoxModelViewSet):
     queryset = CustomFieldset.objects.prefetch_related("fields").all()
     serializer_class = CustomFieldsetSerializer
     filter_backends = (DjangoFilterBackend,)
