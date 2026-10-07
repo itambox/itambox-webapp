@@ -88,6 +88,7 @@ class DefinitionWritesAPITests(TestCase):
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(CustomFieldset.objects.get(pk=pk).label, "Set 2")
 
+
 CHOICE_SET_URL = "/api/extras/custom-field-choice-sets/"
 CHOICE_URL = "/api/extras/custom-field-choices/"
 
@@ -354,6 +355,8 @@ class ChoiceSetWritesAPITests(TestCase):
         permissions = DefinitionActionPermissions()
 
         class _View:
+            __slots__ = ("action",)
+
             def __init__(self, action):
                 self.action = action
 
