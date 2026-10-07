@@ -32,7 +32,7 @@ from extras.services.definition_commands import (
 from extras.services.specifications.contracts import ResourceRevision
 
 _FIELD_TYPES = [choice[0] for choice in CustomField.FIELD_TYPE_CHOICES]
-_ACTIVATIONS = ["composed", "global"]
+_ACTIVATIONS = CustomField.ACTIVATION_CHOICES
 
 
 class CustomFieldCreateInputSerializer(StrictInputSerializer):
