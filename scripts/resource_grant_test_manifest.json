@@ -13,6 +13,7 @@
     "itambox/assets/tests/test_graphql_specification_http.py",
     "itambox/assets/tests/test_graphql_specification_mutation_transport.py",
     "itambox/assets/tests/test_import_export.py",
+    "itambox/assets/tests/test_repair_episode.py",
     "itambox/assets/tests/test_specification_apply_defaults_commands.py",
     "itambox/assets/tests/test_specification_command_races.py",
     "itambox/assets/tests/test_specification_composition_commands.py",

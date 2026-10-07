@@ -301,7 +301,9 @@ class AssetDetailView(ObjectDetailView):
 
         # The repair/replacement timeline groups lifecycle records by episode
         # when links exist and falls back to chronological order otherwise.
-        context["asset_timeline"] = build_asset_timeline(asset)
+        timeline = build_asset_timeline(asset)
+        context["asset_timeline"] = timeline
+        context["recent_activity"] = timeline.recent_events
 
         return context
 

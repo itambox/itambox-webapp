@@ -259,6 +259,29 @@
         </div>
         <div class="card-body">{% include 'assets/includes/detail/asset_assignment.html' %}</div>
       </div>
+      <div class="card mb-3 shadow-sm" id="asset-recent-activity">
+        <div class="card-header border-0 bg-transparent pb-0">
+          <h3 class="card-title text-secondary">{% translate "Recent activity" %}</h3>
+        </div>
+        {% if recent_activity %}
+          <ul class="list-group list-group-flush">
+            {% for event in recent_activity %}
+              <li class="list-group-item d-flex align-items-center gap-2 px-3 py-2">
+                <span class="text-secondary small text-nowrap">{{ event.date|date:"Y-m-d" }}</span>
+                <span class="badge bg-{{ event.color }}-lt asset-recent-activity-kind">{{ event.label }}</span>
+                <a href="{{ event.url }}" class="flex-fill text-truncate">{{ event.title }}</a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="card-body py-3 text-muted text-center">
+            <p class="mb-0">{% translate "No lifecycle records exist for this asset yet." %}</p>
+          </div>
+        {% endif %}
+        <div class="card-footer border-0 bg-transparent">
+          <a href="?tab=timeline">{% translate "Show full timeline" %}</a>
+        </div>
+      </div>
       {# 3. Hardware Specifications Card (Conditional Check) #}
       {% if asset_type_specification_fields or object.component_allocations.all %}
         <div class="card mb-3 shadow-sm">

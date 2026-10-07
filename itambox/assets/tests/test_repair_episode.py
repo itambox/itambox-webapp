@@ -11,10 +11,14 @@ existed renders as.
 import datetime
 import uuid
 
+from unittest.mock import PropertyMock, patch
+
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext as _
@@ -36,7 +40,7 @@ from assets.models import (
 )
 from assets.models.lifecycle import AssetDisposal
 from assets.services import disposal_service_payload, dispose_asset, update_asset_disposal
-from assets.services.timeline import build_asset_timeline
+from assets.services.timeline import AssetTimeline, build_asset_timeline
 from core.models import ObjectChange
 from core.tests.mixins import TenantTestMixin
 from organization.models import Tenant
@@ -413,6 +417,73 @@ class RepairEpisodeViewTests(TenantTestMixin, TestCase):
         response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": self.asset.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "tab=timeline")
+
+    def test_asset_overview_lists_the_five_newest_events_flattened(self):
+        maintenance_types = (
+            AssetMaintenance.MAINTENANCE_TYPE_REPAIR,
+            AssetMaintenance.MAINTENANCE_TYPE_UPGRADE,
+            AssetMaintenance.MAINTENANCE_TYPE_CALIBRATION,
+            AssetMaintenance.MAINTENANCE_TYPE_SOFTWARE_SUPPORT,
+            AssetMaintenance.MAINTENANCE_TYPE_HARDWARE_SUPPORT,
+            AssetMaintenance.MAINTENANCE_TYPE_REPAIR,
+        )
+        records = [
+            _maintenance(
+                self.asset,
+                episode=self.episode if index < 6 else None,
+                start=f"2026-02-{index:02d}",
+                maintenance_type=maintenance_types[index - 1],
+            )
+            for index in range(1, 7)
+        ]
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": self.asset.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        recent_activity = response.context["recent_activity"]
+        expected_records = list(reversed(records[1:]))
+        self.assertEqual(len(recent_activity), 5)
+        self.assertEqual([event.url for event in recent_activity], [record.get_absolute_url() for record in expected_records])
+        self.assertTrue(response.context["asset_timeline"].has_episodes)
+        self.assertContains(response, "Recent activity")
+        self.assertContains(response, "Show full timeline")
+        self.assertContains(response, 'href="?tab=timeline"')
+
+        rendered = response.content.decode()
+        self.assertEqual(rendered.count("asset-recent-activity-kind"), 5)
+        for index, record in enumerate(records):
+            expected_occurrences = 1 if index == 0 else 2
+            self.assertEqual(rendered.count(f'href="{record.get_absolute_url()}"'), expected_occurrences)
+            self.assertEqual(rendered.count(record.start_date.isoformat()), expected_occurrences)
+
+    def test_asset_overview_shows_the_timeline_empty_state(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": self.asset.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["recent_activity"], [])
+        self.assertContains(response, 'id="asset-recent-activity"')
+        self.assertContains(response, "Recent activity")
+        self.assertContains(response, "No lifecycle records exist for this asset yet.")
+        self.assertContains(response, "Show full timeline")
+
+    def test_asset_detail_recent_activity_does_not_add_database_queries(self):
+        _maintenance(self.asset, episode=self.episode, start="2026-02-12")
+        self.client.force_login(self.user)
+        url = reverse("assets:asset_detail", kwargs={"pk": self.asset.pk})
+
+        with CaptureQueriesContext(connection) as baseline_queries:
+            with patch.object(AssetTimeline, "recent_events", new_callable=PropertyMock, return_value=[]):
+                baseline_response = self.client.get(url)
+        with CaptureQueriesContext(connection) as recent_queries:
+            response = self.client.get(url)
+
+        self.assertEqual(baseline_response.status_code, 200)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(recent_queries), len(baseline_queries))
+        self.assertEqual(len(response.context["recent_activity"]), 1)
 
     def test_admin_changelist_renders(self):
         self.client.force_login(self.user)

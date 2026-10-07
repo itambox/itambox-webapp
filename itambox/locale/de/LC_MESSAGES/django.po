@@ -15268,6 +15268,14 @@ msgstr "Leihgerät / Ersatzgerät:"
 msgid "No lifecycle records exist for this asset yet."
 msgstr "Für dieses Asset sind noch keine Einträge im Lebenszyklus vorhanden."
 
+#: itambox/itambox/templates/assets/assets/asset_detail.html
+msgid "Recent activity"
+msgstr "Letzte Aktivitäten"
+
+#: itambox/itambox/templates/assets/assets/asset_detail.html
+msgid "Show full timeline"
+msgstr "Vollständige Timeline anzeigen"
+
 #: itambox/itambox/templates/assets/includes/detail/asset_timeline.html
 msgid "No records are linked to this episode yet."
 msgstr "Mit dieser Episode sind noch keine Datensätze verknüpft."
