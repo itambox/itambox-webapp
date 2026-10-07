@@ -1,5 +1,4 @@
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.storage.cookie import CookieStorage
 from django.db import connection
@@ -8,6 +7,8 @@ from django.test.utils import CaptureQueriesContext
 
 from assets.forms import AssetTypeForm
 from assets.models import AssetType, AssetTypeFieldset, Category, CategoryDefaultFieldset, Manufacturer
+from core.context import set_current_tenant
+from core.tests.mixins import grant
 from extras.models import (
     CustomField,
     CustomFieldChoice,
@@ -16,6 +17,7 @@ from extras.models import (
     CustomFieldsetField,
 )
 from itambox.views.generic import ObjectEditView
+from organization.models import Role, Tenant
 
 User = get_user_model()
 
@@ -24,12 +26,20 @@ class AssetTypeFormPreservationTests(TestCase):
     def setUp(self):
         super().setUp()
         self.user = User.objects.create_user(username="asset-type-form-editor")
-        self.user.user_permissions.add(
-            Permission.objects.get(
-                content_type=ContentType.objects.get_for_model(AssetType),
-                codename="change_assettype",
-            )
+        self.provider = Tenant.objects.create(
+            name="Asset Type Form Provider", slug="asset-type-form-provider", is_provider=True
         )
+        self.role = Role.objects.create(
+            tenant=self.provider,
+            name="Asset Type Form Editor",
+            permissions=["assets.change_assettype", "assets.add_assettype"],
+        )
+        grant(self.user, self.provider, self.role)
+        set_current_tenant(self.provider)
+
+    def tearDown(self):
+        set_current_tenant(None)
+        super().tearDown()
 
     def _authorized_request(self, data=None):
         request = RequestFactory().post("/asset-types/", data=data or {})

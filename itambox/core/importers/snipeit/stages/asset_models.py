@@ -23,6 +23,7 @@ from assets.services.specifications.contracts import (
     ExplicitFieldsetSelectionDTO,
     SpecificationPatchDTO,
 )
+from assets.services.specifications.messages import specification_message
 from core.importers.snipeit.common import _nested_id
 from core.importers.snipeit.contracts import ImportContext, Outcome, StageResult
 from organization.services.access_scope import ActorContextDTO, authentication_revision_for_actor
@@ -69,7 +70,7 @@ def _actor_context_for_user(user: object) -> ActorContextDTO:
 
 def _require_command_success(result: object) -> object:
     if isinstance(result, CommandRejectedDTO):
-        messages = [issue.message_key for issue in result.issues]
+        messages = [specification_message(issue.message_key) for issue in result.issues]
         raise ValidationError("; ".join(messages) or "The specification command was rejected.")
     return result
 

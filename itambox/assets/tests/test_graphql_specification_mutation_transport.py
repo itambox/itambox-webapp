@@ -340,7 +340,7 @@ class GraphQLSpecificationMutationTransportTests(unittest.TestCase):
         with (
             patch.object(mutations, "_actor", return_value=actor),
             patch.object(mutations, "authenticated_user", return_value=user),
-            patch.object(mutations, "has_global_model_permission", return_value=True),
+            patch.object(mutations, "has_provider_catalogue_permission", return_value=True),
             patch.object(mutations, "AssetType") as asset_type,
             patch.object(mutations, "stored_values_for", return_value={}),
             patch.object(mutations, "load_prospective_definition", return_value=(definition, (), ())),
@@ -377,7 +377,7 @@ class GraphQLSpecificationMutationTransportTests(unittest.TestCase):
         with (
             patch.object(mutations, "_actor", return_value=actor),
             patch.object(mutations, "authenticated_user", return_value=user),
-            patch.object(mutations, "has_global_model_permission", return_value=True),
+            patch.object(mutations, "has_provider_catalogue_permission", return_value=True),
             patch.object(mutations, "AssetType") as asset_type,
             patch.object(mutations, "stored_values_for", return_value={}),
             patch.object(mutations, "load_prospective_definition", side_effect=ValueError("not a definition")),

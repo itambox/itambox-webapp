@@ -19,8 +19,6 @@ from types import MappingProxyType
 from typing import Iterator
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import DEFAULT_DB_ALIAS, transaction
 
@@ -83,25 +81,6 @@ def revision_string(value: object, name: str) -> str:
     if type(value) is not str or not value:
         raise ValueError(f"{name} must be a non-empty string")
     return value
-
-
-def has_global_model_permission(actor: object, model: type[object], codename: str) -> bool:
-    """Require an active user's real global model permission, not staff/tenant flags."""
-    if getattr(actor, "is_superuser", False):
-        return True
-    content_type = ContentType.objects.get_for_model(model)
-    permission = Permission.objects.filter(content_type=content_type, codename=codename).first()
-    if permission is None:
-        return False
-    user_permissions = getattr(actor, "user_permissions", None)
-    groups = getattr(actor, "groups", None)
-    return bool(
-        user_permissions is not None
-        and (
-            user_permissions.filter(pk=permission.pk).exists()
-            or (groups is not None and groups.filter(permissions__pk=permission.pk).exists())
-        )
-    )
 
 
 def issue(
@@ -464,7 +443,6 @@ def stale_plan_issue() -> DomainIssueDTO:
 
 __all__ = [
     "actor_change_context",
-    "has_global_model_permission",
     "json_values_equal",
     "load_effective_definition",
     "load_prospective_definition",

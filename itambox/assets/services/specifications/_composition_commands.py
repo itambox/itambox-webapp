@@ -26,9 +26,9 @@ from assets.services.specifications.locking import catalogue_transaction_lock
 from extras.services.specifications.composition import SpecificationDefinitionError
 from extras.services.specifications.contracts import QualifiedIdentity
 from organization.services.access_scope import ActorContextDTO
+from organization.services.catalogue_authorization import has_provider_catalogue_permission
 
 from ._command_support import (
-    has_global_model_permission,
     issue,
     json_values_equal,
     load_effective_definition,
@@ -300,7 +300,10 @@ def _set_type_locked(
         return unavailable()
 
     actor_model = reload_actor(actor)
-    if actor_model is None or not has_global_model_permission(actor_model, AssetType, _TYPE_PERMISSION):
+    if actor_model is None or not has_provider_catalogue_permission(
+        actor_model,
+        f"{AssetType._meta.app_label}.{_TYPE_PERMISSION}",
+    ):
         return unavailable()
 
     current_plan = _definition_for_current_type(owner, owner_ref)
@@ -388,7 +391,10 @@ def _set_category_locked(
         return unavailable()
 
     actor_model = reload_actor(actor)
-    if actor_model is None or not has_global_model_permission(actor_model, Category, _CATEGORY_PERMISSION):
+    if actor_model is None or not has_provider_catalogue_permission(
+        actor_model,
+        f"{Category._meta.app_label}.{_CATEGORY_PERMISSION}",
+    ):
         return unavailable()
 
     actual_resource_revision = resource_revision_for_owner(owner)

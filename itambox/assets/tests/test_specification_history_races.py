@@ -15,12 +15,14 @@ from assets.services.specifications.commands import cleanup_asset_type_history
 from assets.services.specifications.contracts import HistoryCleanupPreviewDTO, OwnerChangedDTO
 from assets.services.specifications.locking import SPECIFICATION_CATALOGUE_LOCK_KEY, catalogue_transaction_lock
 from assets.tests.test_specification_history_boundaries import HistoryBoundaryFixtureMixin
+from core.context import set_current_tenant
 from extras.models import CustomFieldset, SpecificationLibrary
+from organization.models import Tenant
 
 pytestmark = [pytest.mark.serial_only, pytest.mark.django_db(transaction=True)]
 
 
-def _start_worker(target):
+def _start_worker(target, provider_id):
     arrived = queue.Queue()
     results = []
     errors = []
@@ -28,6 +30,7 @@ def _start_worker(target):
     def worker():
         close_old_connections()
         try:
+            set_current_tenant(Tenant._base_manager.get(pk=provider_id))
             with connection.cursor() as cursor:
                 cursor.execute("SELECT pg_backend_pid()")
                 arrived.put(cursor.fetchone()[0])
@@ -35,6 +38,7 @@ def _start_worker(target):
         except Exception as error:  # pragma: no cover - surfaced by _finish
             errors.append(error)
         finally:
+            set_current_tenant(None)
             connections["default"].close()
 
     thread = threading.Thread(target=worker)
@@ -203,7 +207,8 @@ class TestSpecificationHistoryRaces(HistoryBoundaryFixtureMixin, TransactionTest
                         preview_token=preview.preview_token,
                         expected_resource_revision=preview.expected_resource_revision,
                         expected_definition_revision=preview.expected_definition_revision,
-                    )
+                    ),
+                    self.tenant.pk,
                 )
                 _assert_advisory_wait(started[1], blocker[1])
                 blocker[2].set()
@@ -253,7 +258,8 @@ class TestSpecificationHistoryRaces(HistoryBoundaryFixtureMixin, TransactionTest
                         preview_token=preview.preview_token,
                         expected_resource_revision=preview.expected_resource_revision,
                         expected_definition_revision=preview.expected_definition_revision,
-                    )
+                    ),
+                    self.tenant.pk,
                 )
                 _assert_row_wait(started[1], blocker[1], SpecificationLibrary._meta.db_table)
                 blocker[2].set()

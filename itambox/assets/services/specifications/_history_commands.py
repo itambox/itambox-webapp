@@ -51,9 +51,9 @@ from organization.services.access_scope import (
     ResolvedAccessAuthorizationDTO,
     reauthorize_access_scope,
 )
+from organization.services.catalogue_authorization import has_provider_catalogue_permission
 
 from ._command_support import (
-    has_global_model_permission,
     issue,
     json_values_equal,
     lock_relevant_libraries,
@@ -222,7 +222,10 @@ def _load_history_plan(
 
 def _type_actor_or_unavailable(actor: ActorContextDTO):
     actor_model = reload_actor(actor)
-    if actor_model is None or not has_global_model_permission(actor_model, AssetType, _ASSET_TYPE_CHANGE_PERMISSION):
+    if actor_model is None or not has_provider_catalogue_permission(
+        actor_model,
+        f"{AssetType._meta.app_label}.{_ASSET_TYPE_CHANGE_PERMISSION}",
+    ):
         return None
     return actor_model
 

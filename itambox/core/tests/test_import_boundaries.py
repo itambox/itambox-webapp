@@ -1279,13 +1279,15 @@ class SnipeITImporterBoundaryTests(SimpleTestCase):
                     f"{module} must receive inventory service callables through injection",
                 )
             with self.subTest(module=module, target="assets.services"):
-                # T01 native writers use the canonical specification commands;
-                # stock/checkout operations still belong to the injected root.
+                # T01 native writers use the canonical specification commands,
+                # DTO contracts, and issue-message renderer; stock/checkout
+                # operations still belong to the injected root.
                 specification_modules = (
                     "assets.services.specification_writers",
                     "assets.services.specifications._command_support",
                     "assets.services.specifications.commands",
                     "assets.services.specifications.contracts",
+                    "assets.services.specifications.messages",
                 )
                 direct_service_edges = {
                     edge

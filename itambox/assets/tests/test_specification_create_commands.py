@@ -13,7 +13,6 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.files.storage import FileSystemStorage
@@ -50,9 +49,11 @@ from assets.services.specifications.preview_tokens import (
     PreviewTokenExpectation,
     issue_preview_token,
 )
+from core.context import set_current_tenant
 from core.models import ObjectChange
-from core.tests.mixins import TenantTestMixin
+from core.tests.mixins import grant
 from extras.models import CustomField, CustomFieldset, CustomFieldsetField, Tag
+from organization.models import Role, Tenant
 from organization.services.access_scope import ActorContextDTO, authentication_revision_for_actor
 
 User = get_user_model()
@@ -64,9 +65,17 @@ _TINY_PNG = bytes.fromhex(
 )
 
 
-class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
+class SpecificationCreateCommandTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="create-editor")
+        self.provider = Tenant.objects.create(name="Create Provider", slug="create-provider", is_provider=True)
+        self.provider_role = Role.objects.create(
+            tenant=self.provider,
+            name="Create Asset Type",
+            permissions=["assets.add_assettype"],
+        )
+        grant(self.user, self.provider, self.provider_role)
+        set_current_tenant(self.provider)
         self.manufacturer = Manufacturer.objects.create(name="Create maker", slug="create-maker")
         self.category = Category.objects.create(name="Create category", slug="create-category")
         self.role = AssetRole.objects.create(name="Create role", slug="create-role")
@@ -107,12 +116,9 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         )
         self.tag = Tag.objects.create(name="Create tag", slug="create-tag")
 
-        self.user.user_permissions.add(
-            Permission.objects.get(
-                content_type=ContentType.objects.get_for_model(AssetType),
-                codename="add_assettype",
-            )
-        )
+    def tearDown(self):
+        set_current_tenant(None)
+        super().tearDown()
 
     def _field(self, name, *, target=AssetType, required=False):
         field = CustomField.objects.create(
@@ -639,7 +645,8 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
         self.assertEqual(created.custom_field_data, {"first_note": "plan"})
 
     def test_preview_and_create_require_global_add_permission(self):
-        self.user.user_permissions.clear()
+        self.provider_role.permissions = []
+        self.provider_role.save(update_fields=["permissions"])
         self.user.is_staff = True
         self.user.save(update_fields=["is_staff"])
         preview = preview_asset_type_create(
@@ -1295,12 +1302,12 @@ class SpecificationCreateCommandTests(TenantTestMixin, TestCase):
                 [("OBJECT_UNAVAILABLE", ())],
             )
 
-            other_user.user_permissions.add(
-                Permission.objects.get(
-                    content_type=ContentType.objects.get_for_model(AssetType),
-                    codename="add_assettype",
-                )
+            other_role = Role.objects.create(
+                tenant=self.provider,
+                name="Other Create Asset Type",
+                permissions=["assets.add_assettype"],
             )
+            grant(other_user, self.provider, other_role)
             other_actor = ActorContextDTO(
                 actor_id=other_user.pk,
                 authentication_revision=authentication_revision_for_actor(other_user),

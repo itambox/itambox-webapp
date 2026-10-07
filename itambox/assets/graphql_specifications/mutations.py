@@ -17,11 +17,7 @@ from django.db import transaction
 from graphql import GraphQLError
 
 from assets.models import Asset, AssetType, Category
-from assets.services.specifications._command_support import (
-    has_global_model_permission,
-    load_prospective_definition,
-    stored_values_for,
-)
+from assets.services.specifications._command_support import load_prospective_definition, stored_values_for
 from assets.services.specifications._create_commands import _preview_token_key
 from assets.services.specifications.commands import (
     apply_category_defaults,
@@ -61,6 +57,7 @@ from assets.services.specifications.loader import (
     _field_dto,
     _load_fieldset_memberships,
 )
+from assets.services.specifications.messages import specification_message
 from assets.services.specifications.preview_tokens import (
     OwnerRef as PreviewOwnerRef,
 )
@@ -115,6 +112,7 @@ from organization.services.access_scope import (
     authentication_revision_for_actor,
     resolve_access_scope,
 )
+from organization.services.catalogue_authorization import has_provider_catalogue_permission
 
 from .inputs import (
     AddChoiceInput,
@@ -155,30 +153,6 @@ from .types import (
 )
 
 _MISSING = object()
-
-_MESSAGE_TEXT = {
-    "specifications.invalid_type": "The submitted value has an invalid type.",
-    "specifications.invalid_decimal": "Enter a decimal value with no more than three decimal places.",
-    "specifications.invalid_range": "The submitted value is outside the allowed range.",
-    "specifications.invalid_date": "Enter a valid date.",
-    "specifications.invalid_choice": "Select a valid choice.",
-    "specifications.required_field": "This field is required.",
-    "specifications.unknown_field_key": "The field key is not part of this specification.",
-    "specifications.read_only_field": "This field is read-only.",
-    "specifications.conflict_clear_overlap": "A field cannot be set and cleared in the same patch.",
-    "specifications.duplicate_field": "The field occurs more than once.",
-    "specifications.immutable_definition": "The definition is immutable.",
-    "specifications.ownership_conflict": "The submitted object is not owned by this scope.",
-    "specifications.reference_conflict": "A referenced object is not available.",
-    "specifications.dependency_retirement": "A referenced dependency cannot be retired.",
-    "specifications.unsupported_structure": "The specification structure cannot be resolved.",
-    "specifications.stale_resource": "The resource changed after the plan was created.",
-    "specifications.stale_definition": "The effective definition changed after the plan was created.",
-    "specifications.stale_plan": "The preview plan is no longer valid.",
-    "specifications.export_blocked": "The requested export is blocked.",
-    "specifications.object_unavailable": "The requested object is unavailable.",
-    "specifications.missing_precondition": "A required write precondition is missing.",
-}
 
 
 @dataclass(frozen=True)
@@ -310,7 +284,7 @@ def _has_field(value: object, name: str) -> bool:
 
 
 def _message(message_key: str) -> str:
-    return _MESSAGE_TEXT.get(message_key, message_key.rsplit(".", 1)[-1].replace("_", " ").capitalize())
+    return specification_message(message_key)
 
 
 def _graphql_error(issue: DomainIssueDTO, *, prefix_input: bool = False) -> GraphQLError:
@@ -1867,6 +1841,7 @@ class PreviewAssetTypeComposition(graphene.Mutation):
     @staticmethod
     def mutate(root, info, asset_type_id, fieldsets):
         del root
+        user = None
         try:
             asset_type_id = _positive_id(asset_type_id, path=("assetTypeId",))
             if not isinstance(fieldsets, (list, tuple)):
@@ -1878,7 +1853,7 @@ class PreviewAssetTypeComposition(graphene.Mutation):
             user = authenticated_user(info)
         except _InputError as error:
             _raise_preview_failure(error.issues)
-        if user is None or not has_global_model_permission(user, AssetType, "change_assettype"):
+        if user is None or not has_provider_catalogue_permission(user, "assets.change_assettype"):
             _raise_preview_failure((_issue("OBJECT_UNAVAILABLE"),))
         owner = AssetType.all_objects.filter(pk=asset_type_id, deleted_at__isnull=True).first()
         if owner is None:
