@@ -310,6 +310,28 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
         return self.instance
 
 
+@extend_schema_serializer(component_name="AssetTypeCreatePreviewInput")
+class AssetTypeCreatePreviewSerializer(AssetTypeSerializer):
+    """Strict native create payload used by the non-persisting preview action."""
+
+    class Meta(AssetTypeSerializer.Meta):
+        fields = [
+            "manufacturer_id",
+            "model",
+            "slug",
+            "part_number",
+            "eol_months",
+            "category",
+            "assetrole_id",
+            "depreciation_id",
+            "fieldsets",
+            "specification_patch",
+            "requestable",
+            "description",
+            "comments",
+        ]
+
+
 @extend_schema_serializer(component_name="AssetResource")
 class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer):
     asset_type = NestedAssetTypeSerializer(read_only=True)
