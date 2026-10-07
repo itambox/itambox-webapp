@@ -455,7 +455,7 @@ class RepairEpisodeViewTests(TenantTestMixin, TestCase):
         self.assertEqual(rendered.count("asset-recent-activity-kind"), 5)
         for index, record in enumerate(records):
             expected_occurrences = 1 if index == 0 else 2
-            self.assertEqual(rendered.count(f'href="{record.get_absolute_url()}"'), expected_occurrences)
+            self.assertEqual(rendered.count('href="' + record.get_absolute_url() + '"'), expected_occurrences)
             self.assertEqual(rendered.count(record.start_date.isoformat()), expected_occurrences)
 
     def test_asset_overview_shows_the_timeline_empty_state(self):
