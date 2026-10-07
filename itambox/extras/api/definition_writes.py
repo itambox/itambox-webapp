@@ -165,7 +165,12 @@ class CustomFieldWriteMixin(CommandBackedWriteMixin):
     def _run_create(self, request, data):
         values = _tupled(data, "object_types", "mappings")
         values["choice_set_id"] = values.pop("choice_set", None)
-        values = {key: value for key, value in values.items() if value is not None or key in {"quantity_kind", "canonical_unit", "regex", "validation_rule", "replaced_by"}}
+        values = {
+            key: value
+            for key, value in values.items()
+            if value is not None
+            or key in {"quantity_kind", "canonical_unit", "regex", "validation_rule", "replaced_by"}
+        }
         return create_custom_field(actor=actor_for(request.user), definition=CustomFieldCreateInputDTO(**values))
 
     def _run_update(self, request, instance, revision, data):

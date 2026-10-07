@@ -74,7 +74,9 @@ class DefinitionActionPermissions(TokenPermissions):
         if request.method in _SAFE_METHODS:
             return super().has_permission(request, view)
         model = self._queryset(view).model
-        return all(has_provider_catalogue_permission(request.user, perm) for perm in self._write_permissions(view, model))
+        return all(
+            has_provider_catalogue_permission(request.user, perm) for perm in self._write_permissions(view, model)
+        )
 
     def has_object_permission(self, request, view, obj):
         if request.method in _SAFE_METHODS:
