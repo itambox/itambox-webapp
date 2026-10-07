@@ -1,6 +1,7 @@
 import datetime
 import uuid
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import django_tables2 as tables
 from django.contrib.auth import get_user_model
@@ -17,8 +18,10 @@ from assets.models import (
 )
 from assets.services import checkout_asset
 from assets.tables import AssetMaintenanceTable, AssetTable, AssetTypeTable, WarrantyTable
+from core.choices import ObjectChangeActionChoices
 from core.models import ObjectChange
 from core.tables import AssigneeColumn, BaseTable, BooleanColumn, ObjectChangeTable
+from core.templatetags.helpers import get_action_color
 from core.templatetags.utility_tags import localize_journal_comment
 from extras.models import NotificationChannel
 from extras.tables import JournalEntryTable
@@ -53,6 +56,12 @@ class TableLocalizationTests(SimpleTestCase):
             self.assertIn("–", str(column.render(None)))
         with translation.override("en"):
             self.assertIn("–", str(column.render(None)))
+
+    def test_action_color_uses_choice_metadata(self):
+        action = ObjectChangeActionChoices.ACTION_CREATE
+        expected = next(choice[2] for choice in ObjectChangeActionChoices.CHOICES if choice[0] == action)
+
+        self.assertEqual(get_action_color(action), expected)
 
     def test_subscription_renewal_journal_is_localized_only_when_rendered(self):
         comment = "Renewed subscription. Next renewal date: 2026-09-01. Cost: Not set EUR."
@@ -94,6 +103,51 @@ class AssetTableLocalizationTest(SimpleTestCase):
         with translation.override("de"):
             rendered = AssetTable([]).render_audit_due_date(record)
         self.assertIn('title="Überfällig"', rendered)
+
+
+class AssigneeColumnGenericForeignKeyTest(SimpleTestCase):
+    def test_assignee_column_generic_foreign_key_cache(self):
+        parent = SimpleNamespace(pk=101)
+        target = SimpleNamespace(pk=202)
+        assignment = SimpleNamespace(
+            assigned_to_content_type_id=3,
+            location_id=parent.pk,
+            assigned_to_object_id=target.pk,
+        )
+
+        class AssignmentQuerySet:
+            def filter(self, **kwargs):
+                return self
+
+            def select_related(self, *fields):
+                return self
+
+            def __iter__(self):
+                return iter([assignment])
+
+        assignment_model = type(
+            "GenericAssignmentModel",
+            (),
+            {
+                "_meta": SimpleNamespace(
+                    fields=[SimpleNamespace(is_relation=True, related_model=Location, name="location")]
+                ),
+                "assigned_to_content_type": object(),
+                "objects": AssignmentQuerySet(),
+            },
+        )
+        target_model = SimpleNamespace(objects=SimpleNamespace(filter=lambda **kwargs: [target]))
+        content_type = SimpleNamespace(model_class=lambda: target_model)
+        table = SimpleNamespace(data=[parent])
+        column = AssigneeColumn(assignment_model_path="mock.GenericAssignmentModel")
+
+        with (
+            patch.object(column, "_get_assignment_model", return_value=assignment_model),
+            patch("django.contrib.contenttypes.models.ContentType.objects.get_for_id", return_value=content_type),
+        ):
+            column._build_cache(table, Location, "_assignee_cache")
+
+        self.assertEqual(table._assignee_cache, {parent.pk: target})
 
 
 class IDColumnTestCase(TestCase):
