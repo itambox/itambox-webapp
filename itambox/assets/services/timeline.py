@@ -93,6 +93,13 @@ class AssetTimeline:
     def has_groups(self) -> bool:
         return bool(self.groups)
 
+    @property
+    def recent_events(self) -> list[TimelineEvent]:
+        """Return the five latest events without changing the repair grouping."""
+        events = [event for group in self.groups for event in group.events]
+        events.extend(self.ungrouped)
+        return sorted(events, key=lambda event: event.date, reverse=True)[:5]
+
 
 def build_asset_timeline(asset) -> AssetTimeline:
     """Collect and group the timeline events for one asset."""
