@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from assets import schema as assets_schema
 from assets.graphql_specifications import integration as graphql_integration
-from assets.models import Asset, AssetRole, AssetType, Category, Manufacturer, StatusLabel, Supplier
+from assets.models import Asset, AssetRole, AssetType, Category, Manufacturer, StatusLabel
 from core.context import get_current_membership, get_current_tenant
 from core.tenant_access import override_tenant_access_policy
 from core.tests.mixins import grant
@@ -433,51 +433,6 @@ class GraphQLAdversarialTestCase(TestCase):
                 asset {{
                     name
                 }}
-            }}
-        }}
-        '''
-        response = self.client.post(
-            self.graphql_url,
-            data=json.dumps({"query": mutation}),
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
-        )
-        self.assertEqual(response.status_code, 200)
-        res_data = response.json()
-        self.assertIn("errors", res_data)
-        self.assertIn("denied", res_data["errors"][0]["message"].lower())
-
-    def test_cross_tenant_update_license(self):
-        # Tenant A user tries to update Tenant B's license (license_b)
-        mutation = f'''
-        mutation {{
-            updateLicense(
-                id: "{self.license_b.id}",
-                name: "Hacked License Name"
-            ) {{
-                license {{
-                    name
-                }}
-            }}
-        }}
-        '''
-        response = self.client.post(
-            self.graphql_url,
-            data=json.dumps({"query": mutation}),
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token_a.key}",
-        )
-        self.assertEqual(response.status_code, 200)
-        res_data = response.json()
-        self.assertIn("errors", res_data)
-        self.assertIn("denied", res_data["errors"][0]["message"].lower())
-
-    def test_cross_tenant_delete_license(self):
-        # Tenant A user tries to delete Tenant B's license (license_b)
-        mutation = f'''
-        mutation {{
-            deleteLicense(id: "{self.license_b.id}") {{
-                success
             }}
         }}
         '''
