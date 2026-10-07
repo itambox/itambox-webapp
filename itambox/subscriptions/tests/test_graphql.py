@@ -102,7 +102,7 @@ class SubscriptionsGraphQLTestCase(TestCase):
         """
         set_current_tenant(self.tenant)
         context = self.get_context(self.user, self.tenant)
-        result = schema.execute(query, context_value=context)
+        result = schema.execute_sync(query, context_value=context)
 
         self.assertIsNone(result.errors)
         subscriptions_data = result.data["subscriptions"]
@@ -127,7 +127,7 @@ class SubscriptionsGraphQLTestCase(TestCase):
         """
         set_current_tenant(self.tenant)
         context = self.get_context(self.user, self.tenant)
-        result = schema.execute(query, context_value=context)
+        result = schema.execute_sync(query, context_value=context)
 
         self.assertIsNone(result.errors)
         assignments_data = result.data["subscriptionAssignments"]
@@ -147,7 +147,7 @@ class SubscriptionsGraphQLTestCase(TestCase):
             'mutation { createSoftware(name: "X") { software { id } } }',
         )
         for document in documents:
-            result = schema.execute(document, context_value=context)
+            result = schema.execute_sync(document, context_value=context)
             self.assertIsNotNone(result.errors, document)
         self.assertTrue(Subscription.objects.filter(pk=self.subscription.pk).exists())
         self.assertTrue(SubscriptionAssignment.objects.filter(pk=self.assignment.pk).exists())

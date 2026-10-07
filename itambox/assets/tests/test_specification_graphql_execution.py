@@ -9,7 +9,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
-from graphql import parse, validate
+from graphql import build_schema, parse, validate
 from graphql.validation import specified_rules
 
 from assets.models import Asset, AssetType, Manufacturer
@@ -161,9 +161,15 @@ def graphql_world():
 
 
 def _public_schema():
-    from core.schema import schema
+    """The composed root schema without the HTTP operation budgets.
 
-    return schema
+    These tests execute the schema directly to prove resolver semantics; the
+    depth/alias/document/complexity budgets are the endpoint contract and are
+    covered by the adversarial and security suites.
+    """
+    from core.schema import build_schema
+
+    return build_schema(extensions=[])
 
 
 def _context(world):
@@ -175,7 +181,7 @@ def _scope(tenant):
 
 
 def _execute(world, query, *, variables=None, context=None):
-    result = world.schema.execute(
+    result = world.schema.execute_sync(
         query,
         variable_values=variables,
         context_value=_context(world) if context is None else context,
@@ -247,7 +253,7 @@ def test_public_root_executes_typed_union_history_and_scope_denial(graphql_world
         "state",
     }
 
-    denied = graphql_world.schema.execute(
+    denied = graphql_world.schema.execute_sync(
         """
         query($scope: RequestedScopeSelector!, $assetId: ID!) {
           assets(requestedScope: $scope) { id }
@@ -287,7 +293,7 @@ def test_repeated_type_choice_and_entry_expansion_stays_batched(graphql_world):
     """
 
     def run(limit):
-        result = graphql_world.schema.execute(
+        result = graphql_world.schema.execute_sync(
             query_template.replace("LIMIT", str(limit)),
             variable_values={"scope": _scope(graphql_world.tenant_a)},
             context_value=_context(graphql_world),
@@ -366,7 +372,7 @@ def test_public_complexity_rule_rejects_nested_list_fanout():
     }
     """
     errors = validate(
-        schema.graphql_schema,
+        build_schema(schema.as_str()),
         parse(query),
         rules=(*specified_rules, query_complexity_validator(max_complexity=20, fan_out=10)),
     )
@@ -374,7 +380,7 @@ def test_public_complexity_rule_rejects_nested_list_fanout():
 
 
 def test_public_root_denies_missing_context():
-    result = _public_schema().execute("{ assetTypes(first: 1) { edges { node { id } } } }")
+    result = _public_schema().execute_sync("{ assetTypes(first: 1) { edges { node { id } } } }")
     assert result.data is None
     assert result.errors
     assert result.errors[0].extensions["code"] == "UNAUTHENTICATED"

@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "canonical_python": "3.12",
-  "next_sequence": 76,
-  "policy_sha256": "dd1916654f738c65e7921bf26be7a27fc925aae31f7c7ac2729627cc3d1e911d",
+  "next_sequence": 78,
+  "policy_sha256": "8db690eb7b8fd5cfd8e897ab4b58e8202a030bef612971e2cbac0762dcd9cdc8",
   "config": {
     "config_file": "pyproject.toml",
     "working_directory": "itambox",
@@ -51,6 +51,15 @@
         "AssetSerializer",
         "StatusLabelSerializer"
       ]
+    },
+    {
+      "sequence": 76,
+      "path": "itambox/assets/graphql_specifications/scalars.py",
+      "module": "assets.graphql_specifications.scalars",
+      "issue": "#613",
+      "note": "Issue #613 admission: the specification read-transport scalars (SafeInteger, Decimal, Date, the opaque revision and cursor, and JSON) rewritten for the Strawberry port. Coercion is pure transport validation over the shared codec envelope and touches no ORM state.",
+      "scope": "module",
+      "symbols": []
     },
     {
       "sequence": 70,
@@ -197,6 +206,15 @@
       "symbols": [
         "SystemAuthorizationContext"
       ]
+    },
+    {
+      "sequence": 77,
+      "path": "itambox/core/graphql_scalars.py",
+      "module": "core.graphql_scalars",
+      "issue": "#613",
+      "note": "Issue #613 admission: the shared BigInt/JSONString transport scalars introduced by the Graphene-to-Strawberry port, keeping the previous wire contract. The module depends only on strawberry and graphql.",
+      "scope": "module",
+      "symbols": []
     },
     {
       "sequence": 54,

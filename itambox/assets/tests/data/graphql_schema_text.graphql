@@ -1,0 +1,756 @@
+type AccessoryNode {
+  manufacturer: ManufacturerNode!
+  category: Category
+  supplier: SupplierNode
+  tenant: TenantNode
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  name: String!
+  slug: String!
+
+  """SKU or manufacturer part number"""
+  partNumber: String!
+
+  """Alert threshold quantity"""
+  minQty: Int!
+
+  """Allow checkout count to exceed stock capacity"""
+  allowOverallocate: Boolean!
+}
+
+type Asset {
+  assetRole: AssetRoleNode
+  status: StatusLabelNode
+  location: LocationNode
+  tenant: TenantNode
+  supplier: SupplierNode
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  name: String!
+  assetTag: String!
+  serialNumber: String!
+  purchaseDate: Date
+  orderNumber: String!
+
+  """Allow users to request this asset"""
+  requestable: Boolean
+  assetType: AssetType
+  resourceRevision: String!
+  specificationDefinition: SpecificationDefinition!
+  specificationEntries: [SpecificationEntry!]!
+  specificationIssues: [UserError!]!
+}
+
+type AssetRoleNode {
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  name: String!
+  slug: String!
+  description: String!
+
+  """RGB color in hexadecimal (e.g. 00ff00)"""
+  color: String!
+}
+
+type AssetType {
+  manufacturer: ManufacturerNode!
+  depreciation: DepreciationNode
+  category: Category
+  assetRole: AssetRoleNode
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  model: String!
+  slug: String!
+
+  """Manufacturer part number or SKU"""
+  partNumber: String!
+
+  """Lifespan in months before EOL replacement"""
+  eolMonths: Int
+  description: String!
+
+  """Allow users to request assets of this type"""
+  requestable: Boolean!
+  resourceRevision: String!
+  fieldsets: [SpecificationFieldset!]!
+  specificationDefinition(target: SpecificationTarget!): SpecificationDefinition!
+  specificationEntries: [SpecificationEntry!]!
+  specificationIssues: [UserError!]!
+  library: LibraryOrigin
+}
+
+type AssetTypeConnection {
+  edges: [AssetTypeEdge!]!
+  pageInfo: PageInfo!
+}
+
+type AssetTypeEdge {
+  cursor: Cursor!
+  node: AssetType!
+}
+
+"""An enumeration."""
+enum AssetsStatusLabelTypeChoices {
+  """Pending"""
+  PENDING
+
+  """Deployable"""
+  DEPLOYABLE
+
+  """Deployed"""
+  DEPLOYED
+
+  """Undeployable"""
+  UNDEPLOYABLE
+
+  """Archived"""
+  ARCHIVED
+
+  """In Repair"""
+  IN_REPAIR
+
+  """On Order"""
+  ON_ORDER
+}
+
+"""
+The `BigInt` scalar type represents non-fractional whole numeric values.
+`BigInt` is not constrained to 32-bit like the `Int` type and thus is a less
+compatible type.
+"""
+scalar BigInt
+
+type BooleanSpecificationValue {
+  boolean: Boolean!
+}
+
+type Category {
+  """Applies to: {'asset': True, 'accessory': True, 'component': True}"""
+  appliesTo: JSONString!
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  name: String!
+  slug: String!
+
+  """RGB color in hexadecimal (e.g. 00ff00)"""
+  color: String!
+  description: String!
+  key: String!
+  resourceRevision: String!
+  defaultFieldsets: [SpecificationFieldset!]!
+}
+
+type Choice {
+  key: String!
+  label: String!
+  lifecycle: DefinitionLifecycle!
+}
+
+type ChoiceSet {
+  identity: String!
+  label: String!
+  resourceRevision: String!
+  lifecycle: DefinitionLifecycle!
+  choices: [Choice!]!
+}
+
+type ChoiceSpecificationValue {
+  choice: String!
+}
+
+type ComponentNode {
+  manufacturer: ManufacturerNode!
+  category: Category
+  tenant: TenantNode
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  name: String!
+  slug: String!
+
+  """SKU or manufacturer part number"""
+  partNumber: String!
+
+  """Allow checkout count to exceed stock capacity"""
+  allowOverallocate: Boolean!
+  minStockLevel: Int
+  description: String
+}
+
+type ConsumableNode {
+  manufacturer: ManufacturerNode!
+  category: Category
+  tenant: TenantNode
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  name: String!
+  slug: String!
+
+  """SKU or manufacturer part number"""
+  partNumber: String!
+
+  """Alert threshold quantity"""
+  minQty: Int!
+
+  """Allow checkout count to exceed stock capacity"""
+  allowOverallocate: Boolean!
+}
+
+type ContentTypeNode {
+  id: ID!
+  appLabel: String!
+  model: String!
+}
+
+"""Opaque, non-empty cursor text used by bounded connections."""
+scalar Cursor
+
+"""An ISO-8601 calendar date."""
+scalar Date
+
+type DateSpecificationValue {
+  date: Date!
+}
+
+"""Date with time (isoformat)"""
+scalar DateTime
+
+"""A decimal transported as a string to preserve fixed scale."""
+scalar Decimal
+
+type DecimalSpecificationValue {
+  decimal: Decimal!
+}
+
+enum DefinitionLifecycle {
+  ACTIVE
+  DEPRECATED
+}
+
+type DepreciationNode {
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  name: String!
+
+  """Useful lifespan in months for straight-line calculations"""
+  months: Int!
+}
+
+enum FieldActivation {
+  COMPOSED
+  GLOBAL
+}
+
+type IntegerSpecificationValue {
+  integer: SafeInteger!
+}
+
+"""Read-only JSON value transport for uninterpreted history."""
+scalar JSON
+
+"""
+Allows use of a JSON String for input / output from the GraphQL schema.
+
+Use of this type is *not recommended* as you lose the benefits of having a defined, static
+schema (one of the key benefits of GraphQL).
+"""
+scalar JSONString
+
+type KitNode {
+  tenant: TenantNode
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  name: String!
+  description: String!
+}
+
+type LibraryOrigin {
+  identity: String!
+  acceptedRelease: SafeInteger
+  state: LibraryReconciliationState!
+}
+
+enum LibraryReconciliationState {
+  UNCHANGED
+  LOCALLY_MODIFIED
+  UNRECONCILED
+  RETAINED_HISTORY
+}
+
+type LicenseNode {
+  software: SoftwareNode!
+  licenseType: LicensesLicenseLicenseTypeChoices!
+  supplier: SupplierNode
+  tenant: TenantNode
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  """
+  Descriptive name for the license (e.g., Visio Pro 2021 - EA Renewal FY24)
+  """
+  name: String!
+
+  """Total number of seats purchased or entitled"""
+  seats: Int!
+  purchaseDate: Date
+  orderNumber: String!
+
+  """For term licenses or maintenance"""
+  expirationDate: Date
+}
+
+"""An enumeration."""
+enum LicensesLicenseLicenseTypeChoices {
+  """Perpetual Seat"""
+  PERPETUAL_SEAT
+
+  """Subscription Seat"""
+  SUBSCRIPTION_SEAT
+}
+
+type LocationNode {
+  tenant: TenantNode
+  id: ID!
+  name: String!
+  slug: String!
+}
+
+type ManufacturerNode {
+  softwareProducts: [SoftwareNode!]!
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  name: String!
+  slug: String!
+  description: String!
+}
+
+type MultiChoiceSpecificationValue {
+  choices: [String!]!
+}
+
+type NullSpecificationValue {
+  isNull: Boolean!
+}
+
+type PageInfo {
+  endCursor: Cursor
+  hasNextPage: Boolean!
+}
+
+type Query {
+  assets(requestedScope: RequestedScopeSelector!, limit: Int = null, offset: Int = null, sortBy: String = null, name: String = null, assetTag: String = null, serialNumber: String = null, statusId: ID = null, locationId: ID = null): [Asset]
+  asset(id: ID!, requestedScope: RequestedScopeSelector!): Asset
+  assetType(id: ID!): AssetType
+  assetTypes(first: Int! = 50, after: Cursor = null): AssetTypeConnection!
+  specificationFields(first: Int! = 50, after: Cursor = null): SpecificationFieldConnection!
+  choiceSet(identity: String!): ChoiceSet
+  category(id: ID!): Category
+  previewAssetTypeDefinition(target: SpecificationTarget!, categoryId: ID = null, fieldsets: [String!]): SpecificationDefinition!
+  softwareList(limit: Int = null, offset: Int = null, sortBy: String = null, name: String = null, version: String = null): [SoftwareNode]
+  software(id: ID!): SoftwareNode
+  licenses(limit: Int = null, offset: Int = null, sortBy: String = null, name: String = null): [LicenseNode]
+  license(id: ID!): LicenseNode
+  accessories(limit: Int = null, offset: Int = null, sortBy: String = null, name: String = null): [AccessoryNode]
+  accessory(id: ID!): AccessoryNode
+  consumables(limit: Int = null, offset: Int = null, sortBy: String = null, name: String = null): [ConsumableNode]
+  consumable(id: ID!): ConsumableNode
+  kits(limit: Int = null, offset: Int = null, sortBy: String = null, name: String = null): [KitNode]
+  kit(id: ID!): KitNode
+  components(limit: Int = null, offset: Int = null, sortBy: String = null, name: String = null): [ComponentNode]
+  component(id: ID!): ComponentNode
+  subscriptions(limit: Int = null, offset: Int = null, sortBy: String = null, name: String = null, status: String = null, type: String = null): [SubscriptionNode]
+  subscription(id: ID!): SubscriptionNode
+  subscriptionAssignments(limit: Int = null, offset: Int = null, subscriptionId: ID = null): [SubscriptionAssignmentNode]
+  subscriptionAssignment(id: ID!): SubscriptionAssignmentNode
+}
+
+input RequestedScopeSelector {
+  mode: ScopeMode!
+  tenantId: ID = null
+  tenantGroupId: ID = null
+}
+
+"""An integer in the JavaScript safe-integer range."""
+scalar SafeInteger
+
+enum ScopeMode {
+  TENANT
+  TENANT_GROUP
+  ALL_ACCESSIBLE
+}
+
+type SoftwareNode {
+  manufacturer: ManufacturerNode!
+
+  """Functional category"""
+  category: SoftwareSoftwareCategoryChoices
+
+  """Default license type"""
+  licenseType: SoftwareSoftwareLicenseTypeChoices
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  """
+  Name of the software product (e.g., Microsoft Visio Professional 2021). Unique per tenant.
+  """
+  name: String!
+
+  """Current version (e.g., 2021, 16.0)"""
+  version: String!
+
+  """Product homepage or vendor URL"""
+  website: String!
+
+  """Optional description of the software product."""
+  description: String!
+}
+
+"""An enumeration."""
+enum SoftwareSoftwareCategoryChoices {
+  """Operating System"""
+  OPERATING_SYSTEM
+
+  """Productivity"""
+  PRODUCTIVITY
+
+  """Development"""
+  DEVELOPMENT
+
+  """Security"""
+  SECURITY
+
+  """Design"""
+  DESIGN
+
+  """Other"""
+  OTHER
+}
+
+"""An enumeration."""
+enum SoftwareSoftwareLicenseTypeChoices {
+  """Proprietary"""
+  PROPRIETARY
+
+  """Open Source"""
+  OPEN_SOURCE
+
+  """Freeware"""
+  FREEWARE
+
+  """Shareware"""
+  SHAREWARE
+
+  """Subscription"""
+  SUBSCRIPTION
+}
+
+type SpecificationDefinition {
+  revision: String!
+  target: SpecificationTarget!
+  sections: [SpecificationSection!]!
+}
+
+type SpecificationEntry {
+  key: String!
+  definition: SpecificationField
+  state: SpecificationEntryState!
+  reasonCodes: [String!]!
+  value: SpecificationValue!
+}
+
+enum SpecificationEntryState {
+  CURRENT
+  HISTORICAL
+  INVALID
+  UNKNOWN
+}
+
+type SpecificationField {
+  resourceRevision: String!
+  key: String!
+  identity: String!
+  label: String!
+  helpText: String!
+  activation: FieldActivation!
+  fieldType: SpecificationFieldType!
+  required: Boolean!
+  nullable: Boolean!
+  quantityKind: String
+  canonicalUnit: String
+  validation: SpecificationValidation!
+  lifecycle: DefinitionLifecycle!
+  choiceSet: ChoiceSet
+  targets: [SpecificationTarget!]!
+  sources: [String!]!
+}
+
+type SpecificationFieldConnection {
+  edges: [SpecificationFieldEdge!]!
+  pageInfo: PageInfo!
+}
+
+type SpecificationFieldEdge {
+  cursor: Cursor!
+  node: SpecificationField!
+}
+
+enum SpecificationFieldType {
+  TEXT
+  INTEGER
+  DECIMAL
+  BOOLEAN
+  DATE
+  SINGLE_SELECT
+  MULTI_SELECT
+}
+
+type SpecificationFieldset {
+  resourceRevision: String!
+  identity: String!
+  label: String!
+  description: String!
+  lifecycle: DefinitionLifecycle!
+  fields: [SpecificationField!]!
+}
+
+type SpecificationSection {
+  identity: String
+  label: String!
+  fields: [SpecificationField!]!
+}
+
+enum SpecificationTarget {
+  ASSET_TYPE
+  ASSET
+}
+
+type SpecificationValidation {
+  minimum: Decimal
+  maximum: Decimal
+  scale: Int
+  maxLength: Int
+  maxValues: Int
+  regex: String
+  rule: String
+}
+
+union SpecificationValue = TextSpecificationValue | IntegerSpecificationValue | DecimalSpecificationValue | BooleanSpecificationValue | DateSpecificationValue | ChoiceSpecificationValue | MultiChoiceSpecificationValue | NullSpecificationValue | UninterpretedSpecificationValue
+
+type StatusLabelNode {
+  type: AssetsStatusLabelTypeChoices!
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  name: String!
+  slug: String!
+  description: String!
+
+  """RGB color in hexadecimal (e.g. 00ff00)"""
+  color: String!
+}
+
+type SubscriptionAssignmentNode {
+  subscription: SubscriptionNode!
+  contentType: ContentTypeNode
+  objectId: BigInt!
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  assignedDate: DateTime!
+  notes: String!
+}
+
+type SubscriptionNode {
+  """The commercial vendor of this subscription."""
+  supplier: SupplierNode!
+  type: SubscriptionsSubscriptionTypeChoices!
+  status: SubscriptionsSubscriptionStatusChoices!
+
+  """ISO 4217 code. Leave blank to use the tenant default currency."""
+  currency: SubscriptionsSubscriptionCurrencyChoices
+  billingCycle: SubscriptionsSubscriptionBillingCycleChoices
+  tenant: TenantNode
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  """Descriptive name (e.g., Adobe Creative Cloud - All Apps (Team))"""
+  name: String!
+
+  """URL-friendly identifier (auto-generated from name if left blank)"""
+  slug: String
+  startDate: Date
+  renewalDate: Date
+
+  """Cost per renewal period"""
+  renewalCost: Decimal
+
+  """Duration of the subscription term in months"""
+  termMonths: Int
+
+  """
+  Records whether the vendor's contract renews automatically. ITAMbox does not renew subscriptions: a subscription past its renewal date is marked expired.
+  """
+  vendorContractAutoRenews: Boolean!
+
+  """
+  Number of seats, users, or devices entitled by the vendor agreement. This value is independent of linked License seats.
+  """
+  licensedQuantity: Int
+
+  """Contract number, PO reference, or quote ID"""
+  contractReference: String!
+  cancellationDate: Date
+
+  """Optional text detailing coverage or terms"""
+  description: String!
+
+  """Optional internal notes"""
+  notes: String!
+  costCenterId: ID
+  costCenterName: String
+  autoRenewal: Boolean @deprecated(reason: "Use vendorContractAutoRenews; autoRenewal is removed in 2.0.")
+}
+
+"""An enumeration."""
+enum SubscriptionsSubscriptionBillingCycleChoices {
+  """Monthly"""
+  MONTHLY
+
+  """Quarterly"""
+  QUARTERLY
+
+  """Annual"""
+  ANNUAL
+
+  """Biannual"""
+  BIANNUAL
+
+  """Multi-Year"""
+  MULTI_YEAR
+
+  """One-Time"""
+  ONETIME
+}
+
+"""An enumeration."""
+enum SubscriptionsSubscriptionCurrencyChoices {
+  """Euro (€)"""
+  EUR
+
+  """US Dollar ($)"""
+  USD
+
+  """British Pound (£)"""
+  GBP
+
+  """Swiss Franc (CHF)"""
+  CHF
+
+  """Swedish Krona (kr)"""
+  SEK
+
+  """Norwegian Krone (kr)"""
+  NOK
+
+  """Danish Krone (kr)"""
+  DKK
+
+  """Canadian Dollar (CA$)"""
+  CAD
+
+  """Australian Dollar (A$)"""
+  AUD
+
+  """Japanese Yen (¥)"""
+  JPY
+}
+
+"""An enumeration."""
+enum SubscriptionsSubscriptionStatusChoices {
+  """Active"""
+  ACTIVE
+
+  """Suspended"""
+  SUSPENDED
+
+  """Cancelled"""
+  CANCELLED
+
+  """Expired"""
+  EXPIRED
+}
+
+"""An enumeration."""
+enum SubscriptionsSubscriptionTypeChoices {
+  """SaaS"""
+  SAAS
+
+  """Support"""
+  SUPPORT
+
+  """Maintenance"""
+  MAINTENANCE
+
+  """Lease"""
+  LEASE
+
+  """Other"""
+  OTHER
+}
+
+type SupplierNode {
+  """
+  The tenant owning this supplier. Null represents system-wide/global suppliers.
+  """
+  tenant: TenantNode
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  name: String!
+  slug: String!
+  website: String!
+
+  """URL for the supplier's management/administration portal"""
+  portalUrl: String!
+
+  """Optional customer account number with the supplier"""
+  accountId: String!
+  address: String!
+  notes: String!
+
+  """Deactivate to hide from selection lists without deleting"""
+  isActive: Boolean!
+}
+
+type TenantNode {
+  id: ID!
+  name: String!
+  slug: String!
+}
+
+type TextSpecificationValue {
+  text: String!
+}
+
+type UninterpretedSpecificationValue {
+  json: JSON!
+}
+
+type UserError {
+  code: String!
+  path: [String!]!
+  fieldKey: String
+  message: String!
+}
