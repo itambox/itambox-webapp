@@ -128,7 +128,7 @@ class RepairTimelineTests(TestCase):
             end_date=datetime.date(2027, 1, 5),
         )
         _reservation(self.asset, start="2026-01-20")
-        _handover(_asset("Handed Out Laptop"), self.holder)
+        _handover(self.asset, self.holder)
 
         timeline = build_asset_timeline(self.asset)
         self.assertFalse(timeline.has_groups)
@@ -179,13 +179,14 @@ class RepairTimelineTests(TestCase):
 
     def test_a_loan_for_another_asset_is_a_plain_event(self):
         """A loan that belongs to no repair is still an event, in chronological order."""
-        _loan(self.loaner, self.holder, due_date=datetime.date.today() + datetime.timedelta(days=1))
+        due_date = datetime.date.today() + datetime.timedelta(days=1)
+        _loan(self.loaner, self.holder, due_date=due_date)
 
         timeline = build_asset_timeline(self.loaner)
         self.assertFalse(timeline.has_groups)
         self.assertEqual([event.kind for event in timeline.ungrouped], ["loan"])
         event = timeline.ungrouped[0]
-        self.assertIn(_("Due %(date)s") % {"date": "2026-03-01"}, event.parts)
+        self.assertIn(_("Due %(date)s") % {"date": due_date.isoformat()}, event.parts)
         self.assertIn(_("Active"), event.parts)
 
     def test_an_ended_overdue_loan_reports_its_state(self):

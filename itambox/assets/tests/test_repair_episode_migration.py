@@ -40,7 +40,11 @@ class RepairEpisodeMigrationTests(TransactionTestCase):
 
         holder = AssetHolder.objects.create(first_name="Mig", last_name="Holder", upn="mig.holder@example.com")
 
-        status = StatusLabel.objects.create(name="Available", slug="available-mig", type="deployable")
+        # The test database already carries the migration-seeded labels (the repair
+        # migration is rehearsed by stepping the graph down, not by wiping the rows).
+        status = StatusLabel.objects.filter(type="deployable").first()
+        if status is None:
+            status = StatusLabel.objects.create(name="Available (mig)", slug="available-mig", type="deployable")
         self.assets = {}
         for label in ("one_repair", "no_repair", "several_repairs", "substitute_loan", "substitute_bare", "reserved"):
             self.assets[label] = Asset.objects.create(name=f"Laptop {label}", asset_tag=f"MIG-{label}", status=status)
@@ -60,7 +64,7 @@ class RepairEpisodeMigrationTests(TransactionTestCase):
         #    episode notes are appended to its notes.
         one_repair_asset = self.assets["one_repair"]
         one_episode = RepairEpisode.objects.create(asset=one_repair_asset, notes="Screen replaced under warranty.")
-        maintenance = _repair(one_repair_asset, notes="Vendor repair")
+        maintenance = _repair(one_repair_asset, episode=one_episode, notes="Vendor repair")
         disposal_one = AssetDisposal.objects.create(
             asset=one_repair_asset,
             disposal_method="recycle",
@@ -82,8 +86,8 @@ class RepairEpisodeMigrationTests(TransactionTestCase):
         # 3. Several repair maintenance records: no single anchor either.
         several_asset = self.assets["several_repairs"]
         several_episode = RepairEpisode.objects.create(asset=several_asset, notes="Two workshops.")
-        first_repair = _repair(several_asset)
-        second_repair = _repair(several_asset)
+        first_repair = _repair(several_asset, episode=several_episode)
+        second_repair = _repair(several_asset, episode=several_episode)
         disposal_three = AssetDisposal.objects.create(
             asset=several_asset,
             disposal_method="recycle",
@@ -94,8 +98,8 @@ class RepairEpisodeMigrationTests(TransactionTestCase):
         # 4. A substitute that really stood in during the window: its loan links
         #    to the maintenance.
         substitute_asset = self.assets["substitute_loan"]
-        RepairEpisode.objects.create(asset=substitute_asset, substitute_asset=loaner, notes="")
-        substitute_repair = _repair(substitute_asset)
+        substitute_episode = RepairEpisode.objects.create(asset=substitute_asset, substitute_asset=loaner, notes="")
+        substitute_repair = _repair(substitute_asset, episode=substitute_episode)
         loan = AssetAssignment.objects.create(
             asset=loaner,
             assigned_user=holder,
@@ -108,14 +112,14 @@ class RepairEpisodeMigrationTests(TransactionTestCase):
 
         # 5. A substitute without any matching loan: the link cannot be invented.
         bare_asset = self.assets["substitute_bare"]
-        RepairEpisode.objects.create(asset=bare_asset, substitute_asset=loaner, notes="")
-        bare_repair = _repair(bare_asset)
+        bare_episode = RepairEpisode.objects.create(asset=bare_asset, substitute_asset=loaner, notes="")
+        bare_repair = _repair(bare_asset, episode=bare_episode)
 
         # 6. A reservation-linked episode: a reservation is a booking, not a
         #    handover, so it stays standing and is reported.
         reserved_asset = self.assets["reserved"]
         reserved_episode = RepairEpisode.objects.create(asset=reserved_asset, notes="")
-        reserved_repair = _repair(reserved_asset)
+        reserved_repair = _repair(reserved_asset, episode=reserved_episode)
         reservation = AssetReservation.objects.create(
             asset=reserved_asset,
             start_date=datetime.date(2026, 1, 8),
@@ -191,19 +195,19 @@ class RepairEpisodeMigrationTests(TransactionTestCase):
 
     def test_a_stand_in_without_a_loan_is_reported_not_invented(self):
         AssetAssignment = self.apps.get_model("assets", "AssetAssignment")
-        JournalEntry = self.apps.get_model("extras", "JournalEntry")
+        AssetMaintenance = self.apps.get_model("assets", "AssetMaintenance")
 
         self.assertFalse(AssetAssignment.objects.filter(maintenance_id=self.expected["bare_repair"]).exists())
-        entries = JournalEntry.objects.filter(object_id=self.expected["assets"]["substitute_bare"])
-        self.assertTrue(any("could not be translated into exactly one loan" in entry.comment for entry in entries))
+        notes = AssetMaintenance.objects.get(pk=self.expected["bare_repair"]).notes
+        self.assertIn("could not be translated into exactly one loan", notes)
 
     def test_a_reservation_link_is_reported_and_the_row_survives(self):
+        AssetMaintenance = self.apps.get_model("assets", "AssetMaintenance")
         AssetReservation = self.apps.get_model("assets", "AssetReservation")
-        JournalEntry = self.apps.get_model("extras", "JournalEntry")
 
         self.assertTrue(AssetReservation.objects.filter(pk=self.expected["reservation"]).exists())
-        entries = JournalEntry.objects.filter(object_id=self.expected["assets"]["reserved"])
-        self.assertTrue(any("Reservation" in entry.comment for entry in entries))
+        notes = AssetMaintenance.objects.get(pk=self.expected["reserved_repair"]).notes
+        self.assertIn("Reservation", notes)
 
     def test_the_migration_is_recorded_as_applied(self):
         """The rehearsal really applied 0122 rather than silently skipping it."""
