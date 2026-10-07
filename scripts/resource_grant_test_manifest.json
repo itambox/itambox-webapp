@@ -25,6 +25,8 @@
     "itambox/assets/tests/test_form_help_texts.py",
     "itambox/assets/tests/test_fulfillment_semantics.py",
     "itambox/assets/tests/test_fulfillment_ui.py",
+    "itambox/assets/tests/test_graphql.py",
+    "itambox/assets/tests/test_graphql_adversarial.py",
     "itambox/assets/tests/test_import_export.py",
     "itambox/assets/tests/test_integrity_constraints.py",
     "itambox/assets/tests/test_migration_adoption_preflight.py",
