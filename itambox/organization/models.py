@@ -184,6 +184,7 @@ class SiteGroup(StandardModel, SoftDeleteMixin):
 
 
 class TenantGroup(StandardModel, SoftDeleteMixin):
+    tenant_scope_self = "group"
     # Tenant-scoped via a dedicated branch in filter_by_tenant: a user sees the
     # groups containing a tenant they're a member of, plus those groups'
     # ancestors. Internal tenancy machinery (the descendant walk, middleware
@@ -244,6 +245,7 @@ class TenantGroup(StandardModel, SoftDeleteMixin):
 
 
 class Tenant(DeletableVaultModel, BookmarkableMixin):
+    tenant_scope_self = "tenant"
     objects = TenantScopingSoftDeleteManager()
     all_objects = TenantScopingAllObjectsManager()
     name = models.CharField(max_length=100, verbose_name=_("Name"))
