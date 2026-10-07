@@ -2524,14 +2524,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/managers.py",
-      "code": "C901",
-      "message": "'TenantScopingQuerySet.filter_by_tenant' is too complex (30)",
-      "source": "    def filter_by_tenant(self) -> QuerySet:",
-      "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:self",
-      "count": 1
-    },
-    {
       "path": "itambox/core/models.py",
       "code": "C901",
       "message": "'ChangeLoggingMixin._log_change' is too complex (11)",
@@ -7168,22 +7160,6 @@
       "code": "F401",
       "message": "'subscriptions.models.SubscriptionTypeChoices' imported but unused",
       "source": "from subscriptions.models import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/tests/test_graphql.py",
-      "code": "F401",
-      "message": "'django.core.exceptions.PermissionDenied' imported but unused",
-      "source": "from django.core.exceptions import PermissionDenied",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/tests/test_graphql.py",
-      "code": "F401",
-      "message": "'graphql.GraphQLError' imported but unused",
-      "source": "from graphql import GraphQLError",
       "context": "Module:body",
       "count": 1
     },
