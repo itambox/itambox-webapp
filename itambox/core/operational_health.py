@@ -108,7 +108,7 @@ def check_worker(cache):
         return result
     try:
         clusters = Stat.get_all()
-    except Exception:  # broad except: boundary-isolation: heartbeat reads hit the broker cache, whose errors are not enumerable; reported as a reason code
+    except Exception:  # broad except: boundary-isolation: cache errors are not enumerable
         result.update(state="undetectable", reason="heartbeat_read_failed")
         return result
     result["cluster_count"] = len(clusters)
