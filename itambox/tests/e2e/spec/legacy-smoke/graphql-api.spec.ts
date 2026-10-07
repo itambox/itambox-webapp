@@ -184,12 +184,20 @@ test.describe('GraphQL API Specs', () => {
     }
   });
 
-  test('8. Removed GraphQL write mutations are rejected with a validation error', async ({ request }) => {
+  test('8. Removed GraphQL write mutations are rejected with a validation error', async ({ page }) => {
+    // Load an authenticated page first and send the CSRF token: Django rejects
+    // session-authenticated POSTs without it, and the 403 HTML page is not JSON.
+    await page.goto('/');
+    const csrfToken = (await page.context().cookies()).find(cookie => cookie.name === 'csrftoken')?.value ?? '';
     const mutation = `mutation { createAsset(name: "SN123") { asset { id } } }`;
-    const response = await request.post('/graphql/', { data: { query: mutation } });
-    expect(response.status()).not.toBe(500);
+    const response = await page.request.post('/graphql/', {
+      data: { query: mutation },
+      headers: { 'X-CSRFToken': csrfToken },
+    });
+    expect(response.status()).toBe(200);
     const json = await response.json();
     expect(json).toHaveProperty('errors');
+    expect(json.errors.length).toBeGreaterThan(0);
   });
 
   test('10. GraphiQL playground GET /graphql redirects unauthenticated users, allows authenticated', async ({ page, playwright }) => {
