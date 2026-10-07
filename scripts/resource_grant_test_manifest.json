@@ -54,6 +54,7 @@
     "itambox/inventory/tests/test_graphql_global_guard.py",
     "itambox/licenses/tests/test_api_money.py",
     "itambox/organization/tests/test_resource_grant_expiry.py",
+    "itambox/procurement/tests/test_security.py",
     "itambox/software/tests/test_graphql.py",
     "itambox/subscriptions/tests/test_api_money.py",
     "itambox/subscriptions/tests/test_graphql.py",
