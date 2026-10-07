@@ -1,7 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 
-from assets.models import RepairEpisode
+from assets.models import AssetMaintenance
 
 
 class StatusModelChoiceField(forms.ModelChoiceField):
@@ -18,15 +18,17 @@ class StatusModelChoiceField(forms.ModelChoiceField):
         return super().to_python(value)
 
 
-def selectable_episodes(current_id=None):
-    """Repair-episode choices for the record and episode forms (#504).
+def selectable_repair_maintenances(current_id=None):
+    """Repair-maintenance choices for the lifecycle record forms (#644).
 
-    Lists the tenant's active episodes and keeps the episode a record already
-    links to selectable even when it sits in the recycle bin: the link on the
-    record must never be silently dropped by an edit that only changes another
-    field.
+    Lists the tenant's repair maintenances and keeps the maintenance a record
+    already links to selectable even when it sits in the recycle bin: the link on
+    the record must never be silently dropped by an edit that only changes another
+    field. The already-linked row is the only one read unscoped - it has to be
+    resolvable although the recycle bin hides it.
     """
-    queryset = RepairEpisode.objects.all()
+    queryset = AssetMaintenance.objects.filter(maintenance_type=AssetMaintenance.MAINTENANCE_TYPE_REPAIR)
     if current_id:
-        queryset = queryset | RepairEpisode.all_objects.filter(pk=current_id)
+        # unscoped: an already-linked maintenance stays selectable even soft-deleted
+        queryset = queryset | AssetMaintenance.all_objects.filter(pk=current_id)
     return queryset

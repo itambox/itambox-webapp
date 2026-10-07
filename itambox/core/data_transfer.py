@@ -96,7 +96,6 @@ DECLARATIONS = {
     "assets.categorydefaultfieldset": _deny(R_CONFIG, "category default binding, edited through the asset-type form"),
     "assets.depreciation": _allow(SCOPE_GLOBAL),
     "assets.manufacturer": _allow(SCOPE_GLOBAL, import_=True),
-    "assets.repairepisode": _allow(SCOPE_MANAGER),
     "assets.statuslabel": _allow(SCOPE_GLOBAL),
     "assets.supplier": _allow(SCOPE_MANAGER),
     "assets.warranty": _allow(SCOPE_MANAGER),

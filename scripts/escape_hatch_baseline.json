@@ -201,20 +201,6 @@
     },
     {
       "rule": "unscoped",
-      "path": "itambox/assets/forms/episode_form.py",
-      "context": "ClassDef:RepairEpisodeForm/FunctionDef:__init__",
-      "statement": "Asset.all_objects",
-      "count": 1
-    },
-    {
-      "rule": "unscoped",
-      "path": "itambox/assets/forms/fields.py",
-      "context": "FunctionDef:selectable_episodes",
-      "statement": "RepairEpisode.all_objects",
-      "count": 1
-    },
-    {
-      "rule": "unscoped",
       "path": "itambox/assets/services/__init__.py",
       "context": "FunctionDef:_active_disposal_error",
       "statement": "AssetDisposal.all_objects",
@@ -505,20 +491,6 @@
       "path": "itambox/assets/services/specifications/loader.py",
       "context": "FunctionDef:relevant_library_ids",
       "statement": "AssetType.all_objects",
-      "count": 1
-    },
-    {
-      "rule": "unscoped",
-      "path": "itambox/assets/services/timeline.py",
-      "context": "FunctionDef:_collect_asset_events",
-      "statement": "AssetDisposal.all_objects",
-      "count": 1
-    },
-    {
-      "rule": "unscoped",
-      "path": "itambox/assets/services/timeline.py",
-      "context": "FunctionDef:_collect_episode_events",
-      "statement": "AssetDisposal.all_objects",
       "count": 1
     },
     {
