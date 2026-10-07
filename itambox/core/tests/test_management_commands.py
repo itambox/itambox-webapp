@@ -17,6 +17,7 @@ from assets.customfields import resolve_asset_type_custom_fields
 from assets.models import (
     Asset,
     AssetAssignment,
+    AssetDisposal,
     AssetMaintenance,
     AssetRequest,
     AssetReservation,
@@ -24,7 +25,6 @@ from assets.models import (
     AssetType,
     Category,
     Manufacturer,
-    RepairEpisode,
     ReservationStatusChoices,
     StatusLabel,
     Supplier,
@@ -32,6 +32,7 @@ from assets.models import (
 from assets.services import checkin_asset, checkout_asset
 from core.management.commands._seed.access import check_seed_access_invariants
 from core.management.commands._seed.consistency import check_seed_operational_invariants
+from core.management.commands._seed.maintenance import link_repair_records
 from core.management.commands.seed_data import Command as SeedDataCommand
 from core.management.commands.sync_tenant_ldap import Command as SyncTenantLDAPCommand
 from core.models import ChangeLoggingMixin, Job, ObjectChange
@@ -640,35 +641,19 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
         with self.assertRaisesRegex(CommandError, "has no completion date"):
             check_seed_operational_invariants()
 
-    def test_out_of_service_maintenance_without_episode_fails(self):
-        """A repair record that belongs to no episode cannot show in the timeline."""
-        asset = self._asset()
-        AssetMaintenance._base_manager.create(
-            asset=asset,
-            maintenance_type="repair",
-            status="completed",
-            start_date=datetime.date.today() - datetime.timedelta(days=10),
-            completion_date=datetime.date.today() - datetime.timedelta(days=8),
-        )
-        with self.assertRaisesRegex(CommandError, "belongs to no repair episode"):
-            check_seed_operational_invariants()
-
     def test_repair_maintenance_outside_any_repair_window_fails(self):
         """The #506 defect proper: a "repair" on an asset that never went out of service.
 
-        An episode only groups records, so belonging to one is not evidence the unit
-        was ever repaired. The record's service interval must overlap a repair window
-        the change log actually recorded for that asset.
+        The record's service interval must overlap a repair window the change log
+        actually recorded for that asset; paperwork alone is not evidence.
         """
         asset = self._asset()
-        episode = RepairEpisode.objects.create(asset=asset, notes="Grouped but unearned.")
         AssetMaintenance._base_manager.create(
             asset=asset,
             maintenance_type="repair",
             status="completed",
             start_date=datetime.date.today() - datetime.timedelta(days=10),
             completion_date=datetime.date.today() - datetime.timedelta(days=8),
-            episode=episode,
         )
         with self.assertRaisesRegex(CommandError, "records no repair in that period"):
             check_seed_operational_invariants()
@@ -678,16 +663,82 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
         asset = self._asset()
         _log_status_change(asset, self.pending_repair, "update", days_ago=60)
         _log_status_change(asset, self.available, "update", days_ago=40)
-        episode = RepairEpisode.objects.create(asset=asset, notes="Real episode.")
         AssetMaintenance._base_manager.create(
             asset=asset,
             maintenance_type="repair",
             status="completed",
             start_date=datetime.date.today() - datetime.timedelta(days=55),
             completion_date=datetime.date.today() - datetime.timedelta(days=50),
-            episode=episode,
         )
         check_seed_operational_invariants()
+
+    def test_seeded_repair_window_links_its_loan_and_disposal(self):
+        """The repair maintenance anchors the story; its loan and disposal link to it (#644)."""
+        asset = self._asset()
+        loaner = self._asset(name="Invariant Loaner")
+        start = datetime.date.today() - datetime.timedelta(days=30)
+        end = datetime.date.today() - datetime.timedelta(days=20)
+        maintenance = AssetMaintenance._base_manager.create(
+            asset=asset,
+            maintenance_type="repair",
+            status="completed",
+            start_date=start,
+            completion_date=end,
+        )
+        # A seeded stand-in loan is a real checkout, so the unit really wears the
+        # deployed status; its interval is back-dated into the repair window.
+        checkout_asset(loaner, holder=self.holder, user=self.requester, is_loan=True, due_date=end)
+        loan = AssetAssignment.objects.get(asset=loaner, is_active=True)
+        AssetAssignment._base_manager.filter(pk=loan.pk).update(
+            checked_out_at=timezone.now() - datetime.timedelta(days=28)
+        )
+        disposal = AssetDisposal._base_manager.create(
+            asset=asset,
+            disposal_method="recycle",
+            disposal_date=start + datetime.timedelta(days=9),
+        )
+        window = {"asset": asset, "start": start, "end": end, "holder_id": self.holder.pk}
+
+        linked = link_repair_records(maintenance, window)
+
+        self.assertEqual(linked, 2)
+        loan.refresh_from_db()
+        disposal.refresh_from_db()
+        self.assertEqual(loan.maintenance_id, maintenance.pk)
+        self.assertEqual(disposal.maintenance_id, maintenance.pk)
+
+    def test_seeded_links_outside_the_window_stay_unlinked(self):
+        """Somebody else's loan and a disposal outside the window are not this repair's."""
+        asset = self._asset()
+        loaner = self._asset(name="Invariant Spare")
+        start = datetime.date.today() - datetime.timedelta(days=30)
+        end = datetime.date.today() - datetime.timedelta(days=20)
+        maintenance = AssetMaintenance._base_manager.create(
+            asset=asset,
+            maintenance_type="repair",
+            status="completed",
+            start_date=start,
+            completion_date=end,
+        )
+        checkout_asset(loaner, holder=self.second_holder, user=self.requester, is_loan=True)
+        foreign_loan = AssetAssignment.objects.get(asset=loaner, is_active=True)
+        AssetAssignment._base_manager.filter(pk=foreign_loan.pk).update(
+            checked_out_at=timezone.now() - datetime.timedelta(days=28)
+        )
+        late_disposal = AssetDisposal._base_manager.create(
+            asset=asset,
+            disposal_method="recycle",
+            disposal_date=end + datetime.timedelta(days=3),
+        )
+        window = {"asset": asset, "start": start, "end": end, "holder_id": self.holder.pk}
+
+        linked = link_repair_records(maintenance, window)
+
+        self.assertEqual(linked, 0)
+        foreign_loan.refresh_from_db()
+        late_disposal.refresh_from_db()
+        self.assertIsNone(foreign_loan.maintenance_id)
+        self.assertIsNone(late_disposal.maintenance_id)
 
     def test_in_service_maintenance_needs_no_repair_window(self):
         """An upgrade never takes the unit out of service, so it is exempt."""
@@ -783,14 +834,12 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
         asset = self._asset()
         _log_status_change(asset, transit, "update", days_ago=60)
         _log_status_change(asset, self.available, "update", days_ago=40)
-        episode = RepairEpisode.objects.create(asset=asset, notes="No repair ever happened.")
         AssetMaintenance._base_manager.create(
             asset=asset,
             maintenance_type="repair",
             status="completed",
             start_date=datetime.date.today() - datetime.timedelta(days=55),
             completion_date=datetime.date.today() - datetime.timedelta(days=50),
-            episode=episode,
         )
         with self.assertRaisesRegex(CommandError, "records no repair in that period"):
             check_seed_operational_invariants()
@@ -807,14 +856,12 @@ class SeedOperationalInvariantTestCase(TransactionTestCase):
         _log_status_change(asset, self.pending_repair, "update", days_ago=60)
         _log_status_change(asset, self.available, "update", days_ago=40)
         _log_status_change(asset, self.in_use, "update", days_ago=10)
-        episode = RepairEpisode.objects.create(asset=asset, notes="Outside the repair.")
         AssetMaintenance._base_manager.create(
             asset=asset,
             maintenance_type="repair",
             status="completed",
             start_date=datetime.date.today() - datetime.timedelta(days=20),
             completion_date=datetime.date.today() - datetime.timedelta(days=18),
-            episode=episode,
         )
         with self.assertRaisesRegex(CommandError, "records no repair in that period"):
             check_seed_operational_invariants()

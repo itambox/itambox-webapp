@@ -1,25 +1,25 @@
 {% load i18n %}
 {% if timeline.total %}
   <div class="card-body p-0">
-    {% if timeline.has_episodes %}
+    {% if timeline.has_groups %}
       {% for group in timeline.groups %}
         <div class="border-bottom">
           <div class="px-3 pt-3 pb-0">
             <h4 class="mb-1">
-              <a href="{{ group.episode.get_absolute_url }}"
-                 class="fw-bold text-decoration-none">{{ group.episode }}</a>
+              <a href="{{ group.maintenance.get_absolute_url }}"
+                 class="fw-bold text-decoration-none">{{ group.maintenance }}</a>
             </h4>
-            {% if group.episode.asset_id == object.pk %}
-              {% if group.episode.substitute_asset %}
+            {% if group.maintenance.asset_id == object.pk %}
+              {% for substitute in group.substitute_assets %}
                 <div class="text-secondary small">
                   {% translate "Loaner / substitute:" %}
-                  <a href="{{ group.episode.substitute_asset.get_absolute_url }}">{{ group.episode.substitute_asset }}</a>
+                  <a href="{{ substitute.get_absolute_url }}">{{ substitute }}</a>
                 </div>
-              {% endif %}
+              {% endfor %}
             {% else %}
               <div class="text-secondary small">
                 {% translate "This asset stood in for" %}
-                <a href="{{ group.episode.asset.get_absolute_url }}">{{ group.episode.asset }}</a>
+                <a href="{{ group.maintenance.asset.get_absolute_url }}">{{ group.maintenance.asset }}</a>
               </div>
             {% endif %}
           </div>
@@ -28,14 +28,14 @@
               {% include 'assets/includes/detail/asset_timeline_events.html' with events=group.events %}
             </ul>
           {% else %}
-            <div class="px-3 pb-3 text-muted small">{% translate "No records are linked to this episode yet." %}</div>
+            <div class="px-3 pb-3 text-muted small">{% translate "No records are linked to this repair yet." %}</div>
           {% endif %}
         </div>
       {% endfor %}
     {% endif %}
     {% if timeline.ungrouped %}
       <div class="px-3 pt-3 pb-0">
-        {% if timeline.has_episodes %}
+        {% if timeline.has_groups %}
           <h4 class="mb-1">{% translate "Other activity" %}</h4>
         {% endif %}
       </div>

@@ -299,8 +299,8 @@ class AssetDetailView(ObjectDetailView):
         context["disposal_history"] = disposal_history
         context["disposal_obj"] = next((disposal for disposal in disposal_history if disposal.is_active), None)
 
-        # The repair/replacement timeline groups lifecycle records by episode
-        # when links exist and falls back to chronological order otherwise.
+        # The repair timeline groups the records that belong to a repair
+        # maintenance and falls back to chronological order otherwise.
         timeline = build_asset_timeline(asset)
         context["asset_timeline"] = timeline
         context["recent_activity"] = timeline.recent_events

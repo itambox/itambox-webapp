@@ -1447,6 +1447,50 @@
     },
     {
       "dependencies": [
+        "assets.0121_supplier_scoping_and_commercial_fields",
+        "extras.0127_retire_report_designer_legacy",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "assets.0122_repair_maintenance_anchor",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 1,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/assets/migrations/0122_repair_maintenance_anchor.py",
+      "replaces": [],
+      "reviewed_disposition": {
+        "disposition": "upgrade-only",
+        "rationale": "Translates beta-era repair episodes onto the maintenance anchor: a disposal linked to the episode moves to the episode's single repair maintenance, the stand-in's overlapping loan links to it, and everything that cannot be mapped unambiguously (no or several repair maintenances, a reservation link, the episode notes, a substitute without a matching loan) is appended to the maintenance notes or written as a journal entry on the asset. The mapping is lossy, so rollback is restore-first."
+      },
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": true,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "extras.0100_issue88_shard_05_extras_history_1"
       ],
       "id": "compliance.0100_issue88_shard_06_compliance_schema",
@@ -5586,6 +5630,7 @@
     "assets.0119_warranty_supplier",
     "assets.0120_repair_episode",
     "assets.0121_supplier_scoping_and_commercial_fields",
+    "assets.0122_repair_maintenance_anchor",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -5653,6 +5698,7 @@
     "upgrade_only": [
       "assets.0103_asset_type_specification_conversion",
       "assets.0105_asset_type_provenance_capture",
+      "assets.0122_repair_maintenance_anchor",
       "compliance.0102_clear_unsigned_receipt_timestamps",
       "compliance.0107_custodyreceipt_assignment_superseded",
       "extras.0101_issue88_drop_legacy_webhook_name_like",
@@ -5702,7 +5748,7 @@
     "global_roots": [],
     "missing_replacement_targets": 0,
     "per_app_local_roots_and_leaves": {},
-    "post_transition_migrations": 54,
+    "post_transition_migrations": 55,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

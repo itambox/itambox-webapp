@@ -1,11 +1,18 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Column, Fieldset, Layout, Row, Submit
 from django import forms
+from django.db import transaction
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
-from assets.forms.fields import selectable_episodes
-from assets.models import Asset, AssetMaintenance, Category, Supplier
+from assets.models import Asset, AssetDisposal, AssetMaintenance, Category, Supplier
+from assets.services import (
+    REPAIR_ACTION_CHOICES,
+    REPAIR_ACTION_NONE,
+    active_repair_loan,
+    complete_repair,
+    issue_repair_loaner,
+)
 from core.forms import FilterForm, scope_tenant_field, scope_tenant_group_field
 
 
@@ -16,32 +23,55 @@ class AssetMaintenanceFilterForm(FilterForm):
 
 
 class AssetMaintenanceForm(forms.ModelForm):
-    asset = forms.ModelChoiceField(
-        queryset=Asset.objects.all(), widget=forms.Select(attrs={"class": "form-select"}), label=_("Asset")
-    )
+    """Record a maintenance and, for a repair, its loaner story in one step (#644).
+
+    A repair maintenance is the anchor: the optional **Issue loaner** section
+    checks a stand-in unit out to the asset's current holder as a loan bound to
+    this maintenance, and the **Complete repair** section closes that story
+    through the existing services (returned, replaced permanently, or left alone).
+    Both sections are only rendered when the actor may perform the underlying
+    operation, and both run in the same transaction as the maintenance write.
+    """
+
     supplier = forms.ModelChoiceField(
         queryset=Supplier.objects.all(),
         widget=forms.Select(attrs={"class": "form-select"}),
         required=False,
         label=_("Supplier"),
     )
-    maintenance_type = forms.ChoiceField(
-        choices=AssetMaintenance.MAINTENANCE_TYPE_CHOICES,
-        widget=forms.Select(attrs={"class": "form-select"}),
-        label=_("Maintenance Type"),
-    )
-    status = forms.ChoiceField(
-        choices=AssetMaintenance._meta.get_field("status").choices,
-        widget=forms.Select(attrs={"class": "form-select"}),
-        label=_("Status"),
-    )
-    start_date = forms.DateField(
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}), label=_("Start Date")
-    )
-    completion_date = forms.DateField(
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+    loaner_asset = forms.ModelChoiceField(
+        queryset=Asset.objects.none(),
         required=False,
-        label=_("Completion Date"),
+        label=_("Loaner"),
+        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+    )
+    loaner_due_date = forms.DateField(
+        required=False,
+        label=_("Loaner due date"),
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+    )
+    repair_action = forms.ChoiceField(
+        choices=REPAIR_ACTION_CHOICES,
+        required=False,
+        initial=REPAIR_ACTION_NONE,
+        label=_("Completion action"),
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    dispose_original = forms.BooleanField(
+        required=False,
+        label=_("Start the disposal of the unit that was under repair"),
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+    disposal_method = forms.ChoiceField(
+        choices=(),
+        required=False,
+        label=_("Disposal Method"),
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+    disposal_date = forms.DateField(
+        required=False,
+        label=_("Disposal Date"),
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
     )
 
     class Meta:
@@ -58,7 +88,6 @@ class AssetMaintenanceForm(forms.ModelForm):
             "performed_by",
             "description",
             "notes",
-            "episode",
             "tags",
         ]
         widgets = {
@@ -67,22 +96,53 @@ class AssetMaintenanceForm(forms.ModelForm):
             "currency": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "description": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
-            "episode": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "tags": forms.SelectMultiple(attrs={"class": "form-select", "data-tom-select": ""}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, request=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.request = request
+        self.actor = getattr(request, "user", None) if request is not None else None
         # Rescope the tenant-owned `asset` FK per request — its queryset is frozen
         # unscoped at import, so a maintenance record could otherwise reference (and
         # expose in the dropdown) another tenant's asset.
         self.fields["asset"].queryset = Asset.objects.all()
-        # A linked (soft-deleted) episode stays selectable, so editing the
-        # record never silently drops the story link.
-        self.fields["episode"].queryset = selectable_episodes(
-            self.instance.episode_id if self.instance and self.instance.pk else None
-        )
+        self.fields["loaner_asset"].queryset = self._selectable_loaners()
+        self.fields["disposal_method"].choices = [
+            ("", _("Unset")),
+            *AssetDisposal._meta.get_field("disposal_method").choices,
+        ]
+        self.can_hand_over = self._has_permission("assets.change_asset")
+        self.can_dispose = self._has_permission("assets.dispose_asset")
+        self.existing_loan = active_repair_loan(self.instance) if self.instance.pk else None
+        self.offer_loaner = self._is_repair() and self.can_hand_over and self.existing_loan is None
+        self.offer_completion = self._is_repair() and self.can_hand_over and self.existing_loan is not None
+        self._build_helper()
 
+    # ── repair-flow decisions ────────────────────────────────────────────────
+    def _has_permission(self, codename: str) -> bool:
+        """Permissions are resolved through the membership backend, never superuser flags (#644)."""
+        return bool(self.actor is not None and self.actor.is_authenticated and self.actor.has_perm(codename))
+
+    def _is_repair(self) -> bool:
+        """The repair sections follow the SUBMITTED type, so a failed POST keeps them open."""
+        if self.is_bound:
+            submitted = self.data.get(self.add_prefix("maintenance_type"))
+            if submitted:
+                return submitted == AssetMaintenance.MAINTENANCE_TYPE_REPAIR
+        if self.instance.pk:
+            return self.instance.maintenance_type == AssetMaintenance.MAINTENANCE_TYPE_REPAIR
+        return True
+
+    def _selectable_loaners(self):
+        """Tenant-scoped stand-ins: never the unit that is under repair."""
+        queryset = Asset.objects.all()
+        if self.instance.pk and self.instance.asset_id:
+            queryset = queryset.exclude(pk=self.instance.asset_id)
+        return queryset
+
+    # ── rendering ────────────────────────────────────────────────────────────
+    def _build_helper(self):
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
         self.helper.form_tag = True
@@ -90,7 +150,7 @@ class AssetMaintenanceForm(forms.ModelForm):
         button_text = _("Update") if self.instance and self.instance.pk else _("Create")
         cancel_url = reverse("assets:assetmaintenance_list")
 
-        self.helper.layout = Layout(
+        layout = [
             Row(Column("asset", css_class="col-md-12")),
             Row(Column("supplier", css_class="col-md-6"), Column("performed_by", css_class="col-md-6")),
             Row(Column("maintenance_type", css_class="col-md-6"), Column("status", css_class="col-md-6")),
@@ -101,13 +161,102 @@ class AssetMaintenanceForm(forms.ModelForm):
             Row(Column("start_date", css_class="col-md-6"), Column("completion_date", css_class="col-md-6")),
             "description",
             "notes",
-            Row(Column("episode", css_class="col-md-12")),
             "tags",
-            HTML('<div class="mt-3">'),
-            Submit("submit", button_text, css_class="btn btn-primary"),
-            HTML(f'<a href={cancel_url!r} class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
-            HTML("</div>"),
+        ]
+        if self.offer_loaner:
+            layout.extend(self._loaner_section())
+        if self.offer_completion:
+            layout.extend(self._completion_section())
+        layout.extend(
+            [
+                HTML('<div class="mt-3">'),
+                Submit("submit", button_text, css_class="btn btn-primary"),
+                HTML(f'<a href={cancel_url!r} class="btn btn-outline-secondary ms-2">{_("Cancel")}</a>'),
+                HTML("</div>"),
+            ]
         )
+        self.helper.layout = Layout(*layout)
+
+    def _section_header(self, title, open_section=False) -> str:
+        """A collapsed section: the repair extras never crowd the record form."""
+        attribute = " open" if open_section else ""
+        return f'<details class="border rounded p-3 mt-3"{attribute}><summary class="fw-bold">{title}</summary>'
+
+    def _loaner_section(self) -> list:
+        return [
+            HTML(self._section_header(_("Issue loaner"))),
+            Row(Column("loaner_asset", css_class="col-md-6"), Column("loaner_due_date", css_class="col-md-6")),
+            HTML("</details>"),
+        ]
+
+    def _completion_section(self) -> list:
+        section = [
+            HTML(self._section_header(_("Complete repair"), open_section=True)),
+            Row(Column("repair_action", css_class="col-md-12")),
+        ]
+        if self.can_dispose:
+            section.append(Row(Column("dispose_original", css_class="col-md-12 mt-2")))
+            section.append(
+                Row(Column("disposal_method", css_class="col-md-6"), Column("disposal_date", css_class="col-md-6"))
+            )
+        section.append(HTML("</details>"))
+        return section
+
+    # ── validation and write ─────────────────────────────────────────────────
+    def clean(self):
+        data = super().clean()
+        if not self.offer_loaner and data.get("loaner_asset"):
+            raise forms.ValidationError(_("A loaner can only be issued for a repair."))
+        action = data.get("repair_action") or REPAIR_ACTION_NONE
+        if action != REPAIR_ACTION_NONE and not self.offer_completion:
+            raise forms.ValidationError(_("There is no open loaner to close."))
+        if not self.can_dispose and (data.get("dispose_original") or data.get("disposal_method")):
+            raise forms.ValidationError(_("You are not allowed to dispose of an asset."))
+        if self.can_dispose and data.get("dispose_original") and not data.get("disposal_method"):
+            self.add_error("disposal_method", _("Choose a disposal method to start the disposal."))
+        return data
+
+    def save(self, commit=True):
+        with transaction.atomic():
+            maintenance = super().save(commit=commit)
+            if commit:
+                self._apply_repair_workflow(maintenance)
+        return maintenance
+
+    def _apply_repair_workflow(self, maintenance):
+        """Issue the loaner and/or close the repair through the lifecycle services (#644).
+
+        Both services write inside their own transaction; this method wraps them
+        together with the maintenance write, so a refusal (unavailable or
+        foreign-tenant loaner, no holder, no open loaner) rolls the whole form back
+        and the view re-renders it with the reason.
+        """
+        if maintenance.maintenance_type != AssetMaintenance.MAINTENANCE_TYPE_REPAIR:
+            return
+        if self.offer_loaner and self.cleaned_data.get("loaner_asset") is not None:
+            issue_repair_loaner(
+                maintenance,
+                self.cleaned_data["loaner_asset"],
+                self.actor,
+                due_date=self.cleaned_data.get("loaner_due_date") or maintenance.completion_date,
+                request=self.request,
+            )
+        action = self.cleaned_data.get("repair_action") or REPAIR_ACTION_NONE
+        if self.offer_completion and action != REPAIR_ACTION_NONE:
+            complete_repair(
+                maintenance,
+                action,
+                self.actor,
+                request=self.request,
+                disposal_method=self._submitted_disposal_method(),
+                disposal_date=self.cleaned_data.get("disposal_date"),
+            )
+
+    def _submitted_disposal_method(self) -> str:
+        """The disposal starts only when the operator asked for it and may dispose."""
+        if not self.can_dispose or not self.cleaned_data.get("dispose_original"):
+            return ""
+        return self.cleaned_data.get("disposal_method") or ""
 
 
 from compliance.registry import signature_providers

@@ -1,11 +1,9 @@
-"""#504 — repair/replacement episodes: model, timeline builder, write paths, CRUD.
+"""Repair timeline and the retired episode surface (#504, #644).
 
-An episode is the optional hub that groups the records of one repair or
-replacement story (maintenance, reservation, disposal) around the asset and,
-when one exists, its loaner/substitute. The timeline builder renders that story
-on the asset detail page; records without an episode stay in the flat
-chronological fallback, which is what every record written before the feature
-existed renders as.
+The repair maintenance is the anchor of a repair story: its loan and its disposal
+are grouped under it on the timeline of the failed asset *and* of the loaner, and
+assignments and loans appear as timeline events. The beta-era RepairEpisode, its
+CRUD surface and its navigation entry are gone.
 """
 
 import datetime
@@ -14,35 +12,23 @@ from unittest.mock import PropertyMock, patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ValidationError
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.translation import gettext as _
 from model_bakery import baker
 
-from assets.filters import RepairEpisodeFilterSet
-from assets.forms import RepairEpisodeForm
 from assets.forms.disposal_form import AssetDisposalForm
-from assets.forms.fields import selectable_episodes
-from assets.forms.reservation_form import AssetReservationForm
-from assets.models import (
-    Asset,
-    AssetMaintenance,
-    AssetReservation,
-    AssetType,
-    RepairEpisode,
-    StatusLabel,
-    Warranty,
-)
+from assets.forms.fields import selectable_repair_maintenances
+from assets.models import Asset, AssetAssignment, AssetMaintenance, AssetReservation, AssetType, StatusLabel, Warranty
 from assets.models.lifecycle import AssetDisposal
-from assets.services import disposal_service_payload, dispose_asset, update_asset_disposal
+from assets.services import checkout_asset, disposal_service_payload, dispose_asset, update_asset_disposal
 from assets.services.timeline import AssetTimeline, build_asset_timeline
 from core.models import ObjectChange
 from core.tests.mixins import TenantTestMixin
-from organization.models import Tenant
+from organization.models import AssetHolder
 
 User = get_user_model()
 
@@ -55,27 +41,53 @@ def _asset(name, tenant=None, **kwargs):
     return baker.make(Asset, name=name, status=status, tenant=tenant, asset_type=asset_type, **kwargs)
 
 
-def _episode(asset, **kwargs):
-    kwargs.setdefault("notes", "")
-    return baker.make(RepairEpisode, asset=asset, **kwargs)
-
-
-def _maintenance(asset, episode=None, start="2026-01-10", **kwargs):
+def _maintenance(asset, start="2026-01-10", maintenance_type="repair", **kwargs):
+    kwargs.setdefault("completion_date", None)
     return baker.make(
         AssetMaintenance,
         asset=asset,
-        episode=episode,
+        maintenance_type=maintenance_type,
         start_date=datetime.date.fromisoformat(start),
-        completion_date=None,
         **kwargs,
     )
 
 
-def _reservation(asset, episode=None, start="2026-01-20", holder=None, **kwargs):
+def _deployed_status():
+    """A deployed-type label: an active assignment requires the asset to wear one."""
+    return StatusLabel.objects.filter(type="deployed").first() or baker.make(
+        StatusLabel, type="deployed", name="Deployed"
+    )
+
+
+def _holder(**kwargs):
+    return baker.make(AssetHolder, **kwargs)
+
+
+def _loan(asset, holder, maintenance=None, due_date=None, **kwargs):
+    """Issue a real loan: the checkout service owns the deployed status (#644)."""
+    _deployed_status()
+    checkout_asset(
+        asset,
+        holder=holder,
+        is_loan=True,
+        due_date=due_date,
+        maintenance=maintenance,
+        **kwargs,
+    )
+    return AssetAssignment.objects.get(asset=asset, is_active=True)
+
+
+def _handover(asset, holder, **kwargs):
+    """A plain checkout, so the timeline has a non-loan assignment to show."""
+    _deployed_status()
+    checkout_asset(asset, holder=holder, **kwargs)
+    return AssetAssignment.objects.get(asset=asset, is_active=True)
+
+
+def _reservation(asset, start="2026-01-20", holder=None, **kwargs):
     return baker.make(
         AssetReservation,
         asset=asset,
-        episode=episode,
         reserved_for=holder,
         start_date=datetime.date.fromisoformat(start),
         end_date=datetime.date.fromisoformat(start) + datetime.timedelta(days=7),
@@ -83,74 +95,14 @@ def _reservation(asset, episode=None, start="2026-01-20", holder=None, **kwargs)
     )
 
 
-def _disposal(asset, episode=None, day="2026-02-01", **kwargs):
+def _disposal(asset, maintenance=None, day="2026-02-01", **kwargs):
     return baker.make(
         AssetDisposal,
         asset=asset,
-        episode=episode,
+        maintenance=maintenance,
         disposal_date=datetime.date.fromisoformat(day),
         **kwargs,
     )
-
-
-# ---------------------------------------------------------------------------
-# Model contract
-# ---------------------------------------------------------------------------
-
-
-class RepairEpisodeModelTests(TestCase):
-    def setUp(self):
-        self.asset = _asset("Main Laptop")
-        self.loaner = _asset("Loaner Laptop")
-
-    def test_episode_links_the_asset_and_its_substitute(self):
-        episode = _episode(self.asset, substitute_asset=self.loaner)
-        episode.full_clean()
-        self.assertEqual(episode.asset_id, self.asset.pk)
-        self.assertEqual(episode.substitute_asset_id, self.loaner.pk)
-
-    def test_substitute_cannot_be_the_asset_itself(self):
-        episode = RepairEpisode(asset=self.asset, substitute_asset=self.asset)
-        with self.assertRaises(ValidationError):
-            episode.full_clean()
-
-    def test_substitute_must_belong_to_the_same_tenant(self):
-        tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
-        tenant_b = Tenant.objects.create(name="Tenant B", slug="tenant-b")
-        asset_a = _asset("Asset A", tenant=tenant_a)
-        asset_b = _asset("Asset B", tenant=tenant_b)
-        sister = _asset("Asset A2", tenant=tenant_a)
-
-        with self.assertRaises(ValidationError):
-            RepairEpisode(asset=asset_a, substitute_asset=asset_b).full_clean()
-        RepairEpisode(asset=asset_a, substitute_asset=sister).full_clean()
-
-    def test_tenant_property_follows_the_asset(self):
-        tenant = Tenant.objects.create(name="Tenant T", slug="tenant-t")
-        asset = _asset("Tenant Asset", tenant=tenant)
-        self.assertEqual(_episode(asset).tenant, tenant)
-        self.assertIsNone(_episode(self.asset).tenant)
-
-    def test_str_and_absolute_url(self):
-        episode = _episode(self.asset)
-        self.assertIn("Main Laptop", str(episode))
-        self.assertEqual(episode.get_absolute_url(), reverse("assets:repairepisode_detail", kwargs={"pk": episode.pk}))
-
-    def test_records_stay_valid_without_an_episode(self):
-        maintenance = _maintenance(self.asset)
-        reservation = _reservation(self.asset)
-        disposal = _disposal(self.asset)
-        for record in (maintenance, reservation, disposal):
-            self.assertIsNone(record.episode_id)
-
-    def test_records_link_to_the_episode_through_the_optional_fk(self):
-        episode = _episode(self.asset)
-        maintenance = _maintenance(self.asset, episode=episode)
-        reservation = _reservation(self.asset, episode=episode)
-        disposal = _disposal(self.asset, episode=episode)
-        self.assertEqual(maintenance.episode_id, episode.pk)
-        self.assertEqual(reservation.episode_id, episode.pk)
-        self.assertEqual(disposal.episode_id, episode.pk)
 
 
 # ---------------------------------------------------------------------------
@@ -158,19 +110,20 @@ class RepairEpisodeModelTests(TestCase):
 # ---------------------------------------------------------------------------
 
 
-class RepairEpisodeTimelineTests(TestCase):
+class RepairTimelineTests(TestCase):
     def setUp(self):
         self.asset = _asset("Main Laptop")
         self.loaner = _asset("Loaner Laptop")
+        self.holder = _holder()
 
     def test_empty_timeline_has_no_events(self):
         timeline = build_asset_timeline(self.asset)
         self.assertEqual(timeline.total, 0)
-        self.assertFalse(timeline.has_episodes)
+        self.assertFalse(timeline.has_groups)
         self.assertEqual(timeline.ungrouped, [])
 
-    def test_records_without_episode_stay_chronological(self):
-        _maintenance(self.asset, start="2026-01-10")
+    def test_records_without_a_repair_stay_chronological(self):
+        _maintenance(self.asset, start="2026-01-10", maintenance_type="upgrade")
         baker.make(
             Warranty,
             asset=self.asset,
@@ -178,80 +131,86 @@ class RepairEpisodeTimelineTests(TestCase):
             end_date=datetime.date(2027, 1, 5),
         )
         _reservation(self.asset, start="2026-01-20")
+        _handover(self.asset, self.holder)
 
         timeline = build_asset_timeline(self.asset)
-        self.assertFalse(timeline.has_episodes)
+        self.assertFalse(timeline.has_groups)
         self.assertEqual(
             [event.date for event in timeline.ungrouped], sorted(event.date for event in timeline.ungrouped)
         )
-        self.assertEqual({event.kind for event in timeline.ungrouped}, {"maintenance", "warranty", "reservation"})
-        self.assertEqual(timeline.total, 3)
+        self.assertEqual(
+            {event.kind for event in timeline.ungrouped}, {"maintenance", "warranty", "reservation", "assignment"}
+        )
+        self.assertEqual(timeline.total, 4)
 
-    def test_linked_records_are_grouped_under_the_episode(self):
-        episode = _episode(self.asset, substitute_asset=self.loaner)
-        _maintenance(self.asset, episode=episode)
-        _reservation(self.asset, episode=episode)
+    def test_repair_groups_its_loan_and_disposal(self):
+        maintenance = _maintenance(self.asset)
+        _loan(self.loaner, self.holder, maintenance=maintenance)
+        _disposal(self.asset, maintenance=maintenance)
 
         timeline = build_asset_timeline(self.asset)
-        self.assertTrue(timeline.has_episodes)
+        self.assertTrue(timeline.has_groups)
         self.assertEqual(len(timeline.groups), 1)
         group = timeline.groups[0]
-        self.assertEqual(group.episode.pk, episode.pk)
-        self.assertEqual({event.kind for event in group.events}, {"maintenance", "reservation"})
+        self.assertEqual(group.maintenance.pk, maintenance.pk)
+        self.assertEqual({event.kind for event in group.events}, {"maintenance", "loan", "disposal"})
+        self.assertEqual([asset.pk for asset in group.substitute_assets], [self.loaner.pk])
         self.assertEqual(timeline.ungrouped, [])
-        self.assertEqual(timeline.total, 2)
+        self.assertEqual(timeline.total, 3)
 
-    def test_unlinked_records_fall_back_to_the_flat_list(self):
-        episode = _episode(self.asset)
-        _maintenance(self.asset, episode=episode)
-        baker.make(
-            Warranty,
-            asset=self.asset,
-            start_date=datetime.date(2026, 1, 5),
-            end_date=datetime.date(2027, 1, 5),
-        )
-
-        timeline = build_asset_timeline(self.asset)
-        self.assertEqual(len(timeline.groups), 1)
-        self.assertEqual([event.kind for event in timeline.ungrouped], ["warranty"])
-        self.assertEqual(timeline.total, 2)
-
-    def test_story_spans_the_substitute_asset_on_both_pages(self):
-        episode = _episode(self.asset, substitute_asset=self.loaner)
-        _maintenance(self.asset, episode=episode)
-        _reservation(self.loaner, episode=episode)
+    def test_story_spans_the_loaner_asset_on_both_pages(self):
+        maintenance = _maintenance(self.asset)
+        _loan(self.loaner, self.holder, maintenance=maintenance)
+        _disposal(self.asset, maintenance=maintenance)
 
         main_timeline = build_asset_timeline(self.asset)
         loaner_timeline = build_asset_timeline(self.loaner)
         for timeline in (main_timeline, loaner_timeline):
             self.assertEqual(len(timeline.groups), 1)
             group = timeline.groups[0]
-            self.assertEqual({event.kind for event in group.events}, {"maintenance", "reservation"})
-            keys = [(event.kind, event.url) for event in group.events]
+            self.assertEqual({event.kind for event in group.events}, {"maintenance", "loan", "disposal"})
+            keys = [(event.kind, event.url, event.date) for event in group.events]
             self.assertEqual(len(keys), len(set(keys)), "the two views must not duplicate an event")
 
         # The borrowed record names the asset it really belongs to, on both pages.
-        main_reservation = [event for event in main_timeline.groups[0].events if event.kind == "reservation"][0]
-        self.assertTrue(any("Loaner Laptop" in part for part in main_reservation.parts))
         loaner_maintenance = [event for event in loaner_timeline.groups[0].events if event.kind == "maintenance"][0]
         self.assertTrue(any("Main Laptop" in part for part in loaner_maintenance.parts))
+        main_disposal = [event for event in main_timeline.groups[0].events if event.kind == "disposal"][0]
+        self.assertEqual(main_disposal.parts, [])
+        main_loan = [event for event in main_timeline.groups[0].events if event.kind == "loan"][0]
+        self.assertTrue(any("Loaner Laptop" in part for part in main_loan.parts))
 
-    def test_orphaned_episode_link_falls_back_to_ungrouped(self):
-        other = _asset("Unrelated Server")
-        foreign_episode = _episode(other)
-        _maintenance(self.asset, episode=foreign_episode)
+    def test_a_loan_for_another_asset_is_a_plain_event(self):
+        """A loan that belongs to no repair is still an event, in chronological order."""
+        due_date = datetime.date.today() + datetime.timedelta(days=1)
+        _loan(self.loaner, self.holder, due_date=due_date)
+
+        timeline = build_asset_timeline(self.loaner)
+        self.assertFalse(timeline.has_groups)
+        self.assertEqual([event.kind for event in timeline.ungrouped], ["loan"])
+        event = timeline.ungrouped[0]
+        self.assertIn(_("Due %(date)s") % {"date": due_date.isoformat()}, event.parts)
+        self.assertIn(_("Active"), event.parts)
+
+    def test_an_ended_overdue_loan_reports_its_state(self):
+        assignment = _loan(self.loaner, self.holder)
+        assignment.is_active = False
+        assignment.due_date = datetime.date.today() - datetime.timedelta(days=5)
+        assignment.returned_at = datetime.date.today() - datetime.timedelta(days=4)
+        assignment.save()
+
+        timeline = build_asset_timeline(self.loaner)
+        event = timeline.ungrouped[0]
+        self.assertEqual(event.kind, "loan")
+        self.assertIn(_("Ended"), event.parts)
+        self.assertIn(_("Returned %(date)s") % {"date": assignment.returned_at.isoformat()}, event.parts)
+
+    def test_non_repair_work_stays_ungrouped(self):
+        _maintenance(self.asset, maintenance_type="calibration")
 
         timeline = build_asset_timeline(self.asset)
-        self.assertFalse(timeline.has_episodes)
+        self.assertFalse(timeline.has_groups)
         self.assertEqual([event.kind for event in timeline.ungrouped], ["maintenance"])
-
-    def test_episode_without_records_keeps_an_empty_group(self):
-        episode = _episode(self.asset)
-        timeline = build_asset_timeline(self.asset)
-        self.assertTrue(timeline.has_episodes)
-        self.assertEqual(timeline.groups[0].episode.pk, episode.pk)
-        self.assertEqual(timeline.groups[0].events, [])
-        self.assertEqual(timeline.total, 0)
 
     def test_status_transitions_read_from_the_changelog(self):
         deployable = self.asset.status
@@ -298,12 +257,8 @@ class RepairEpisodeTimelineTests(TestCase):
         self.assertTrue(any(_("Unknown status") in part for event in status_events for part in event.parts))
 
     def test_record_details_are_part_of_the_event(self):
-        episode = _episode(self.asset)
-        maintenance = _maintenance(self.asset, episode=episode)
-        maintenance.completion_date = maintenance.start_date + datetime.timedelta(days=2)
-        maintenance.save()
-        _reservation(self.asset, episode=episode, start="2026-01-22")
-        disposal = _disposal(self.asset, episode=episode, recipient="Recycler GmbH")
+        maintenance = _maintenance(self.asset, completion_date=datetime.date.fromisoformat("2026-01-12"))
+        disposal = _disposal(self.asset, maintenance=maintenance, recipient="Recycler GmbH")
         cancellation = baker.make(User, username="canceller")
         disposal.cancelled_at = timezone.now()
         disposal.cancelled_by = cancellation
@@ -311,6 +266,7 @@ class RepairEpisodeTimelineTests(TestCase):
         disposal.save()
         # Records the pre-guard era left in the recycle bin still render.
         AssetDisposal.all_objects.filter(pk=disposal.pk).update(deleted_at=timezone.now())
+        _reservation(self.asset, start="2026-01-22")
 
         timeline = build_asset_timeline(self.asset)
         events = {event.kind: event for event in timeline.groups[0].events}
@@ -319,123 +275,152 @@ class RepairEpisodeTimelineTests(TestCase):
         self.assertIn(_("Recipient: %(recipient)s") % {"recipient": "Recycler GmbH"}, events["disposal"].parts)
         self.assertIn(_("Cancelled"), events["disposal"].parts)
         self.assertIn(_("Previously deleted (recycle bin)"), events["disposal"].parts)
-        self.assertIn(_("(no holder)"), events["reservation"].title)
+        reservation_event = [event for event in timeline.ungrouped if event.kind == "reservation"][0]
+        self.assertIn(_("(no holder)"), reservation_event.title)
 
 
 # ---------------------------------------------------------------------------
-# Write paths: disposal service, forms and the episode picker
+# Retired surface
 # ---------------------------------------------------------------------------
 
 
-class RepairEpisodeWritePathTests(TestCase):
+class RepairEpisodeSurfaceTests(TestCase):
+    def test_the_model_is_gone(self):
+        with self.assertRaises(ImportError):
+            from assets.models import RepairEpisode  # noqa: F401
+
+    def test_the_routes_are_gone(self):
+        for name in (
+            "assets:repairepisode_list",
+            "assets:repairepisode_create",
+            "assets:repairepisode_detail",
+            "assets:repairepisode_update",
+            "assets:repairepisode_delete",
+        ):
+            with self.assertRaises(NoReverseMatch):
+                reverse(name, kwargs={"pk": 1} if name.endswith(("detail", "update", "delete")) else {})
+
+    def test_the_generic_export_declaration_is_gone(self):
+        from core.data_transfer import DECLARATIONS
+
+        self.assertNotIn("assets.repairepisode", DECLARATIONS)
+
+    def test_reservations_no_longer_carry_a_repair_link(self):
+        field_names = {field.name for field in AssetReservation._meta.get_fields()}
+        self.assertNotIn("episode", field_names)
+
+    def test_assignments_and_disposals_anchor_on_the_maintenance(self):
+        self.assertIn("maintenance", {field.name for field in AssetAssignment._meta.get_fields()})
+        self.assertIn("maintenance", {field.name for field in AssetDisposal._meta.get_fields()})
+
+
+# ---------------------------------------------------------------------------
+# Disposal write path and the maintenance picker
+# ---------------------------------------------------------------------------
+
+
+class DisposalRepairLinkTests(TestCase):
     def setUp(self):
         self.asset = _asset("Main Laptop")
-        self.episode = _episode(self.asset)
+        self.maintenance = _maintenance(self.asset)
 
-    def test_disposal_service_payload_carries_the_episode(self):
+    def test_disposal_service_payload_carries_the_maintenance(self):
         payload = disposal_service_payload(
-            {"disposal_method": "recycle", "disposal_date": datetime.date(2026, 2, 1), "episode": self.episode}
+            {
+                "disposal_method": "recycle",
+                "disposal_date": datetime.date(2026, 2, 1),
+                "maintenance": self.maintenance,
+            }
         )
-        self.assertEqual(payload["episode"], self.episode)
+        self.assertEqual(payload["maintenance"], self.maintenance)
 
-    def test_dispose_asset_links_the_episode(self):
+    def test_dispose_asset_links_the_maintenance(self):
         baker.make(StatusLabel, type="archived")
         user = baker.make(User, username="technician")
         disposal = dispose_asset(
             self.asset,
             disposal_method="recycle",
             disposal_date=datetime.date(2026, 2, 1),
-            episode=self.episode,
+            maintenance=self.maintenance,
             user=user,
         )
-        self.assertEqual(disposal.episode_id, self.episode.pk)
+        self.assertEqual(disposal.maintenance_id, self.maintenance.pk)
 
-    def test_update_asset_disposal_can_amend_the_episode(self):
+    def test_update_asset_disposal_can_amend_the_maintenance(self):
         baker.make(StatusLabel, type="archived")
-        other = _episode(self.asset, notes="second")
-        disposal = _disposal(self.asset, episode=self.episode)
+        other = _maintenance(self.asset, start="2026-03-01")
+        disposal = _disposal(self.asset, maintenance=self.maintenance)
 
-        update_asset_disposal(disposal, user=None, data={"episode": other})
+        update_asset_disposal(disposal, user=None, data={"maintenance": other})
         disposal.refresh_from_db()
-        self.assertEqual(disposal.episode_id, other.pk)
+        self.assertEqual(disposal.maintenance_id, other.pk)
 
-    def test_selectable_episodes_keeps_a_deleted_current_link(self):
-        self.episode.delete()
-        self.assertNotIn(self.episode.pk, set(selectable_episodes().values_list("pk", flat=True)))
-        self.assertIn(self.episode.pk, set(selectable_episodes(self.episode.pk).values_list("pk", flat=True)))
+    def test_selectable_maintenances_keeps_a_deleted_current_link(self):
+        self.maintenance.delete()
+        listed = set(selectable_repair_maintenances().values_list("pk", flat=True))
+        self.assertNotIn(self.maintenance.pk, listed)
+        kept = set(selectable_repair_maintenances(self.maintenance.pk).values_list("pk", flat=True))
+        self.assertIn(self.maintenance.pk, kept)
 
-    def test_disposal_form_keeps_the_linked_deleted_episode_selectable(self):
-        disposal = _disposal(self.asset, episode=self.episode)
+    def test_disposal_form_keeps_the_linked_deleted_maintenance_selectable(self):
+        disposal = _disposal(self.asset, maintenance=self.maintenance)
         form = AssetDisposalForm(instance=disposal)
-        self.assertIn("episode", form.fields)
-        self.episode.delete()
+        self.assertIn("maintenance", form.fields)
+        self.maintenance.delete()
         form = AssetDisposalForm(instance=disposal)
-        self.assertIn(self.episode.pk, set(form.fields["episode"].queryset.values_list("pk", flat=True)))
-
-    def test_reservation_form_exposes_the_episode_picker(self):
-        form = AssetReservationForm()
-        self.assertIn("episode", form.fields)
-        self.assertIn(self.episode.pk, set(form.fields["episode"].queryset.values_list("pk", flat=True)))
-
-    def test_episode_form_rejects_the_asset_as_its_own_substitute(self):
-        form = RepairEpisodeForm(data={"asset": self.asset.pk, "substitute_asset": self.asset.pk, "notes": ""})
-        self.assertFalse(form.is_valid())
-        self.assertIn("substitute_asset", form.errors)
+        self.assertIn(self.maintenance.pk, set(form.fields["maintenance"].queryset.values_list("pk", flat=True)))
 
 
 # ---------------------------------------------------------------------------
-# CRUD surface + filter
+# Detail page
 # ---------------------------------------------------------------------------
 
 
-class RepairEpisodeViewTests(TenantTestMixin, TestCase):
+class RepairTimelineDetailViewTests(TenantTestMixin, TestCase):
     def setUp(self):
         self.setup_tenant_context()
         self.user = baker.make(User, is_superuser=True, is_staff=True)
+        self.client.force_login(self.user)
         self.asset = _asset("View Laptop", tenant=self.tenant)
-        self.episode = _episode(self.asset)
+        self.loaner = _asset("View Loaner", tenant=self.tenant)
+        self.holder = _holder(tenant=self.tenant)
+        self.maintenance = _maintenance(self.asset)
+        _loan(self.loaner, self.holder, maintenance=self.maintenance)
+        _disposal(self.asset, maintenance=self.maintenance)
 
-    def test_list_view_requires_login(self):
-        response = self.client.get(reverse("assets:repairepisode_list"))
-        self.assertEqual(response.status_code, 302)
-
-    def test_list_view_renders_the_episode(self):
-        self.client.force_login(self.user)
-        response = self.client.get(reverse("assets:repairepisode_list"))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "View Laptop")
-
-    def test_detail_view_renders_the_episode_panel(self):
-        self.client.force_login(self.user)
-        response = self.client.get(reverse("assets:repairepisode_detail", kwargs={"pk": self.episode.pk}))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "View Laptop")
-
-    def test_asset_detail_page_renders_the_timeline_tab(self):
-        self.client.force_login(self.user)
+    def test_the_asset_page_offers_log_repair(self):
         response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": self.asset.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "tab=timeline")
+        self.assertContains(response, "Log repair")
+        self.assertNotContains(response, "Add Repair Episode")
+
+    def test_the_asset_page_groups_the_whole_repair_story(self):
+        response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": self.asset.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Repair on View Laptop")
+        self.assertContains(response, "View Loaner")
+
+    def test_the_loaner_page_groups_the_story_and_names_the_failed_asset(self):
+        response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": self.loaner.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This asset stood in for")
+        self.assertContains(response, "View Laptop")
+
+
+# ---------------------------------------------------------------------------
+# Recent activity card (#645)
+# ---------------------------------------------------------------------------
+
+
+class RecentActivityCardTests(TenantTestMixin, TestCase):
+    def setUp(self):
+        self.setup_tenant_context()
+        self.user = baker.make(User, is_superuser=True, is_staff=True)
+        self.client.force_login(self.user)
+        self.asset = _asset("Card Laptop", tenant=self.tenant)
 
     def test_asset_overview_lists_the_five_newest_events_flattened(self):
-        maintenance_types = (
-            AssetMaintenance.MAINTENANCE_TYPE_REPAIR,
-            AssetMaintenance.MAINTENANCE_TYPE_UPGRADE,
-            AssetMaintenance.MAINTENANCE_TYPE_CALIBRATION,
-            AssetMaintenance.MAINTENANCE_TYPE_SOFTWARE_SUPPORT,
-            AssetMaintenance.MAINTENANCE_TYPE_HARDWARE_SUPPORT,
-            AssetMaintenance.MAINTENANCE_TYPE_REPAIR,
-        )
-        records = [
-            _maintenance(
-                self.asset,
-                episode=self.episode if index < 6 else None,
-                start=f"2026-02-{index:02d}",
-                maintenance_type=maintenance_types[index - 1],
-            )
-            for index in range(1, 7)
-        ]
-        self.client.force_login(self.user)
+        records = [_maintenance(self.asset, start=f"2026-02-{index:02d}") for index in range(1, 7)]
 
         response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": self.asset.pk}))
 
@@ -446,7 +431,6 @@ class RepairEpisodeViewTests(TenantTestMixin, TestCase):
         self.assertEqual(
             [event.url for event in recent_activity], [record.get_absolute_url() for record in expected_records]
         )
-        self.assertTrue(response.context["asset_timeline"].has_episodes)
         self.assertContains(response, "Recent activity")
         self.assertContains(response, "Show full timeline")
         self.assertContains(response, 'href="?tab=timeline"')
@@ -464,8 +448,6 @@ class RepairEpisodeViewTests(TenantTestMixin, TestCase):
             self.assertIn(expected_link, rendered)
 
     def test_asset_overview_shows_the_timeline_empty_state(self):
-        self.client.force_login(self.user)
-
         response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": self.asset.pk}))
 
         self.assertEqual(response.status_code, 200)
@@ -476,8 +458,7 @@ class RepairEpisodeViewTests(TenantTestMixin, TestCase):
         self.assertContains(response, "Show full timeline")
 
     def test_asset_detail_recent_activity_does_not_add_database_queries(self):
-        _maintenance(self.asset, episode=self.episode, start="2026-02-12")
-        self.client.force_login(self.user)
+        _maintenance(self.asset, start="2026-02-12")
         url = reverse("assets:asset_detail", kwargs={"pk": self.asset.pk})
 
         with CaptureQueriesContext(connection) as baseline_queries:
@@ -490,31 +471,3 @@ class RepairEpisodeViewTests(TenantTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(recent_queries), len(baseline_queries))
         self.assertEqual(len(response.context["recent_activity"]), 1)
-
-    def test_admin_changelist_renders(self):
-        self.client.force_login(self.user)
-        response = self.client.get(reverse("admin:assets_repairepisode_changelist"))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "View Laptop")
-
-    def test_create_view_prefills_the_asset_from_the_query_string(self):
-        self.client.force_login(self.user)
-        response = self.client.get(f"{reverse('assets:repairepisode_create')}?asset={self.asset.pk}")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(str(response.context["form"].initial["asset"]), str(self.asset.pk))
-
-    def test_delete_view_asks_for_confirmation(self):
-        self.client.force_login(self.user)
-        response = self.client.get(reverse("assets:repairepisode_delete", kwargs={"pk": self.episode.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_filter_searches_asset_name_and_notes(self):
-        other_asset = _asset("Other Server", tenant=self.tenant)
-        other_episode = _episode(other_asset, notes="fan rattle")
-        queryset = RepairEpisode.objects.all()
-
-        by_name = RepairEpisodeFilterSet({"q": "View Laptop"}, queryset=queryset)
-        self.assertEqual(set(by_name.qs.values_list("pk", flat=True)), {self.episode.pk})
-
-        by_notes = RepairEpisodeFilterSet({"q": "fan rattle"}, queryset=queryset)
-        self.assertEqual(set(by_notes.qs.values_list("pk", flat=True)), {other_episode.pk})

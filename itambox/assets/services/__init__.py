@@ -34,7 +34,7 @@ from licenses.models import LicenseSeatAssignment
 
 from ..choices import StatusTypeChoices
 from ..depreciation import compute_book_value
-from ..models import Asset, AssetAssignment, AssetDisposal, StatusLabel
+from ..models import Asset, AssetAssignment, AssetDisposal, AssetMaintenance, StatusLabel
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,7 @@ def checkout_asset(
     status: StatusLabel | None = None,
     is_loan: bool = False,
     due_date: datetime.date | None = None,
+    maintenance: "AssetMaintenance | None" = None,
     _suppress_custody_receipt: bool = False,
 ) -> AssetHolder | Location | Asset:
     target = holder or location or asset_target
@@ -140,6 +141,7 @@ def checkout_asset(
             "pre_checkout_status": original_status,
             "is_loan": is_loan,
             "due_date": due_date,
+            "maintenance": maintenance,
         }
         if holder:
             assignment_kwargs["assigned_user"] = holder
@@ -385,6 +387,195 @@ def checkin_asset(
         return None
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Repair workflow (#644): the repair maintenance anchors the story and issues
+# the loaner. There is no separate grouping object.
+# ─────────────────────────────────────────────────────────────────────────────
+
+#: The deliberate outcomes an operator may choose when a repair is completed.
+REPAIR_ACTION_NONE = "none"
+REPAIR_ACTION_RETURN = "return"
+REPAIR_ACTION_REPLACE = "replace"
+REPAIR_ACTION_CHOICES = (
+    (REPAIR_ACTION_NONE, _("Do nothing")),
+    (REPAIR_ACTION_RETURN, _("Returned - check the loaner in and hand the asset back")),
+    (REPAIR_ACTION_REPLACE, _("Replace permanently - the loaner stays with the holder")),
+)
+
+
+def repair_holder(asset: Asset):
+    """The person holding ``asset`` right now, or ``None`` when nobody does (#644).
+
+    A loaner is issued *to somebody*: a unit in the deployable pool or deployed to a
+    location has no person to lend to, so the caller fails closed instead of
+    inventing a target.
+    """
+    assignment = asset.active_assignment
+    if assignment is None or assignment.assigned_user is None:
+        return None
+    return assignment.assigned_user
+
+
+def active_repair_loan(maintenance: "AssetMaintenance") -> "AssetAssignment | None":
+    """The open loaner of a repair maintenance, or ``None`` when none was issued (#644)."""
+    return (
+        AssetAssignment.objects.filter(maintenance=maintenance, is_loan=True, is_active=True)
+        .select_related("asset", "assigned_user")
+        .first()
+    )
+
+
+def issue_repair_loaner(
+    maintenance: "AssetMaintenance",
+    loaner: Asset,
+    user: AbstractBaseUser | None = None,
+    *,
+    due_date: datetime.date | None = None,
+    notes: str = "",
+    request: HttpRequest | None = None,
+) -> "AssetAssignment":
+    """Check ``loaner`` out to the failed asset's current holder as the loan of this repair (#644).
+
+    The loan is written through ``checkout_asset`` in the same transaction as the
+    maintenance it belongs to, so status handling, custody and the audit trail are
+    identical to any other checkout; only the link to the repair maintenance is new.
+
+    Fails closed, writing nothing, when the failed asset has no holder to lend to,
+    when the loaner belongs to another tenant, when the loaner is the unit under
+    repair, or when the loaner is not issuable (already assigned, disposed of, or
+    not in a deployable status) - ``checkout_asset`` performs the availability check.
+    """
+    if maintenance.maintenance_type != AssetMaintenance.MAINTENANCE_TYPE_REPAIR:
+        raise ValidationError(_("A loaner can only be issued for a repair maintenance."))
+    if maintenance.asset_id == loaner.pk:
+        raise ValidationError(_("The unit under repair cannot be issued to itself as a loaner."))
+    holder = repair_holder(maintenance.asset)
+    if holder is None:
+        raise ValidationError(_("The asset has no holder, so no loaner can be issued."))
+    if loaner.tenant_id != maintenance.asset.tenant_id:
+        raise ValidationError(_("The loaner must belong to the same tenant as the asset."))
+
+    # The expected completion is the loan's default return date: a stand-in is needed
+    # until the repair is done.
+    resolved_due_date = due_date or maintenance.completion_date
+    with transaction.atomic():
+        checkout_asset(
+            loaner,
+            holder=holder,
+            user=user,
+            request=request,
+            notes=notes or _("Loaner issued for repair maintenance %(maintenance)s") % {"maintenance": maintenance.pk},
+            is_loan=True,
+            due_date=resolved_due_date,
+            maintenance=maintenance,
+        )
+        return active_repair_loan(maintenance)
+
+
+def complete_repair(
+    maintenance: "AssetMaintenance",
+    action: str,
+    user=None,
+    *,
+    request: HttpRequest | None = None,
+    disposal_method: str = "",
+    disposal_date: datetime.date | None = None,
+) -> "AssetAssignment | None":
+    """Close the story of a completed repair maintenance (#644).
+
+    Three deliberate outcomes, all reusing the existing lifecycle services:
+
+    * ``return`` - the loaner is checked back in and the repaired unit is checked out
+      to the same holder, so responsibility returns to where it was;
+    * ``replace`` - the loan is converted into a regular assignment (``is_loan`` and
+      ``due_date`` cleared) and, when a ``disposal_method`` is given, the disposal of
+      the unit that was under repair is started, linked to the maintenance;
+    * ``none`` - nothing is changed; both units stay exactly as they are.
+
+    Nothing is written when the maintenance is not a repair, when it has no open
+    loaner, or when any of the reused services refuses (permission and availability
+    stay with those services).
+    """
+    action = action or REPAIR_ACTION_NONE
+    if maintenance.maintenance_type != AssetMaintenance.MAINTENANCE_TYPE_REPAIR:
+        raise ValidationError(_("Only a repair maintenance can close a repair."))
+    if action == REPAIR_ACTION_NONE:
+        return None
+    loan = active_repair_loan(maintenance)
+    if loan is None:
+        raise ValidationError(_("This repair has no open loaner."))
+    if action == REPAIR_ACTION_RETURN:
+        return _return_repair(maintenance, loan, user=user, request=request)
+    if action == REPAIR_ACTION_REPLACE:
+        return _replace_repair(
+            maintenance, loan, user=user, disposal_method=disposal_method, disposal_date=disposal_date
+        )
+    raise ValidationError(_("Unknown repair completion action."))
+
+
+def _return_repair(maintenance, loan, *, user, request) -> "AssetAssignment":
+    """Check the loaner in and hand the repaired unit back to the same holder (#644)."""
+    holder = loan.assigned_user
+    with transaction.atomic():
+        checkin_asset(
+            loan.asset,
+            user=user,
+            notes=_("Returned after repair maintenance %(maintenance)s completed.") % {"maintenance": maintenance.pk},
+            request=request,
+        )
+        # The repaired unit may still be recorded as held by that person; close that
+        # stale assignment first, so the hand-back is a clean, auditable checkout.
+        checkin_asset(
+            maintenance.asset,
+            user=user,
+            notes=_("Returned from repair maintenance %(maintenance)s.") % {"maintenance": maintenance.pk},
+            request=request,
+        )
+        checkout_asset(
+            maintenance.asset,
+            holder=holder,
+            user=user,
+            request=request,
+            notes=_("Handed back to the holder after repair maintenance %(maintenance)s.")
+            % {"maintenance": maintenance.pk},
+        )
+        return active_assignment_of(maintenance.asset)
+
+
+def _replace_repair(maintenance, loan, *, user, disposal_method, disposal_date) -> "AssetAssignment":
+    """Keep the loaner with the holder and optionally dispose of the repaired unit (#644)."""
+    with transaction.atomic():
+        loan.snapshot()
+        loan.is_loan = False
+        loan.due_date = None
+        loan._changelog_action = ObjectChangeActionChoices.ACTION_UPDATE
+        loan._changelog_message = "Loan converted into a regular assignment (repair replaced permanently)"
+        loan.save(update_fields=["is_loan", "due_date", "updated_at"])
+        if disposal_method:
+            # The disposal service owns the disposal lifecycle: the record, the
+            # archived status and the check-in are one atomic operation there.
+            dispose_asset(
+                maintenance.asset,
+                disposal_method=disposal_method,
+                disposal_date=disposal_date or datetime.date.today(),
+                maintenance=maintenance,
+                user=user,
+            )
+        return loan
+
+
+def active_assignment_of(asset: Asset, *, is_loan: bool | None = None) -> "AssetAssignment | None":
+    """The asset's active assignment, optionally narrowed to loans or non-loans (#644).
+
+    Helper for the repair workflow, which has to name the assignment it just wrote
+    through ``checkout_asset`` (that service returns its target, not the row).
+    """
+    queryset = AssetAssignment.objects.filter(asset=asset, is_active=True)
+    if is_loan is not None:
+        queryset = queryset.filter(is_loan=is_loan)
+    return queryset.order_by("-checked_out_at").first()
+
+
 #: Editable metadata of a disposal record. ``asset`` is deliberately absent: a
 #: record's asset identity is immutable.
 DISPOSAL_METADATA_FIELDS = (
@@ -397,7 +588,7 @@ DISPOSAL_METADATA_FIELDS = (
     "proceeds",
     "currency",
     "weee_compliant",
-    "episode",
+    "maintenance",
     "notes",
 )
 
@@ -418,7 +609,7 @@ def disposal_service_payload(data: Mapping) -> dict:
         "proceeds": data.get("proceeds"),
         "currency": data.get("currency") or "",
         "weee_compliant": data.get("weee_compliant") or False,
-        "episode": data.get("episode"),
+        "maintenance": data.get("maintenance"),
         "notes": data.get("notes") or "",
     }
 
@@ -528,7 +719,7 @@ def dispose_asset(
     proceeds=None,
     currency: str = "",
     weee_compliant: bool = False,
-    episode=None,
+    maintenance: "AssetMaintenance | None" = None,
     notes: str = "",
     user=None,
 ) -> "AssetDisposal":
@@ -583,7 +774,7 @@ def dispose_asset(
             proceeds=proceeds,
             currency=currency,
             weee_compliant=weee_compliant,
-            episode=episode,
+            maintenance=maintenance,
             notes=notes,
         )
         disposal.full_clean()

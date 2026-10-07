@@ -105,6 +105,15 @@ class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLog
         verbose_name=_("Returned At"),
         help_text=_("Date the loaned asset was physically returned."),
     )
+    maintenance = models.ForeignKey(
+        "assets.AssetMaintenance",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assignments",
+        verbose_name=_("Repair Maintenance"),
+        help_text=_("Optional: the repair maintenance this loan or handover belongs to."),
+    )
 
     class Meta:
         ordering = ["-checked_out_at"]
@@ -132,6 +141,8 @@ class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLog
 
     def clean(self):
         super().clean()
+        if self.maintenance_id and self.asset_id and self.maintenance.asset.tenant_id != self.asset.tenant_id:
+            raise ValidationError({"maintenance": _("The maintenance must belong to the same tenant as the asset.")})
         targets = [self.assigned_user, self.assigned_location, self.assigned_asset]
         filled = [t for t in targets if t is not None]
         if self.is_active:
