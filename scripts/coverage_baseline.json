@@ -4,22 +4,22 @@
   "coverage_series": "7.15",
   "policy_sha256": "d361fd8b3ad72413b002fabc4612c7646ef74b2bc39a07ef07c4884f47551845",
   "totals": {
-    "num_statements": 66949,
-    "covered_lines": 59381,
-    "line_rate": 88.7,
-    "num_branches": 19022,
-    "covered_branches": 14612,
-    "branch_rate": 76.82,
+    "num_statements": 65750,
+    "covered_lines": 58115,
+    "line_rate": 88.39,
+    "num_branches": 18740,
+    "covered_branches": 14312,
+    "branch_rate": 76.37,
     "excluded_lines": 48,
-    "measured_files": 631
+    "measured_files": 632
   },
   "decline_justification": {
-    "reason": "Removed dead provider-slot indirection (kit checkout, seat usage, software reconciliation), the issue-445 cutover verifier and the unreachable license-line receipt branch (#615). The deleted modules were measured code, so measured files, statements and branches fall with them; the new totals are taken from the hosted run's lane artifact for this head.",
-    "previous_line_rate": 88.6,
-    "previous_branch_rate": 76.72,
+    "reason": "Deliberate #612 removal of asset GraphQL mutation code: mutations.py (-1,116 statements/-296 branches; 1,004 covered lines), inputs.py (-210 statements), assets/schema.py (-120 statements/-20 branches). REST preview replacement adds 35 statements/2 branches; differential coverage passes.",
+    "previous_line_rate": 88.7,
+    "previous_branch_rate": 76.82,
     "previous_excluded_lines": 48,
-    "previous_measured_files": 634,
-    "previous_num_statements": 67144,
-    "previous_num_branches": 19128
+    "previous_measured_files": 631,
+    "previous_num_statements": 66949,
+    "previous_num_branches": 19022
   }
 }
