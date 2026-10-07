@@ -52,6 +52,6 @@ class SoftwareGraphQLMutationsRemovedTestCase(TestCase):
         )
         context = self._context(self.tenant)
         for document in documents:
-            result = schema.execute(document, context_value=context)
+            result = schema.execute_sync(document, context_value=context)
             self.assertIsNotNone(result.errors, document)
         self.assertEqual(list(Software.objects.values_list("name", flat=True)), ["Keep Me"])

@@ -1,9 +1,15 @@
-import graphene
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Annotated
+
+import strawberry
+import strawberry_django
 from django.db.models import Q
-from graphene_django import DjangoObjectType
 from graphql import GraphQLError
 
 from assets.services.specifications._command_support import load_prospective_definition
+from core.graphql_choice_enums import choice_enum
+from core.graphql_scalars import JSONString
 from core.graphql_utils import paginate_queryset
 from organization.models import Location, Tenant
 
@@ -43,206 +49,199 @@ from .graphql_specifications.types import (
 )
 from .models import Asset, AssetRole, AssetType, Category, Depreciation, Manufacturer, StatusLabel, Supplier
 
+if TYPE_CHECKING:  # the runtime reference stays lazy to avoid an import cycle
+    from software.schema import SoftwareNode
+
 _SCHEMA_MISSING = object()
 
-
-class TenantNode(DjangoObjectType):
-    class Meta:
-        model = Tenant
-        fields = ("id", "name", "slug")
+StatusLabelTypeChoices = choice_enum(StatusLabel, "type")
 
 
-class LocationNode(DjangoObjectType):
-    class Meta:
-        model = Location
-        fields = ("id", "name", "slug", "site", "tenant")
+@strawberry_django.type(Tenant, name="TenantNode", fields=["id", "name", "slug"])
+class TenantNode:
+    pass
 
 
-class StatusLabelNode(DjangoObjectType):
-    class Meta:
-        model = StatusLabel
-        fields = ("id", "name", "slug", "type", "description", "color", "created_at", "updated_at")
+@strawberry_django.type(Location, name="LocationNode", fields=["id", "name", "slug"])
+class LocationNode:
+    tenant: TenantNode | None
 
 
-class AssetRoleNode(DjangoObjectType):
-    class Meta:
-        model = AssetRole
-        fields = ("id", "name", "slug", "description", "color", "created_at", "updated_at")
+@strawberry_django.type(
+    StatusLabel,
+    name="StatusLabelNode",
+    fields=["id", "name", "slug", "description", "color", "created_at", "updated_at"],
+)
+class StatusLabelNode:
+    type: StatusLabelTypeChoices
 
 
-class ManufacturerNode(DjangoObjectType):
-    class Meta:
-        model = Manufacturer
-        fields = ("id", "name", "slug", "description", "created_at", "updated_at", "software_products")
+@strawberry_django.type(
+    AssetRole,
+    name="AssetRoleNode",
+    fields=["id", "name", "slug", "description", "color", "created_at", "updated_at"],
+)
+class AssetRoleNode:
+    pass
 
 
-class DepreciationNode(DjangoObjectType):
-    class Meta:
-        model = Depreciation
-        fields = ("id", "name", "months", "created_at", "updated_at")
+@strawberry_django.type(
+    Manufacturer,
+    name="ManufacturerNode",
+    fields=["id", "name", "slug", "description", "created_at", "updated_at"],
+)
+class ManufacturerNode:
+    software_products: list[Annotated["SoftwareNode", strawberry.lazy("software.schema")]]
 
 
-class AssetTypeNode(DjangoObjectType):
-    resource_revision = graphene.String(required=True)
-    fieldsets = graphene.List(graphene.NonNull(SpecificationFieldsetType), required=True)
-    specification_definition = graphene.Field(
-        SpecificationDefinitionType,
-        target=SpecificationTargetEnum(required=True),
-        required=True,
-    )
-    specification_entries = graphene.List(graphene.NonNull(SpecificationEntryType), required=True)
-    specification_issues = graphene.List(graphene.NonNull(UserErrorType), required=True)
-    library = graphene.Field(LibraryOriginType)
+@strawberry_django.type(
+    Depreciation,
+    name="DepreciationNode",
+    fields=["id", "name", "months", "created_at", "updated_at"],
+)
+class DepreciationNode:
+    pass
 
-    class Meta:
-        model = AssetType
-        name = "AssetType"
-        fields = (
-            "id",
-            "slug",
-            "manufacturer",
-            "model",
-            "part_number",
-            "eol_months",
-            "depreciation",
-            "category",
-            "asset_role",
-            "description",
-            "requestable",
-            "created_at",
-            "updated_at",
-        )
 
-    @staticmethod
-    def resolve_resource_revision(root, info):
-        del info
-        return owner_resource_revision(root)
+@strawberry_django.type(
+    Supplier,
+    name="SupplierNode",
+    fields=[
+        "id",
+        "name",
+        "slug",
+        "website",
+        "portal_url",
+        "account_id",
+        "address",
+        "notes",
+        "is_active",
+        "created_at",
+        "updated_at",
+    ],
+)
+class SupplierNode:
+    tenant: TenantNode | None
 
-    @staticmethod
-    def resolve_fieldsets(root, info):
+
+@strawberry_django.type(
+    Category,
+    name="Category",
+    fields=["id", "name", "slug", "color", "description", "created_at", "updated_at"],
+)
+class CategoryNode:
+    applies_to: JSONString
+
+    @strawberry.field
+    def key(self) -> str:
+        return self.slug
+
+    @strawberry.field
+    def resource_revision(self) -> str:
+        return owner_resource_revision(self)
+
+    @strawberry.field
+    def default_fieldsets(self) -> list[SpecificationFieldsetType]:
+        return category_fieldsets_for(self)
+
+
+@strawberry_django.type(
+    AssetType,
+    name="AssetType",
+    fields=[
+        "id",
+        "slug",
+        "model",
+        "part_number",
+        "eol_months",
+        "description",
+        "requestable",
+        "created_at",
+        "updated_at",
+    ],
+)
+class AssetTypeNode:
+    manufacturer: ManufacturerNode
+    depreciation: DepreciationNode | None
+    category: CategoryNode | None
+    asset_role: AssetRoleNode | None
+
+    @strawberry.field
+    def resource_revision(self) -> str:
+        return owner_resource_revision(self)
+
+    @strawberry.field
+    def fieldsets(self, info: strawberry.Info) -> list[SpecificationFieldsetType]:
+        return fieldsets_for_type(request_loader_for_info(info), int(self.pk))
+
+    @strawberry.field
+    def specification_definition(
+        self, info: strawberry.Info, target: SpecificationTargetEnum
+    ) -> SpecificationDefinitionType:
         loader = request_loader_for_info(info)
-        return fieldsets_for_type(loader, int(root.pk))
+        return loader.definition_for_type(int(self.pk), target_kind=target.value)
 
-    @staticmethod
-    def resolve_specification_definition(root, info, target):
+    @strawberry.field
+    def specification_entries(self, info: strawberry.Info) -> list[SpecificationEntryType]:
         loader = request_loader_for_info(info)
-        target_kind = getattr(target, "value", target)
-        return loader.definition_for_type(int(root.pk), target_kind=target_kind)
+        return list(loader.read_owner(self, target_kind="asset_type").projection.entries)
 
-    @staticmethod
-    def resolve_specification_entries(root, info):
+    @strawberry.field
+    def specification_issues(self, info: strawberry.Info) -> list[UserErrorType]:
         loader = request_loader_for_info(info)
-        return loader.read_owner(root, target_kind="asset_type").projection.entries
+        return list(owner_user_errors(loader, self, "asset_type"))
 
-    @staticmethod
-    def resolve_specification_issues(root, info):
-        loader = request_loader_for_info(info)
-        return owner_user_errors(loader, root, "asset_type")
-
-    @staticmethod
-    def resolve_library(root, info):
-        del info
-        return library_origin_for(root)
+    @strawberry.field
+    def library(self) -> LibraryOriginType | None:
+        return library_origin_for(self)
 
 
-class SupplierNode(DjangoObjectType):
-    class Meta:
-        model = Supplier
-        fields = (
-            "id",
-            "name",
-            "slug",
-            "website",
-            "portal_url",
-            "account_id",
-            "address",
-            "notes",
-            "is_active",
-            "tenant",
-            "tenant_group",
-            "created_at",
-            "updated_at",
-        )
+@strawberry_django.type(
+    Asset,
+    name="Asset",
+    fields=[
+        "id",
+        "name",
+        "asset_tag",
+        "serial_number",
+        "purchase_date",
+        "order_number",
+        "requestable",
+        "created_at",
+        "updated_at",
+    ],
+)
+class AssetNode:
+    asset_role: AssetRoleNode | None
+    status: StatusLabelNode | None
+    location: LocationNode | None
+    tenant: TenantNode | None
+    supplier: SupplierNode | None
 
-
-class CategoryNode(DjangoObjectType):
-    key = graphene.String(required=True)
-    resource_revision = graphene.String(required=True)
-    default_fieldsets = graphene.List(graphene.NonNull(SpecificationFieldsetType), required=True)
-
-    class Meta:
-        model = Category
-        name = "Category"
-        fields = ("id", "name", "slug", "color", "description", "applies_to", "created_at", "updated_at")
-
-    @staticmethod
-    def resolve_key(root, info):
-        del info
-        return root.slug
-
-    @staticmethod
-    def resolve_resource_revision(root, info):
-        del info
-        return owner_resource_revision(root)
-
-    @staticmethod
-    def resolve_default_fieldsets(root, info):
-        del info
-        return category_fieldsets_for(root)
-
-
-class AssetNode(DjangoObjectType):
-    resource_revision = graphene.String(required=True)
-    specification_definition = graphene.Field(SpecificationDefinitionType, required=True)
-    specification_entries = graphene.List(graphene.NonNull(SpecificationEntryType), required=True)
-    specification_issues = graphene.List(graphene.NonNull(UserErrorType), required=True)
-
-    class Meta:
-        model = Asset
-        name = "Asset"
-        fields = (
-            "id",
-            "name",
-            "asset_tag",
-            "serial_number",
-            "asset_type",
-            "asset_role",
-            "status",
-            "location",
-            "tenant",
-            "purchase_date",
-            "supplier",
-            "order_number",
-            "requestable",
-            "created_at",
-            "updated_at",
-        )
-
-    @staticmethod
-    def resolve_asset_type(root, info):
+    @strawberry.field
+    def asset_type(self, info: strawberry.Info) -> AssetTypeNode | None:
         if not has_global_permission(info, "assets.view_assettype"):
             return None
-        return root.asset_type
+        return self.asset_type
 
-    @staticmethod
-    def resolve_resource_revision(root, info):
-        del info
-        return owner_resource_revision(root)
+    @strawberry.field
+    def resource_revision(self) -> str:
+        return owner_resource_revision(self)
 
-    @staticmethod
-    def resolve_specification_definition(root, info):
+    @strawberry.field
+    def specification_definition(self, info: strawberry.Info) -> SpecificationDefinitionType:
         loader = request_loader_for_info(info)
-        return loader.read_owner(root, target_kind="asset").definition
+        return loader.read_owner(self, target_kind="asset").definition
 
-    @staticmethod
-    def resolve_specification_entries(root, info):
+    @strawberry.field
+    def specification_entries(self, info: strawberry.Info) -> list[SpecificationEntryType]:
         loader = request_loader_for_info(info)
-        return loader.read_owner(root, target_kind="asset").projection.entries
+        return list(loader.read_owner(self, target_kind="asset").projection.entries)
 
-    @staticmethod
-    def resolve_specification_issues(root, info):
+    @strawberry.field
+    def specification_issues(self, info: strawberry.Info) -> list[UserErrorType]:
         loader = request_loader_for_info(info)
-        return owner_user_errors(loader, root, "asset")
+        return list(owner_user_errors(loader, self, "asset"))
 
 
 ASSET_SORTABLE_FIELDS = {
@@ -261,64 +260,34 @@ ASSET_SORTABLE_FIELDS = {
 }
 
 
-class AssetTypeEdgeType(graphene.ObjectType):
-    class Meta:
-        name = "AssetTypeEdge"
-
-    cursor = graphene.Field(CursorScalar, required=True)
-    node = graphene.Field(lambda: AssetTypeNode, required=True)
+@strawberry.type(name="AssetTypeEdge")
+class AssetTypeEdgeType:
+    cursor: CursorScalar
+    node: AssetTypeNode
 
 
-class AssetTypeConnectionType(graphene.ObjectType):
-    class Meta:
-        name = "AssetTypeConnection"
-
-    edges = graphene.List(graphene.NonNull(AssetTypeEdgeType), required=True)
-    page_info = graphene.Field(PageInfoType, required=True)
+@strawberry.type(name="AssetTypeConnection")
+class AssetTypeConnectionType:
+    edges: list[AssetTypeEdgeType]
+    page_info: PageInfoType
 
 
-class Query(graphene.ObjectType):
-    assets = graphene.List(
-        AssetNode,
-        requested_scope=RequestedScopeSelectorInput(required=True),
-        limit=graphene.Int(),
-        offset=graphene.Int(),
-        sort_by=graphene.String(),
-        name=graphene.String(),
-        asset_tag=graphene.String(),
-        serial_number=graphene.String(),
-        status_id=graphene.ID(),
-        location_id=graphene.ID(),
-    )
-    asset = graphene.Field(
-        AssetNode,
-        id=graphene.ID(required=True),
-        requested_scope=RequestedScopeSelectorInput(required=True),
-    )
-    asset_type = graphene.Field(AssetTypeNode, id=graphene.ID(required=True))
-    asset_types = graphene.Field(
-        AssetTypeConnectionType,
-        first=graphene.Int(required=True, default_value=50),
-        after=CursorScalar(),
-        required=True,
-    )
-    specification_fields = graphene.Field(
-        SpecificationFieldConnectionType,
-        first=graphene.Int(required=True, default_value=50),
-        after=CursorScalar(),
-        required=True,
-    )
-    choice_set = graphene.Field(ChoiceSetType, identity=graphene.String(required=True))
-    category = graphene.Field(CategoryNode, id=graphene.ID(required=True))
-    preview_asset_type_definition = graphene.Field(
-        SpecificationDefinitionType,
-        category_id=graphene.ID(),
-        fieldsets=graphene.List(graphene.NonNull(graphene.String)),
-        target=SpecificationTargetEnum(required=True),
-        required=True,
-    )
-
-    def resolve_assets(self, info, requested_scope, limit=None, offset=None, sort_by=None, **kwargs):
+@strawberry.type
+class Query:
+    @strawberry.field
+    def assets(
+        self,
+        info: strawberry.Info,
+        requested_scope: RequestedScopeSelectorInput,
+        limit: int | None = None,
+        offset: int | None = None,
+        sort_by: str | None = None,
+        name: str | None = None,
+        asset_tag: str | None = None,
+        serial_number: str | None = None,
+        status_id: strawberry.ID | None = None,
+        location_id: strawberry.ID | None = None,
+    ) -> list[AssetNode | None] | None:
         authenticated_user(info)
         scope = resolve_read_scope(info, requested_scope)
         if scope is None:
@@ -326,7 +295,14 @@ class Query(graphene.ObjectType):
         loader = request_loader_for_info(info)
         bind_scope(loader, scope)
         qs = asset_queryset_for_scope(scope)
-        for key, val in kwargs.items():
+        filters = {
+            "name": name,
+            "asset_tag": asset_tag,
+            "serial_number": serial_number,
+            "status_id": status_id,
+            "location_id": location_id,
+        }
+        for key, val in filters.items():
             if val is not None:
                 qs = qs.filter(**{key: val})
         if sort_by and sort_by in ASSET_SORTABLE_FIELDS:
@@ -335,7 +311,10 @@ class Query(graphene.ObjectType):
         prepare_asset_graph(loader, items)
         return items
 
-    def resolve_asset(self, info, id, requested_scope):
+    @strawberry.field
+    def asset(
+        self, info: strawberry.Info, id: strawberry.ID, requested_scope: RequestedScopeSelectorInput
+    ) -> AssetNode | None:
         authenticated_user(info)
         scope = resolve_read_scope(info, requested_scope)
         if scope is None:
@@ -349,7 +328,8 @@ class Query(graphene.ObjectType):
         except Asset.DoesNotExist:
             return None
 
-    def resolve_asset_type(self, info, id):
+    @strawberry.field
+    def asset_type(self, info: strawberry.Info, id: strawberry.ID) -> AssetTypeNode | None:
         require_global_permission(info, "assets.view_assettype")
         try:
             asset_type = AssetType.objects.select_related("library", "library__accepted_release").get(pk=id)
@@ -358,7 +338,10 @@ class Query(graphene.ObjectType):
         prepare_type_graph(request_loader_for_info(info), (asset_type,))
         return asset_type
 
-    def resolve_asset_types(self, info, first=50, after=None):
+    @strawberry.field
+    def asset_types(
+        self, info: strawberry.Info, first: int = 50, after: CursorScalar | None = None
+    ) -> AssetTypeConnectionType:
         require_global_permission(info, "assets.view_assettype")
         size = page_size(first)
         asset_types_qs = AssetType.objects.select_related("library", "library__accepted_release").order_by("slug", "pk")
@@ -370,35 +353,36 @@ class Query(graphene.ObjectType):
         prepare_type_graph(loader, asset_types)
         return asset_type_connection(asset_types, first=size, after=None)
 
-    def resolve_specification_fields(self, info, first=50, after=None):
+    @strawberry.field
+    def specification_fields(
+        self, info: strawberry.Info, first: int = 50, after: CursorScalar | None = None
+    ) -> SpecificationFieldConnectionType:
         require_global_permission(info, "extras.view_customfield")
         loader = request_loader_for_info(info)
         graph = loader.global_graph(("asset_type", "asset"))
         fields = tuple(graph.fields_by_key.values())
         return specification_field_connection(fields, first=first, after=after)
 
-    def resolve_choice_set(self, info, identity):
+    @strawberry.field
+    def choice_set(self, info: strawberry.Info, identity: str) -> ChoiceSetType | None:
         require_global_permission(info, "extras.view_customfieldchoiceset")
         return choice_set_for_identity(identity, loader=request_loader_for_info(info))
 
-    def resolve_category(self, info, id):
+    @strawberry.field
+    def category(self, info: strawberry.Info, id: strawberry.ID) -> CategoryNode | None:
         require_global_permission(info, "assets.view_category")
         return Category.objects.filter(pk=id).first()
 
-    def resolve_preview_asset_type_definition(
+    @strawberry.field
+    def preview_asset_type_definition(
         self,
-        info,
-        target,
-        category_id=None,
-        fieldsets=_SCHEMA_MISSING,
-    ):
+        info: strawberry.Info,
+        target: SpecificationTargetEnum,
+        category_id: strawberry.ID | None = None,
+        fieldsets: list[str] | None = strawberry.UNSET,
+    ) -> SpecificationDefinitionType:
         require_global_permission(info, "assets.view_assettype")
-        target_kind = getattr(target, "value", target)
-        if target_kind not in {"asset_type", "asset"}:
-            raise GraphQLError(
-                "The submitted value has an invalid type.",
-                extensions={"code": "INVALID_TYPE", "path": ["target"]},
-            )
+        target_kind = target.value
         category = None
         if category_id is not None:
             category = Category.objects.filter(pk=category_id).first()
@@ -407,7 +391,7 @@ class Query(graphene.ObjectType):
                     "The requested object is unavailable.",
                     extensions={"code": "OBJECT_UNAVAILABLE", "path": ["categoryId"]},
                 )
-        if fieldsets is _SCHEMA_MISSING:
+        if fieldsets is strawberry.UNSET:
             if category is None:
                 selected_fieldsets = ()
             else:

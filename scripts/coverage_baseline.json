@@ -4,22 +4,22 @@
   "coverage_series": "7.15",
   "policy_sha256": "d361fd8b3ad72413b002fabc4612c7646ef74b2bc39a07ef07c4884f47551845",
   "totals": {
-    "num_statements": 65032,
-    "covered_lines": 57705,
-    "line_rate": 88.73,
-    "num_branches": 18588,
-    "covered_branches": 14293,
-    "branch_rate": 76.89,
-    "excluded_lines": 48,
-    "measured_files": 634
+    "num_statements": 65471,
+    "covered_lines": 58165,
+    "line_rate": 88.84,
+    "num_branches": 18696,
+    "covered_branches": 14420,
+    "branch_rate": 77.13,
+    "excluded_lines": 50,
+    "measured_files": 639
   },
   "decline_justification": {
-    "reason": "Deliberate #612 removal of GraphQL mutation code. Assets (#648): mutations.py, inputs.py, assets/schema.py. Non-assets (#649): mutation modules, inputs and schema wiring of inventory, licenses, software, subscriptions; writes are REST-only.",
-    "previous_line_rate": 88.39,
-    "previous_branch_rate": 76.37,
+    "reason": "Issue #613 Graphene-to-Strawberry port: assets/schema.py keeps the assets<->software node reference lazy with a documented 'if TYPE_CHECKING:' import, which coverage counts as two excluded lines (the clause and its body) where the port replaced the previous module-level wiring. Only the excluded-line count changed; the recorded rates come from the same canonical CI run.",
+    "previous_line_rate": 88.73,
+    "previous_branch_rate": 76.89,
     "previous_excluded_lines": 48,
-    "previous_measured_files": 632,
-    "previous_num_statements": 65750,
-    "previous_num_branches": 18740
+    "previous_measured_files": 634,
+    "previous_num_statements": 65032,
+    "previous_num_branches": 18588
   }
 }

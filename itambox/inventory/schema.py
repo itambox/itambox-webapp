@@ -1,79 +1,12 @@
-import graphene
-from graphene_django import DjangoObjectType
+from __future__ import annotations
 
-from core.graphql_utils import check_permission, paginate_queryset
+import strawberry
+import strawberry_django
+
+from assets.schema import CategoryNode, ManufacturerNode, SupplierNode, TenantNode
+from core.graphql_utils import active_tenant_from_info, check_permission, paginate_queryset
 
 from .models import Accessory, Component, Consumable, Kit
-
-
-class AccessoryNode(DjangoObjectType):
-    class Meta:
-        model = Accessory
-        fields = (
-            "id",
-            "name",
-            "slug",
-            "manufacturer",
-            "category",
-            "supplier",
-            "part_number",
-            "min_qty",
-            "allow_overallocate",
-            "tenant",
-            "created_at",
-            "updated_at",
-        )
-
-
-class ConsumableNode(DjangoObjectType):
-    class Meta:
-        model = Consumable
-        fields = (
-            "id",
-            "name",
-            "slug",
-            "manufacturer",
-            "category",
-            "part_number",
-            "min_qty",
-            "allow_overallocate",
-            "tenant",
-            "created_at",
-            "updated_at",
-        )
-
-
-class KitNode(DjangoObjectType):
-    class Meta:
-        model = Kit
-        fields = ("id", "name", "description", "tenant", "created_at", "updated_at")
-
-
-class ComponentNode(DjangoObjectType):
-    min_stock_level = graphene.Int()
-    description = graphene.String()
-
-    class Meta:
-        model = Component
-        fields = (
-            "id",
-            "name",
-            "slug",
-            "manufacturer",
-            "category",
-            "part_number",
-            "allow_overallocate",
-            "tenant",
-            "created_at",
-            "updated_at",
-        )
-
-    def resolve_min_stock_level(self, info):
-        return self.min_qty
-
-    def resolve_description(self, info):
-        return self.notes
-
 
 ACCESSORY_SORTABLE_FIELDS = {
     "name",
@@ -87,6 +20,9 @@ ACCESSORY_SORTABLE_FIELDS = {
     "updated_at",
     "-updated_at",
 }
+_ACCESSORY_RELATED = ("manufacturer", "category", "supplier", "tenant")
+
+
 CONSUMABLE_SORTABLE_FIELDS = {
     "name",
     "-name",
@@ -99,7 +35,13 @@ CONSUMABLE_SORTABLE_FIELDS = {
     "updated_at",
     "-updated_at",
 }
+_CONSUMABLE_RELATED = ("manufacturer", "category", "tenant")
+
+
 KIT_SORTABLE_FIELDS = {"name", "-name", "created_at", "-created_at", "updated_at", "-updated_at"}
+_KIT_RELATED = ("tenant",)
+
+
 COMPONENT_SORTABLE_FIELDS = {
     "name",
     "-name",
@@ -112,130 +54,165 @@ COMPONENT_SORTABLE_FIELDS = {
     "updated_at",
     "-updated_at",
 }
+_COMPONENT_RELATED = ("manufacturer", "category", "tenant")
 
 
-class Query(graphene.ObjectType):
-    accessories = graphene.List(
-        AccessoryNode,
-        limit=graphene.Int(),
-        offset=graphene.Int(),
-        sort_by=graphene.String(),
-        name=graphene.String(),
-    )
-    accessory = graphene.Field(AccessoryNode, id=graphene.ID(required=True))
+@strawberry_django.type(
+    Accessory,
+    name="AccessoryNode",
+    fields=["id", "name", "slug", "part_number", "min_qty", "allow_overallocate", "created_at", "updated_at"],
+)
+class AccessoryNode:
+    manufacturer: ManufacturerNode
+    category: CategoryNode | None
+    supplier: SupplierNode | None
+    tenant: TenantNode | None
 
-    components = graphene.List(
-        ComponentNode,
-        limit=graphene.Int(),
-        offset=graphene.Int(),
-        sort_by=graphene.String(),
-        name=graphene.String(),
-    )
-    component = graphene.Field(ComponentNode, id=graphene.ID(required=True))
 
-    consumables = graphene.List(
-        ConsumableNode,
-        limit=graphene.Int(),
-        offset=graphene.Int(),
-        sort_by=graphene.String(),
-        name=graphene.String(),
-    )
-    consumable = graphene.Field(ConsumableNode, id=graphene.ID(required=True))
+@strawberry_django.type(
+    Consumable,
+    name="ConsumableNode",
+    fields=["id", "name", "slug", "part_number", "min_qty", "allow_overallocate", "created_at", "updated_at"],
+)
+class ConsumableNode:
+    manufacturer: ManufacturerNode
+    category: CategoryNode | None
+    tenant: TenantNode | None
 
-    kits = graphene.List(
-        KitNode,
-        limit=graphene.Int(),
-        offset=graphene.Int(),
-        sort_by=graphene.String(),
-        name=graphene.String(),
-    )
-    kit = graphene.Field(KitNode, id=graphene.ID(required=True))
 
-    def resolve_accessories(self, info, limit=None, offset=None, sort_by=None, **kwargs):
+@strawberry_django.type(Kit, name="KitNode", fields=["id", "name", "description", "created_at", "updated_at"])
+class KitNode:
+    tenant: TenantNode | None
+
+
+@strawberry_django.type(
+    Component,
+    name="ComponentNode",
+    fields=["id", "name", "slug", "part_number", "allow_overallocate", "created_at", "updated_at"],
+)
+class ComponentNode:
+    manufacturer: ManufacturerNode
+    category: CategoryNode | None
+    tenant: TenantNode | None
+
+    @strawberry.field
+    def min_stock_level(self) -> int | None:
+        return self.min_qty
+
+    @strawberry.field
+    def description(self) -> str | None:
+        return self.notes
+
+
+@strawberry.type
+class Query:
+    @strawberry.field
+    def accessories(
+        self,
+        info: strawberry.Info,
+        limit: int | None = None,
+        offset: int | None = None,
+        sort_by: str | None = None,
+        name: str | None = None,
+    ) -> list[AccessoryNode | None] | None:
         check_permission(info, "inventory.view_accessory")
-        active_tenant = getattr(info.context, "active_tenant", None)
-        qs = Accessory.objects.select_related("manufacturer", "category", "supplier", "tenant").filter(
-            tenant=active_tenant
-        )
-        for key, val in kwargs.items():
-            if val is not None:
-                qs = qs.filter(**{key: val})
+        qs = Accessory.objects.select_related(*_ACCESSORY_RELATED).filter(tenant=active_tenant_from_info(info))
+        if name is not None:
+            qs = qs.filter(name=name)
         if sort_by and sort_by in ACCESSORY_SORTABLE_FIELDS:
             qs = qs.order_by(sort_by)
-        return paginate_queryset(qs, limit, offset)
+        return list(paginate_queryset(qs, limit, offset))
 
-    def resolve_accessory(self, info, id):
+    @strawberry.field
+    def accessory(self, info: strawberry.Info, id: strawberry.ID) -> AccessoryNode | None:
         check_permission(info, "inventory.view_accessory")
-        active_tenant = getattr(info.context, "active_tenant", None)
         try:
             return (
-                Accessory.objects.select_related("manufacturer", "category", "supplier", "tenant")
-                .filter(tenant=active_tenant)
+                Accessory.objects.select_related(*_ACCESSORY_RELATED)
+                .filter(tenant=active_tenant_from_info(info))
                 .get(pk=id)
             )
         except Accessory.DoesNotExist:
             return None
 
-    def resolve_consumables(self, info, limit=None, offset=None, sort_by=None, **kwargs):
+    @strawberry.field
+    def consumables(
+        self,
+        info: strawberry.Info,
+        limit: int | None = None,
+        offset: int | None = None,
+        sort_by: str | None = None,
+        name: str | None = None,
+    ) -> list[ConsumableNode | None] | None:
         check_permission(info, "inventory.view_consumable")
-        active_tenant = getattr(info.context, "active_tenant", None)
-        qs = Consumable.objects.select_related("manufacturer", "category", "tenant").filter(tenant=active_tenant)
-        for key, val in kwargs.items():
-            if val is not None:
-                qs = qs.filter(**{key: val})
+        qs = Consumable.objects.select_related(*_CONSUMABLE_RELATED).filter(tenant=active_tenant_from_info(info))
+        if name is not None:
+            qs = qs.filter(name=name)
         if sort_by and sort_by in CONSUMABLE_SORTABLE_FIELDS:
             qs = qs.order_by(sort_by)
-        return paginate_queryset(qs, limit, offset)
+        return list(paginate_queryset(qs, limit, offset))
 
-    def resolve_consumable(self, info, id):
+    @strawberry.field
+    def consumable(self, info: strawberry.Info, id: strawberry.ID) -> ConsumableNode | None:
         check_permission(info, "inventory.view_consumable")
-        active_tenant = getattr(info.context, "active_tenant", None)
         try:
             return (
-                Consumable.objects.select_related("manufacturer", "category", "tenant")
-                .filter(tenant=active_tenant)
+                Consumable.objects.select_related(*_CONSUMABLE_RELATED)
+                .filter(tenant=active_tenant_from_info(info))
                 .get(pk=id)
             )
         except Consumable.DoesNotExist:
             return None
 
-    def resolve_kits(self, info, limit=None, offset=None, sort_by=None, **kwargs):
+    @strawberry.field
+    def kits(
+        self,
+        info: strawberry.Info,
+        limit: int | None = None,
+        offset: int | None = None,
+        sort_by: str | None = None,
+        name: str | None = None,
+    ) -> list[KitNode | None] | None:
         check_permission(info, "inventory.view_kit")
-        active_tenant = getattr(info.context, "active_tenant", None)
-        qs = Kit.objects.select_related("tenant").filter(tenant=active_tenant)
-        for key, val in kwargs.items():
-            if val is not None:
-                qs = qs.filter(**{key: val})
+        qs = Kit.objects.select_related(*_KIT_RELATED).filter(tenant=active_tenant_from_info(info))
+        if name is not None:
+            qs = qs.filter(name=name)
         if sort_by and sort_by in KIT_SORTABLE_FIELDS:
             qs = qs.order_by(sort_by)
-        return paginate_queryset(qs, limit, offset)
+        return list(paginate_queryset(qs, limit, offset))
 
-    def resolve_kit(self, info, id):
+    @strawberry.field
+    def kit(self, info: strawberry.Info, id: strawberry.ID) -> KitNode | None:
         check_permission(info, "inventory.view_kit")
-        active_tenant = getattr(info.context, "active_tenant", None)
         try:
-            return Kit.objects.select_related("tenant").filter(tenant=active_tenant).get(pk=id)
+            return Kit.objects.select_related(*_KIT_RELATED).filter(tenant=active_tenant_from_info(info)).get(pk=id)
         except Kit.DoesNotExist:
             return None
 
-    def resolve_components(self, info, limit=None, offset=None, sort_by=None, **kwargs):
+    @strawberry.field
+    def components(
+        self,
+        info: strawberry.Info,
+        limit: int | None = None,
+        offset: int | None = None,
+        sort_by: str | None = None,
+        name: str | None = None,
+    ) -> list[ComponentNode | None] | None:
         check_permission(info, "inventory.view_component")
-        active_tenant = getattr(info.context, "active_tenant", None)
-        qs = Component.objects.select_related("manufacturer", "category", "tenant").filter(tenant=active_tenant)
-        for key, val in kwargs.items():
-            if val is not None:
-                qs = qs.filter(**{key: val})
+        qs = Component.objects.select_related(*_COMPONENT_RELATED).filter(tenant=active_tenant_from_info(info))
+        if name is not None:
+            qs = qs.filter(name=name)
         if sort_by and sort_by in COMPONENT_SORTABLE_FIELDS:
             qs = qs.order_by(sort_by)
-        return paginate_queryset(qs, limit, offset)
+        return list(paginate_queryset(qs, limit, offset))
 
-    def resolve_component(self, info, id):
+    @strawberry.field
+    def component(self, info: strawberry.Info, id: strawberry.ID) -> ComponentNode | None:
         check_permission(info, "inventory.view_component")
-        active_tenant = getattr(info.context, "active_tenant", None)
         try:
             return (
-                Component.objects.select_related("manufacturer", "category", "tenant")
-                .filter(tenant=active_tenant)
+                Component.objects.select_related(*_COMPONENT_RELATED)
+                .filter(tenant=active_tenant_from_info(info))
                 .get(pk=id)
             )
         except Component.DoesNotExist:

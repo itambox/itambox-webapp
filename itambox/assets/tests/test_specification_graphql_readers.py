@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import graphene
 import pytest
+import strawberry
 from django.utils.translation import override
 from graphql import GraphQLError
-from graphql.language import ast
 
 from assets.graphql_specifications.loaders import RequestScopedSpecificationLoader
 from assets.graphql_specifications.readers import issues_for_entries, issues_for_missing_required
@@ -127,26 +126,50 @@ def test_user_errors_never_expose_internal_specification_message_keys() -> None:
     assert not denial_message.startswith("specifications.")
 
 
-def test_safe_integer_uses_javascript_safe_range_and_accepts_beyond_graphql_int() -> None:
-    assert SafeInteger.serialize(2_147_483_648) == 2_147_483_648
-    assert SafeInteger.parse_value(9_007_199_254_740_991) == 9_007_199_254_740_991
-    assert SafeInteger.parse_literal(ast.IntValueNode(value="9007199254740991")) == 9_007_199_254_740_991
+def _scalar_echo_schema() -> strawberry.Schema:
+    """Schema that routes values through the SafeInteger/Decimal scalars."""
 
-    with pytest.raises((GraphQLError, ValueError, TypeError)):
-        SafeInteger.parse_value(9_007_199_254_740_992)
-    with pytest.raises((GraphQLError, ValueError, TypeError)):
-        SafeInteger.parse_value(True)
+    @strawberry.type
+    class ScalarEchoQuery:
+        @strawberry.field
+        def big(self) -> SafeInteger:
+            # Beyond GraphQL Int, inside the JavaScript safe-integer range.
+            return 2_147_483_648
+
+        @strawberry.field
+        def echo(self, value: SafeInteger) -> SafeInteger:
+            return value
+
+        @strawberry.field
+        def decimal_echo(self, value: DecimalScalar) -> DecimalScalar:
+            return value
+
+    return strawberry.Schema(query=ScalarEchoQuery)
+
+
+def test_safe_integer_uses_javascript_safe_range_and_accepts_beyond_graphql_int() -> None:
+    schema = _scalar_echo_schema()
+
+    result = schema.execute_sync("{ big echo(value: 9007199254740991) }")
+    assert result.errors is None, result.errors
+    assert result.data == {"big": 2_147_483_648, "echo": 9_007_199_254_740_991}
+
+    over_range = schema.execute_sync("{ echo(value: 9007199254740992) }")
+    assert over_range.errors, "out-of-range SafeInteger literal must be rejected"
+
+    boolean = schema.execute_sync("{ echo(value: true) }")
+    assert boolean.errors, "boolean is not a safe integer"
 
 
 def test_decimal_scalar_is_string_valued_and_preserves_fixed_scale_text() -> None:
-    assert DecimalScalar.serialize("24.000") == "24.000"
-    assert DecimalScalar.parse_value("24.000") == "24.000"
-    assert DecimalScalar.parse_literal(ast.StringValueNode(value="24.000")) == "24.000"
+    schema = _scalar_echo_schema()
 
-    with pytest.raises((GraphQLError, ValueError, TypeError)):
-        DecimalScalar.parse_value(24.0)
-    with pytest.raises((GraphQLError, ValueError, TypeError)):
-        DecimalScalar.parse_value(DecimalScalar)
+    result = schema.execute_sync('{ decimalEcho(value: "24.000") }')
+    assert result.errors is None, result.errors
+    assert result.data == {"decimalEcho": "24.000"}
+
+    float_literal = schema.execute_sync("{ decimalEcho(value: 24.0) }")
+    assert float_literal.errors, "a JSON number must not be accepted as a Decimal string"
 
 
 def test_typed_definition_and_union_execute_with_decimal_and_history_escape_hatch() -> None:
@@ -171,17 +194,17 @@ def test_typed_definition_and_union_execute_with_decimal_and_history_escape_hatc
         missing_required_issues=(ProjectionIssueDTO("MISSING_REQUIRED", FieldKey("required_field")),),
     )
 
-    class Query(graphene.ObjectType):
-        definition = graphene.Field(SpecificationDefinitionType)
-        entries = graphene.List(SpecificationEntryType)
-
-        def resolve_definition(self, info):
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def definition(self) -> SpecificationDefinitionType:
             return definition
 
-        def resolve_entries(self, info):
-            return projection.entries
+        @strawberry.field
+        def entries(self) -> list[SpecificationEntryType]:
+            return list(projection.entries)
 
-    result = graphene.Schema(query=Query).execute(
+    result = strawberry.Schema(query=Query).execute_sync(
         """
         {
           definition {
@@ -281,14 +304,22 @@ def test_asset_schema_executes_typed_reader_contract_without_static_only_shortcu
     import django
 
     django.setup()
-    from assets.schema import Query
+    from graphql import build_schema
 
-    schema = graphene.Schema(query=Query)
-    sdl = str(schema)
-    assert "assetTypes(first: Int! = 50, after: Cursor): AssetTypeConnection!" in sdl
-    assert "specificationFields(first: Int! = 50, after: Cursor): SpecificationFieldConnection!" in sdl
-    assert "integer: SafeInteger!" in sdl
-    assert "decimal: Decimal!" in sdl
-    result = schema.execute("{ __typename }")
+    from core.schema import schema
+
+    graphql_schema = build_schema(schema.as_str())
+    query = graphql_schema.query_type
+
+    assert str(query.fields["assetTypes"].type) == "AssetTypeConnection!"
+    assert {name: str(arg.type) for name, arg in query.fields["assetTypes"].args.items()} == {
+        "first": "Int!",
+        "after": "Cursor",
+    }
+    assert str(query.fields["specificationFields"].type) == "SpecificationFieldConnection!"
+    assert str(graphql_schema.type_map["IntegerSpecificationValue"].fields["integer"].type) == "SafeInteger!"
+    assert str(graphql_schema.type_map["DecimalSpecificationValue"].fields["decimal"].type) == "Decimal!"
+
+    result = schema.execute_sync("{ __typename }")
     assert result.errors is None
     assert result.data == {"__typename": "Query"}
