@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, AssetDisposal
 
-from .fields import selectable_episodes
+from .fields import selectable_repair_maintenances
 
 
 class AssetDisposalForm(forms.ModelForm):
@@ -36,7 +36,7 @@ class AssetDisposalForm(forms.ModelForm):
             "proceeds",
             "currency",
             "weee_compliant",
-            "episode",
+            "maintenance",
             "notes",
         ]
         widgets = {
@@ -49,7 +49,7 @@ class AssetDisposalForm(forms.ModelForm):
             "proceeds": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
             "currency": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "weee_compliant": forms.CheckboxInput(attrs={"class": "form-check-input"}),
-            "episode": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
+            "maintenance": forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             "notes": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
 
@@ -64,10 +64,10 @@ class AssetDisposalForm(forms.ModelForm):
         # before disposing as defence-in-depth.
         self.fields["asset"].queryset = Asset.objects.all()
 
-        # A linked (soft-deleted) episode stays selectable, so amending the
-        # record never silently drops the story link.
-        self.fields["episode"].queryset = selectable_episodes(
-            self.instance.episode_id if self.instance and self.instance.pk else None
+        # A linked (soft-deleted) repair maintenance stays selectable, so amending
+        # the record never silently drops the link to the repair it closes out.
+        self.fields["maintenance"].queryset = selectable_repair_maintenances(
+            self.instance.maintenance_id if self.instance and self.instance.pk else None
         )
 
         # A record's asset identity cannot be re-pointed after the fact.
@@ -99,7 +99,7 @@ class AssetDisposalForm(forms.ModelForm):
                     css_class="row",
                 ),
                 Div(
-                    Div("episode", css_class="col-md-12"),
+                    Div("maintenance", css_class="col-md-12"),
                     css_class="row",
                 ),
             ),

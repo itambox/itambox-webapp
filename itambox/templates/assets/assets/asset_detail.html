@@ -583,9 +583,9 @@
         <h3 class="card-title">{% translate "Repair &amp; Lifecycle Timeline" %}</h3>
         <button type="button"
                 class="btn btn-sm btn-primary"
-                hx-get="{% url 'assets:repairepisode_create' %}?asset={{ object.pk }}&_quickadd=1"
+                hx-get="{% url 'assets:assetmaintenance_create' %}?asset={{ object.pk }}&maintenance_type=repair&_quickadd=1"
                 hx-target="#modal-placeholder">
-          <i class="mdi mdi-plus"></i> {% translate "Add Repair Episode" %}
+          <i class="mdi mdi-plus"></i> {% translate "Log repair" %}
         </button>
       </div>
       {% include 'assets/includes/detail/asset_timeline.html' with timeline=asset_timeline %}

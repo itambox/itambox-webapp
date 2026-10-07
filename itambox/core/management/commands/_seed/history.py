@@ -186,6 +186,7 @@ class SeedHistoryMixin:
                     "start": repair_start,
                     "end": repair_end,
                     "checked_in": bool(open_assignments),
+                    "holder_id": open_assignments[-1].assigned_user_id if open_assignments else None,
                 }
             )
 

@@ -304,7 +304,7 @@ class Command(
             check_seed_access_invariants(self._users.values())
             check_seed_inventory_invariants()
             # Operational-story coherence: a received PO line has its assets, a
-            # repair episode agrees with the assignment, maintenance belongs to the
+            # repair agrees with the assignment, maintenance belongs to the
             # asset's timeline, and an approved request can actually be claimed.
             check_seed_operational_invariants()
 

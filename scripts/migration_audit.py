@@ -28,6 +28,7 @@ POST_TRANSITION_MIGRATIONS = {
     "assets.0119_warranty_supplier",
     "assets.0120_repair_episode",
     "assets.0121_supplier_scoping_and_commercial_fields",
+    "assets.0122_repair_maintenance_anchor",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -209,6 +210,19 @@ SEMANTIC_DISPOSITIONS = {
         ),
         {
             "assets.0103_asset_type_specification_conversion",
+        },
+    ),
+    **_dispositions(
+        "upgrade-only",
+        (
+            "Translates beta-era repair episodes onto the maintenance anchor: a disposal linked to the episode "
+            "moves to the episode's single repair maintenance, the stand-in's overlapping loan links to it, and "
+            "everything that cannot be mapped unambiguously (no or several repair maintenances, a reservation "
+            "link, the episode notes, a substitute without a matching loan) is appended to the maintenance notes "
+            "or written as a journal entry on the asset. The mapping is lossy, so rollback is restore-first."
+        ),
+        {
+            "assets.0122_repair_maintenance_anchor",
         },
     ),
     **_dispositions(

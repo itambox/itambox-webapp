@@ -14,6 +14,7 @@ An **Asset Disposal** records the end-of-life process, disposal method, and data
 | **Notes** | Optional comments or additional information. | Text | No |
 | **Proceeds** | The financial amount received for the asset (resale or salvage value). | Decimal | No |
 | **Recipient** | The buyer, recycler, charity, or other recipient of the disposed asset. | String | No |
+| **Repair Maintenance** | The repair maintenance this disposal closes out, when the disposal ends a repair story. | Foreign Key | No |
 | **Sanitization Certificate** | Certificate serial number or reference ID from the sanitization vendor. | String | No |
 | **Sanitized By** | The person or vendor who performed the data sanitization. | String | No |
 | **WEEE Compliant** | Indicates if the disposal was carried out by an authorized WEEE recycler. | Boolean | Yes |
@@ -31,6 +32,10 @@ An **Asset Disposal** records the end-of-life process, disposal method, and data
 * **Audit protection**: every disposal, amendment and cancellation is written to the change log (`ObjectChange`) with the actor; the pre-change snapshot of the record is retained.
 * **Environmental compliance**: tracks WEEE compliance for electronics recycling.
 * **Data sanitization evidence**: captures sanitization methods and certificates to meet organizational security requirements.
+
+## Repair link
+
+A disposal that ends a repair carries the **Repair Maintenance** link, so the asset timeline groups the disposal, the repair and the loaner under the same story. Completing a repair with *Replace permanently* starts that disposal in the same step.
 
 ## Disposal history
 

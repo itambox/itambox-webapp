@@ -40,7 +40,7 @@ from core.models import ObjectChange
 from procurement.models import PurchaseOrderLine
 
 #: Maintenance types that describe work the product models as taking a unit out of
-#: service. Such a record is the paperwork of an episode and must belong to one.
+#: service: the record's service interval must overlap a real repair window.
 OUT_OF_SERVICE_TYPES = ("repair", "calibration")
 
 
@@ -291,11 +291,10 @@ def _check_repair_history_matches_assignments():
 
 
 def _check_maintenance_matches_timeline():
-    """A maintenance record must be internally consistent and belong to an episode.
+    """A maintenance record must be internally consistent with the asset timeline.
 
-    A record that claims to be completed without a completion date, completes before
-    it starts, or describes out-of-service work that belongs to no repair episode is
-    paperwork the asset's own timeline cannot corroborate.
+    A record that claims to be completed without a completion date or completes
+    before it starts is paperwork the asset's own timeline cannot corroborate.
     """
     incomplete = (
         AssetMaintenance._base_manager.filter(
@@ -319,32 +318,15 @@ def _check_maintenance_matches_timeline():
             f"({inverted.start_date})."
         )
 
-    ungrouped = (
-        AssetMaintenance._base_manager.filter(
-            maintenance_type__in=OUT_OF_SERVICE_TYPES,
-            episode__isnull=True,
-            deleted_at__isnull=True,
-        )
-        .order_by("pk")
-        .first()
-    )
-    if ungrouped is not None:
-        raise CommandError(
-            "Seed operational invariant failed: maintenance record "
-            f"{ungrouped.pk} is out-of-service work that belongs to no repair episode."
-        )
-
     _check_out_of_service_work_matches_repair_windows()
 
 
 def _check_out_of_service_work_matches_repair_windows():
     """Every out-of-service record must sit inside a real repair window.
 
-    An episode only *groups* records; it carries no lifecycle state, so belonging to
-    one is not evidence that the unit ever went out of service. This is the check
-    that actually closes the #506 defect ("repair" records on assets that never left
-    deployable state): the record's service interval must overlap a repair window
-    that the change log recorded for the same asset.
+    This is the check that closes the #506 defect ("repair" records on assets that
+    never left deployable state): the record's service interval must overlap a repair
+    window that the change log recorded for the same asset.
     """
     repair_pks = _repair_label_pks()
     if not repair_pks:

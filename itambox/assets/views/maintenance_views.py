@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
@@ -43,7 +44,31 @@ class AssetMaintenanceEditView(QuickAddMixin, ObjectEditView):
         asset_id = self.request.GET.get("asset")
         if asset_id:
             initial["asset"] = asset_id
+        # "Log repair" on the asset timeline opens this quick-add with the repair
+        # type preselected (#644).
+        maintenance_type = self.request.GET.get("maintenance_type")
+        if maintenance_type:
+            initial["maintenance_type"] = maintenance_type
         return initial
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
+    def form_valid(self, form):
+        """Re-render the repair form when a lifecycle service refuses (#644).
+
+        Issuing a loaner and closing a repair run through the services, which fail
+        closed on an unavailable or foreign-tenant unit or with no holder to lend
+        to. That refusal is a visible field error, never a 500 and never a
+        half-written record: the form's own transaction rolls the maintenance back.
+        """
+        try:
+            return super().form_valid(form)
+        except DjangoValidationError as exc:
+            form.add_error(None, exc)
+            return self.form_invalid(form)
 
 
 class AssetMaintenanceCloneView(AssetMaintenanceEditView, ObjectCloneView):
