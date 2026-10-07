@@ -453,10 +453,15 @@ class RepairEpisodeViewTests(TenantTestMixin, TestCase):
 
         rendered = response.content.decode()
         self.assertEqual(rendered.count("asset-recent-activity-kind"), 5)
-        for index, record in enumerate(records):
-            expected_occurrences = 1 if index == 0 else 2
-            self.assertEqual(rendered.count('href="' + record.get_absolute_url() + '"'), expected_occurrences)
-            self.assertEqual(rendered.count(record.start_date.isoformat()), expected_occurrences)
+        for event in recent_activity:
+            expected_date = '<span class="text-secondary small text-nowrap">' + event.date.isoformat() + "</span>"
+            expected_badge = (
+                '<span class="badge bg-' + event.color + '-lt asset-recent-activity-kind">' + event.label + "</span>"
+            )
+            expected_link = '<a href="' + event.url + '" class="flex-fill text-truncate">' + event.title + "</a>"
+            self.assertIn(expected_date, rendered)
+            self.assertIn(expected_badge, rendered)
+            self.assertIn(expected_link, rendered)
 
     def test_asset_overview_shows_the_timeline_empty_state(self):
         self.client.force_login(self.user)
