@@ -3127,14 +3127,6 @@
       "path": "itambox/core/schema.py",
       "code": "B009",
       "message": "Do not call getattr with a constant attribute value, it is not any safer than normal property access.",
-      "source": "                mutation_bases.append(getattr(schema_module, \"Mutation\"))",
-      "context": "Module:body/For:Name(id='plugin_name', ctx=Store()):Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='settings', ctx=Load()), Constant(value='PLUGINS'), List(elts=[], ctx=Load())], keywords=[]):body/Try:body/If:Name(id='graphql_schema_path', ctx=Load()):body/If:Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='schema_module', ctx=Load()), Constant(value='Mutation')], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/schema.py",
-      "code": "B009",
-      "message": "Do not call getattr with a constant attribute value, it is not any safer than normal property access.",
       "source": "                query_bases.append(getattr(schema_module, \"Query\"))",
       "context": "Module:body/For:Name(id='plugin_name', ctx=Store()):Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='settings', ctx=Load()), Constant(value='PLUGINS'), List(elts=[], ctx=Load())], keywords=[]):body/Try:body/If:Name(id='graphql_schema_path', ctx=Load()):body/If:Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='schema_module', ctx=Load()), Constant(value='Query')], keywords=[]):body",
       "count": 1
@@ -7680,22 +7672,6 @@
       "code": "F401",
       "message": "'subscriptions.models.SubscriptionTypeChoices' imported but unused",
       "source": "from subscriptions.models import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/tests/test_graphql.py",
-      "code": "F401",
-      "message": "'django.core.exceptions.PermissionDenied' imported but unused",
-      "source": "from django.core.exceptions import PermissionDenied",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/tests/test_graphql.py",
-      "code": "F401",
-      "message": "'graphql.GraphQLError' imported but unused",
-      "source": "from graphql import GraphQLError",
       "context": "Module:body",
       "count": 1
     },
