@@ -22,6 +22,7 @@ from decimal import Decimal
 
 from assets.models import AssetTypeFieldset, CategoryDefaultFieldset
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField, Tag
+from extras.services.custom_field_data import write_custom_field_data
 
 
 def _get_core_choice_set(slug, label):
@@ -1137,8 +1138,7 @@ class SeedCatalogMixin:
                     for membership in category_defaults
                 ]
             )
-            obj.custom_field_data = specs
-            obj.save(update_fields=["custom_field_data"])
+            write_custom_field_data(obj, specs, update_fields=("custom_field_data",))
             self._asset_types[slug] = obj
 
         # Components

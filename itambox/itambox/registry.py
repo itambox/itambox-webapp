@@ -143,6 +143,7 @@ class Registry:
     def __init__(self):
         self._model_features = defaultdict(set)
         self._custom_field_data_validators = {}
+        self._custom_field_data_definition_providers = {}
         self._search_indexes = defaultdict(list)
         self._filter_sets = {}
         self._table_classes = {}
@@ -215,6 +216,15 @@ class Registry:
 
     def get_custom_field_data_validator(self, model):
         return self._custom_field_data_validators.get(model)
+
+    def register_custom_field_data_definition_provider(self, model, provider):
+        existing = self._custom_field_data_definition_providers.get(model)
+        if existing is not None and existing is not provider:
+            raise RuntimeError(f"A custom-field data definition provider is already registered for {model}.")
+        self._custom_field_data_definition_providers[model] = provider
+
+    def get_custom_field_data_definition_provider(self, model):
+        return self._custom_field_data_definition_providers.get(model)
 
     def register_search_index(self, model, index_instance):
         self._search_indexes[model].append(index_instance)

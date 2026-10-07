@@ -55,18 +55,16 @@ class ExtrasConfig(AppConfig):
 
     def _register_custom_field_data_validators(self):
         # inline import: app-registry: defer custom-field helpers until all models are loaded
-        from extras.customfields import validate_generic_custom_field_data
+        from extras.customfields import validate_custom_field_data_owner
 
         for model in self.apps.get_models():
-            if model._meta.abstract or model._meta.label_lower in {"assets.asset", "assets.assettype"}:
-                continue
             try:
                 model._meta.get_field("custom_field_data")
             except FieldDoesNotExist:
                 continue
             generic_presentation_registry.register_custom_field_data_validator(
                 model,
-                validate_generic_custom_field_data,
+                validate_custom_field_data_owner,
             )
 
     def _register_alert_schedule(self, sender, using=DEFAULT_DB_ALIAS, **kwargs):

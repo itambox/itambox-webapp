@@ -1,13 +1,18 @@
 """Branch coverage for the extras custom-field value validators."""
 
+from collections.abc import Mapping, Sequence
 from datetime import date
 from decimal import Decimal
-from types import SimpleNamespace
+from types import MappingProxyType, SimpleNamespace
+from typing import cast
+from unittest.mock import patch
 
 from django import forms
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 
+from assets.customfields import asset_custom_field_definitions, asset_type_custom_field_definitions
+from assets.models import Asset, AssetType
 from extras.customfields import (
     JCS_INTEGER_MAX,
     CustomFieldModelFormMixin,
@@ -25,11 +30,15 @@ from extras.customfields import (
     clean_custom_field_form_values,
     custom_field_clear_key,
     serialize_custom_field_value,
+    validate_custom_field_data_owner,
     validate_custom_field_data_values,
     validate_custom_field_regex,
     validate_custom_field_value,
     validate_required_custom_field_values,
 )
+from extras.services.custom_field_data import write_custom_field_data
+from itambox.registry import Registry, registry
+from organization.models import Location
 
 
 class _CF(SimpleNamespace):
@@ -688,3 +697,121 @@ class CustomFieldFormFieldVariantTests(SimpleTestCase):
 
         self.assertEqual(cleaned["cf_kind"], "")
         self.assertEqual(form.errors, {})
+
+
+class _WritableState:
+    db: str | None
+
+    def __init__(self):
+        self.db = None
+
+
+class _WritableOwner:
+    custom_field_data: object
+    _state: _WritableState
+    saved: dict[str, object] | None
+
+    def __init__(self):
+        self.custom_field_data = {}
+        self._state = _WritableState()
+        self.saved = None
+
+    def save(self, *, using: str | None = None, update_fields: Sequence[str] | None = None) -> None:
+        self.saved = {"using": using, "update_fields": update_fields}
+
+
+class CustomFieldDataWriteServiceTests(SimpleTestCase):
+    def test_write_service_detaches_nested_mappings_and_persists_once(self):
+        owner = _WritableOwner()
+        values = MappingProxyType({"nested": MappingProxyType({"choices": ("a", "b")})})
+
+        with patch("extras.services.custom_field_data.transaction.atomic") as atomic:
+            result = write_custom_field_data(owner, values, update_fields=("updated_at",), using="default")
+
+        self.assertIs(result, owner)
+        self.assertEqual(owner.custom_field_data, {"nested": {"choices": ["a", "b"]}})
+        self.assertEqual(owner.saved, {"using": "default", "update_fields": ["updated_at", "custom_field_data"]})
+        atomic.assert_called_once_with(using="default")
+
+    def test_uncommitted_write_stages_values_without_saving(self):
+        owner = _WritableOwner()
+        validated = {}
+
+        def validate(candidate):
+            validated.update(candidate.custom_field_data)
+
+        with patch(
+            "extras.services.custom_field_data.registry.get_custom_field_data_validator",
+            return_value=validate,
+        ):
+            result = write_custom_field_data(owner, {"value": 1}, commit=False)
+
+        self.assertIs(result, owner)
+        self.assertEqual(owner.custom_field_data, {"value": 1})
+        self.assertEqual(validated, {"value": 1})
+        self.assertIsNone(owner.saved)
+
+    def test_non_json_values_are_rejected_before_assignment(self):
+        owner = _WritableOwner()
+        owner.custom_field_data = {"old": "keep"}
+
+        with self.assertRaises(ValidationError):
+            write_custom_field_data(owner, {"value": object()}, commit=False)
+
+        self.assertEqual(owner.custom_field_data, {"old": "keep"})
+
+    def test_non_mapping_values_and_non_string_keys_are_rejected_before_assignment(self):
+        invalid_values = (cast(Mapping[str, object], None), cast(Mapping[str, object], {1: "bad"}))
+        for values in invalid_values:
+            owner = _WritableOwner()
+            owner.custom_field_data = {"old": "keep"}
+            with self.subTest(values=values), self.assertRaises(ValidationError):
+                write_custom_field_data(owner, values, commit=False)
+            self.assertEqual(owner.custom_field_data, {"old": "keep"})
+
+    def test_finite_float_values_are_kept_but_non_finite_values_are_rejected(self):
+        owner = _WritableOwner()
+        write_custom_field_data(owner, {"value": 1.25}, commit=False)
+        self.assertEqual(owner.custom_field_data, {"value": 1.25})
+
+        with self.assertRaises(ValidationError):
+            write_custom_field_data(owner, {"value": float("nan")}, commit=False)
+
+        self.assertEqual(owner.custom_field_data, {"value": 1.25})
+
+    def test_conflicting_custom_field_definition_provider_is_rejected(self):
+        isolated_registry = Registry()
+        isolated_registry.register_custom_field_data_definition_provider(Location, object())
+
+        with self.assertRaisesRegex(RuntimeError, "already registered"):
+            isolated_registry.register_custom_field_data_definition_provider(Location, object())
+
+    def test_validator_rejection_restores_previous_value_map(self):
+        owner = _WritableOwner()
+        owner.custom_field_data = {"value": "previous"}
+
+        def reject_invalid_value(candidate):
+            if candidate.custom_field_data["value"] == "invalid":
+                raise ValidationError("Invalid custom-field value.")
+
+        with (
+            patch(
+                "extras.services.custom_field_data.registry.get_custom_field_data_validator",
+                return_value=reject_invalid_value,
+            ),
+            self.assertRaises(ValidationError),
+        ):
+            write_custom_field_data(owner, {"value": "invalid"}, commit=False)
+
+        self.assertEqual(owner.custom_field_data, {"value": "previous"})
+
+    def test_all_owner_models_share_one_validator_and_assets_only_supply_definitions(self):
+        for model in (Asset, AssetType, Location):
+            with self.subTest(model=model._meta.label):
+                self.assertIs(registry.get_custom_field_data_validator(model), validate_custom_field_data_owner)
+        self.assertIs(registry.get_custom_field_data_definition_provider(Asset), asset_custom_field_definitions)
+        self.assertIs(
+            registry.get_custom_field_data_definition_provider(AssetType),
+            asset_type_custom_field_definitions,
+        )
+        self.assertIsNone(registry.get_custom_field_data_definition_provider(Location))
