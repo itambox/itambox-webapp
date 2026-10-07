@@ -45,10 +45,7 @@ for plugin_name in getattr(settings, "PLUGINS", []):
 query_bases.append(graphene.ObjectType)
 
 Query = type("Query", tuple(query_bases), {})
-if mutation_bases:
-    mutation_bases.append(graphene.ObjectType)
-    Mutation = type("Mutation", tuple(mutation_bases), {})
-else:
-    Mutation = None
+# No mutation root unless a plugin contributes one (core apps are REST-only for writes).
+Mutation = type("Mutation", (*mutation_bases, graphene.ObjectType), {}) if mutation_bases else None
 
 schema = graphene.Schema(query=Query, mutation=Mutation)
