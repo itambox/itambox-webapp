@@ -6,14 +6,23 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import EmptyResultSet, FieldError
 from django.db.models import F, Q, Value
 
-logger = logging.getLogger(__name__)
 from core.managers import Scope
+
+logger = logging.getLogger(__name__)
 from itambox.utils import get_content_type_by_natural_key
 
 from .search import SEARCH_INDEXES
 
 MAX_SEARCH_RESULTS_PER_MODEL = getattr(settings, "MAX_SEARCH_RESULTS_PER_MODEL", 1000)
 MAX_SEARCH_COUNT_PER_MODEL = getattr(settings, "MAX_SEARCH_COUNT_PER_MODEL", 10000)
+
+
+def _scoped_objects(model):
+    """The model's default queryset, scoped explicitly to the current scope."""
+    queryset = model.objects.all()
+    if hasattr(queryset, "for_scope"):
+        queryset = queryset.for_scope(Scope.current())
+    return queryset
 
 
 class DatabaseBackend:
@@ -78,10 +87,7 @@ class DatabaseBackend:
             if empty_scope or not q_objects:
                 continue
 
-            queryset = model.objects.all()
-            if hasattr(queryset, "for_scope"):
-                queryset = queryset.for_scope(Scope.current())
-            queryset = queryset.filter(q_objects)
+            queryset = _scoped_objects(model).filter(q_objects)
 
             capped_queryset = queryset[:MAX_SEARCH_RESULTS_PER_MODEL]
             try:
