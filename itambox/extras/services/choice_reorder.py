@@ -58,7 +58,9 @@ def _apply_positions(actor, choices, keys, using):
     parked above every current position first; the final pass then only writes
     into slots that are free (either vacated by a mover or already correct).
     """
-    movers = [(position, choices[key]) for position, key in enumerate(keys, start=1) if choices[key].position != position]
+    movers = [
+        (position, choices[key]) for position, key in enumerate(keys, start=1) if choices[key].position != position
+    ]
     if not movers:
         return None
     park_base = max([choice.position for choice in choices.values()] + [len(keys)]) + 1

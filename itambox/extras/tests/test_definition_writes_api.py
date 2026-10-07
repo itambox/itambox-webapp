@@ -243,9 +243,7 @@ class ChoiceSetWritesAPITests(TestCase):
             HTTP_IF_MATCH=created["ETag"],
         )
         self.assertIn(response.status_code, (400, 409), response.content)
-        self.assertIn(
-            response.data["error"]["issues"][0]["code"], {"DUPLICATE_FIELD", "REFERENCE_CONFLICT"}
-        )
+        self.assertIn(response.data["error"]["issues"][0]["code"], {"DUPLICATE_FIELD", "REFERENCE_CONFLICT"})
 
     def test_reorder_requires_if_match(self):
         created, _ = self._choice_ids()
