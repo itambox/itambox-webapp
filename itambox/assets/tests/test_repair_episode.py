@@ -461,6 +461,10 @@ class RecentActivityCardTests(TenantTestMixin, TestCase):
         _maintenance(self.asset, start="2026-02-12")
         url = reverse("assets:asset_detail", kwargs={"pk": self.asset.pk})
 
+        # Warm process-level caches (content types, templates, translations) so
+        # the comparison measures the request itself, not first-hit setup work.
+        self.client.get(url)
+
         with CaptureQueriesContext(connection) as baseline_queries:
             with patch.object(AssetTimeline, "recent_events", new_callable=PropertyMock, return_value=[]):
                 baseline_response = self.client.get(url)
