@@ -75,9 +75,8 @@ class PurchaseOrderForm(forms.ModelForm):
             HTML('<div class="mt-4"></div>'),
             Submit("submit", _("Save Purchase Order"), css_class="btn btn-primary"),
             HTML(
-                '<a href="{% url \'procurement:purchaseorder_list\' %}" class="btn btn-outline-secondary ms-2" data-no-dirty-track="true">'
-                + str(_("Cancel"))
-                + "</a>"
+                "<a href=\"{% url 'procurement:purchaseorder_list' %}\" "
+                'class="btn btn-outline-secondary ms-2" data-no-dirty-track="true">' + str(_("Cancel")) + "</a>"
             ),
         )
 
@@ -302,9 +301,8 @@ class ContractForm(forms.ModelForm):
             HTML('<div class="mt-4"></div>'),
             Submit("submit", _("Save Contract"), css_class="btn btn-primary"),
             HTML(
-                '<a href="{% url \'procurement:contract_list\' %}" class="btn btn-outline-secondary ms-2" data-no-dirty-track="true">'
-                + str(_("Cancel"))
-                + "</a>"
+                "<a href=\"{% url 'procurement:contract_list' %}\" "
+                'class="btn btn-outline-secondary ms-2" data-no-dirty-track="true">' + str(_("Cancel")) + "</a>"
             ),
         )
 

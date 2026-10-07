@@ -187,9 +187,9 @@ exclude_also = [
 show_contexts = false
 
 [tool.ruff]
-# Canonical formatter and import sorter (see issue #87). Ruff owns formatting
-# and import order only; Flake8 (setup.cfg) remains the semantic lint gate --
-# this section deliberately does not enable Ruff's own semantic rule sets.
+# Canonical formatter, import sorter, and E501 gate (see issue #87 / #622).
+# Ruff owns formatting/import order plus 132-character E501; Flake8 retains all
+# other rules until their later migration phases.
 line-length = 120
 target-version = "py312"
 # Two independent import roots: itambox/ (Django project root -- apps import
@@ -210,10 +210,13 @@ extend-exclude = [
 line-ending = "lf"
 
 [tool.ruff.lint]
-# Import-order enforcement only. No pycodestyle/pyflakes/bugbear rules here --
-# those stay on the Flake8 identity baseline (scripts/flake8_baseline.json) so
-# this phase introduces no new semantic gate or rule weakening.
-select = ["I"]
+# Import ordering and E501 only. Other Flake8 rules stay on the identity
+# baseline (scripts/flake8_baseline.json) until later rollout phases.
+select = ["I", "E501"]
+
+[tool.ruff.lint.pycodestyle]
+# B950's 10% grace over Flake8 max-line-length=120 was exactly 132 characters.
+max-line-length = 132
 
 # Backend static typing policy (issue #93). The flags below are written out one
 # by one rather than abbreviated to `strict = true`: `strict` is an alias whose

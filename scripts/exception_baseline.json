@@ -232,7 +232,7 @@
       "scope": "FunctionDef:plugin_template_content",
       "handler_type": "Exception",
       "classification": "silent",
-      "body_sha256": "1283d756712fe95ce9af28482b33bf1a65b8c775ddc389f758a26f63353f37d5",
+      "body_sha256": "9013e452da07c877cb5332cd03904b1acfa9b15b668737b2d166ea9c8e71dc02",
       "count": 1
     },
     {

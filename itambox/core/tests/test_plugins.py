@@ -499,7 +499,8 @@ class TemplateTagTestCase(TestCase):
 
         self.assertIn("<div>Good Injection</div>", rendered)
         self.assertIn(
-            "<!-- Error rendering plugin template content class 'BrokenContent' for position 'left_panel': Simulated template error -->",
+            "<!-- Error rendering plugin template content class 'BrokenContent' "
+            "for position 'left_panel': Simulated template error -->",
             rendered,
         )
 

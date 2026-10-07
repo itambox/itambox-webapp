@@ -95,7 +95,8 @@ def generate_doughnut_chart(data, title=""):
         f'<text x="110" y="118" text-anchor="middle" font-size="18" font-weight="800" fill="#0f172a">{total:,}</text>'
     )
     svg_parts.append(
-        f'<text x="110" y="132" text-anchor="middle" font-size="9" font-weight="600" fill="#64748b" text-transform="uppercase" letter-spacing="0.5px">{_("Total")}</text>'
+        f'<text x="110" y="132" text-anchor="middle" font-size="9" font-weight="600" fill="#64748b" '
+        f'text-transform="uppercase" letter-spacing="0.5px">{_("Total")}</text>'
     )
 
     # Legend Section (right side, starting at x=230)
@@ -190,7 +191,9 @@ def generate_bar_chart(data, title=""):
 
         # Label text
         svg_parts.append(
-            f'<text x="20" y="{y_pos + 12}" font-size="11" font-weight="600" fill="#475569" text-anchor="start">{escape(short_label)}</text>'
+            '<text x="20" y="{}" font-size="11" font-weight="600" fill="#475569" text-anchor="start">{}</text>'.format(
+                y_pos + 12, escape(short_label)
+            )
         )
 
         # Bar background
@@ -209,7 +212,11 @@ def generate_bar_chart(data, title=""):
         else:
             val_str = f"{int(val):,}"
         svg_parts.append(
-            f'<text x="{145 + bar_width}" y="{y_pos + 12}" font-size="11" font-weight="700" fill="#0f172a" text-anchor="start">{escape(val_str)}</text>'
+            '<text x="{}" y="{}" font-size="11" font-weight="700" fill="#0f172a" text-anchor="start">{}</text>'.format(
+                145 + bar_width,
+                y_pos + 12,
+                escape(val_str),
+            )
         )
 
     svg_parts.append("</svg>")

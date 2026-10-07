@@ -227,7 +227,8 @@ class UserApiTokensView(UserGenericTabView):
             messages.success(
                 request,
                 _(
-                    "API Token generated successfully! Make sure to copy your new personal access token now, as you won't be able to see it again: <code>{token_key}</code>"
+                    "API Token generated successfully! Make sure to copy your new personal access token now, "
+                    "as you won't be able to see it again: <code>{token_key}</code>"
                 ).format(token_key=token.key),
             )
             request.session["new_token_key"] = token.key
@@ -402,11 +403,20 @@ class BookmarkToggleView(LoginRequiredMixin, View):
             star_icon = "mdi-star" if is_bookmarked else "mdi-star-outline"
             title = _("Remove Bookmark") if is_bookmarked else _("Bookmark")
             button_html = (
-                f'<button type="button" class="btn btn-icon {btn_class}"'
-                f' hx-post="{reverse("users:bookmark_toggle", kwargs={"content_type_id": content_type_id, "object_id": object_id})}"'
-                f' hx-headers=\'{{"X-CSRFToken": "{csrf_token}"}}\''
-                f' hx-target="this" hx-swap="outerHTML" title="{title}">'
-                f'<i class="mdi {star_icon}"></i></button>'
+                '<button type="button" class="btn btn-icon {}"'
+                ' hx-post="{}"'
+                ' hx-headers=\'{{"X-CSRFToken": "{}"}}\''
+                ' hx-target="this" hx-swap="outerHTML" title="{}">'
+                '<i class="mdi {}"></i></button>'
+            ).format(
+                btn_class,
+                reverse(
+                    "users:bookmark_toggle",
+                    kwargs={"content_type_id": content_type_id, "object_id": object_id},
+                ),
+                csrf_token,
+                title,
+                star_icon,
             )
             msg = (
                 _("Bookmarked {name}.").format(name=str(target_obj))

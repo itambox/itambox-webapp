@@ -483,7 +483,8 @@ class SeedOrganizationsMixin:
                 group=(
                     "Meridian Capital Group",
                     "meridian-bank",
-                    "Cross-border banking group: German retail bank (AG), UK capital-markets arm (plc) and a shared risk-services entity.",
+                    "Cross-border banking group: German retail bank (AG), UK capital-markets arm "
+                    "(plc) and a shared risk-services entity.",
                 ),
                 domain="meridianbank.com",
                 tenants=[

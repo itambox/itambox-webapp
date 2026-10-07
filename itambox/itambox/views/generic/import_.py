@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 
 from django.apps import apps
 from django.conf import settings
@@ -90,7 +91,7 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
         if "_confirm" in request.POST:
             rows = request.session.get("import_rows", [])
             if rows:
-                model = self._get_model()
+                model = cast(type[models.Model], self._get_model())
                 ct = ContentType.objects.get_for_model(model)
 
                 current_tenant = get_current_tenant()
@@ -115,19 +116,16 @@ class ObjectImportView(PermissionRequiredMixin, LoginRequiredMixin, BaseHTMXView
                         tenant_id=tenant_id,
                     )
                 else:
-                    transaction.on_commit(
-                        lambda job_pk=job.pk, r=rows, app=model._meta.app_label, name=model._meta.model_name, u_pk=request.user.pk, t_id=tenant_id: (
-                            async_task(
-                                "core.tasks.import_csv_task",
-                                job_pk,
-                                r,
-                                app,
-                                name,
-                                u_pk,
-                                tenant_id=t_id,
-                            )
-                        )
+                    task_args = (
+                        "core.tasks.import_csv_task",
+                        job.pk,
+                        rows,
+                        model._meta.app_label,
+                        model._meta.model_name,
+                        request.user.pk,
                     )
+                    task_kwargs = {"tenant_id": tenant_id}
+                    transaction.on_commit(lambda args=task_args, kwargs=task_kwargs: async_task(*args, **kwargs))
 
                 messages.success(
                     request,
