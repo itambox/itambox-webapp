@@ -1,9 +1,10 @@
 """Branch coverage for the extras custom-field value validators."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date
 from decimal import Decimal
 from types import MappingProxyType, SimpleNamespace
+from typing import cast
 from unittest.mock import patch
 
 from django import forms
@@ -36,7 +37,7 @@ from extras.customfields import (
     validate_required_custom_field_values,
 )
 from extras.services.custom_field_data import write_custom_field_data
-from itambox.registry import registry
+from itambox.registry import Registry, registry
 from organization.models import Location
 
 
@@ -758,6 +759,32 @@ class CustomFieldDataWriteServiceTests(SimpleTestCase):
             write_custom_field_data(owner, {"value": object()}, commit=False)
 
         self.assertEqual(owner.custom_field_data, {"old": "keep"})
+
+    def test_non_mapping_values_and_non_string_keys_are_rejected_before_assignment(self):
+        invalid_values = (cast(Mapping[str, object], None), cast(Mapping[str, object], {1: "bad"}))
+        for values in invalid_values:
+            owner = _WritableOwner()
+            owner.custom_field_data = {"old": "keep"}
+            with self.subTest(values=values), self.assertRaises(ValidationError):
+                write_custom_field_data(owner, values, commit=False)
+            self.assertEqual(owner.custom_field_data, {"old": "keep"})
+
+    def test_finite_float_values_are_kept_but_non_finite_values_are_rejected(self):
+        owner = _WritableOwner()
+        write_custom_field_data(owner, {"value": 1.25}, commit=False)
+        self.assertEqual(owner.custom_field_data, {"value": 1.25})
+
+        with self.assertRaises(ValidationError):
+            write_custom_field_data(owner, {"value": float("nan")}, commit=False)
+
+        self.assertEqual(owner.custom_field_data, {"value": 1.25})
+
+    def test_conflicting_custom_field_definition_provider_is_rejected(self):
+        isolated_registry = Registry()
+        isolated_registry.register_custom_field_data_definition_provider(Location, object())
+
+        with self.assertRaisesRegex(RuntimeError, "already registered"):
+            isolated_registry.register_custom_field_data_definition_provider(Location, object())
 
     def test_validator_rejection_restores_previous_value_map(self):
         owner = _WritableOwner()

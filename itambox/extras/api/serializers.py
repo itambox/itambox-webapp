@@ -1,15 +1,11 @@
-from collections.abc import Mapping
-
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import models, transaction
+from django.db import models
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from core.managers import get_current_tenant
-from extras.customfields import apply_custom_field_patch, custom_fields_for_model
 from extras.definition_contract import custom_field_definition_contract_errors
 from extras.models import (
     AlertLog,
@@ -27,7 +23,6 @@ from extras.models import (
     WebhookEndpoint,
     alert_rule_channel_scope_errors,
 )
-from extras.services.custom_field_data import write_custom_field_data
 from itambox.api.base import BaseModelSerializer
 from itambox.api.fields import ContentTypeField, validate_gfk_target_tenant
 from itambox.registry import registry
@@ -47,84 +42,6 @@ _EVENT_RULE_CONDITIONS_WITHDRAWN_MESSAGE = _(
 def _is_secret_config_key(key):
     k = str(key).lower()
     return any(hint in k for hint in _SECRET_CONFIG_HINTS)
-
-
-class CustomFieldDataValidationMixin:
-    def get_custom_field_definitions(self):
-        return custom_fields_for_model(self.Meta.model)
-
-    def get_extra_kwargs(self):
-        extra_kwargs = super().get_extra_kwargs()
-        custom_field_kwargs = dict(extra_kwargs.get("custom_field_data", {}))
-        custom_field_kwargs["read_only"] = True
-        extra_kwargs["custom_field_data"] = custom_field_kwargs
-        return extra_kwargs
-
-    def get_existing_custom_field_data(self):
-        instance = self.instance
-        if instance is None or isinstance(instance, (list, tuple)):
-            return {}
-        return getattr(instance, "custom_field_data", None) or {}
-
-    def validate_specification_patch(self, value):
-        if not isinstance(value, Mapping):
-            raise serializers.ValidationError(_("Custom field specification patch must be an object."))
-        unknown_operations = set(value) - {"set", "clear"}
-        if unknown_operations:
-            raise serializers.ValidationError(_("Custom field patch contains an unknown operation."))
-        submitted = value.get("set", {})
-        clear_keys = value.get("clear", [])
-        if not isinstance(submitted, Mapping):
-            raise serializers.ValidationError(_("Custom field patch 'set' must be an object."))
-        if not isinstance(clear_keys, list) or any(not isinstance(key, str) for key in clear_keys):
-            raise serializers.ValidationError(_("Custom field patch 'clear' must be a list of field keys."))
-        try:
-            merged = apply_custom_field_patch(
-                self.get_existing_custom_field_data(),
-                self.get_custom_field_definitions(),
-                submitted,
-                clear_keys=clear_keys,
-            )
-        except DjangoValidationError as exc:
-            raise serializers.ValidationError(exc.messages) from exc
-        return {"set": dict(submitted), "clear": list(clear_keys), "_merged": merged}
-
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-        if "specification_patch" not in attrs:
-            try:
-                apply_custom_field_patch(
-                    self.get_existing_custom_field_data(),
-                    self.get_custom_field_definitions(),
-                    {},
-                )
-            except DjangoValidationError as exc:
-                raise serializers.ValidationError({"specification_patch": exc.messages}) from exc
-        return attrs
-
-    def create(self, validated_data):
-        patch = validated_data.pop("specification_patch", None)
-        with transaction.atomic():
-            instance = super().create(validated_data)
-            if patch is not None:
-                write_custom_field_data(
-                    instance,
-                    patch["_merged"],
-                    update_fields=("custom_field_data", "updated_at"),
-                )
-            return instance
-
-    def update(self, instance, validated_data):
-        patch = validated_data.pop("specification_patch", None)
-        with transaction.atomic():
-            instance = super().update(instance, validated_data)
-            if patch is not None:
-                instance = write_custom_field_data(
-                    instance,
-                    patch["_merged"],
-                    update_fields=("custom_field_data", "updated_at"),
-                )
-            return instance
 
 
 class TagSerializer(BaseModelSerializer):

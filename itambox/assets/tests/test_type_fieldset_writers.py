@@ -36,7 +36,7 @@ def test_non_ui_writers_use_the_audited_writer_seam():
     inventory = (root / "core" / "importers" / "snipeit" / "stages" / "inventory.py").read_text()
     catalog = (root / "core" / "importers" / "snipeit" / "stages" / "catalog.py").read_text()
     generic_form = (root / "extras" / "customfields.py").read_text()
-    generic_api = (root / "extras" / "api" / "serializers.py").read_text()
+    asset_api = (root / "assets" / "api" / "serializers.py").read_text()
     command_support = (root / "assets" / "services" / "specifications" / "_command_support.py").read_text()
     specification_commands = (root / "assets" / "services" / "specifications" / "commands.py").read_text()
     composition_commands = (root / "assets" / "services" / "specifications" / "_composition_commands.py").read_text()
@@ -70,7 +70,7 @@ def test_non_ui_writers_use_the_audited_writer_seam():
     assert "assets.specification_adapters" not in asset_models
     assert "load_prospective_definition" in asset_models
     assert "write_custom_field_data" in generic_form
-    assert "write_custom_field_data" in generic_api
+    assert "update_asset_specifications(" in asset_api
     assert "write_custom_field_data" in command_support
     assert "custom_field_data=custom_field_data" in specification_commands
     assert "custom_field_data=proposed_values" in composition_commands

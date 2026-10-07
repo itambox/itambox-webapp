@@ -58,8 +58,6 @@ class ExtrasConfig(AppConfig):
         from extras.customfields import validate_custom_field_data_owner
 
         for model in self.apps.get_models():
-            if model._meta.abstract:
-                continue
             try:
                 model._meta.get_field("custom_field_data")
             except FieldDoesNotExist:
