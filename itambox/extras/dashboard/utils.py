@@ -54,7 +54,13 @@ def get_default_dashboard():
             "h": 3,
             "style": "default",
             "config": {
-                "content": "# Welcome to ITAMbox!\n\nThis is your premium ITAM dashboard. Click the gear icon on any widget to adjust parameters, or click **Unlock** at the top right to drag, resize, or reorder elements.\n\n- Star any object to see it under **My Bookmarks**\n- Press **Ctrl+K** to jump to search from anywhere"
+                "content": (
+                    "# Welcome to ITAMbox!\n\n"
+                    "This is your premium ITAM dashboard. Click the gear icon on any widget to adjust "
+                    "parameters, or click **Unlock** at the top right to drag, resize, or reorder elements.\n\n"
+                    "- Star any object to see it under **My Bookmarks**\n"
+                    "- Press **Ctrl+K** to jump to search from anywhere"
+                )
             },
         },
         # Row 2 (y=3, h4) — status donut, financial centerpiece, tenant spend, counts

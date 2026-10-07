@@ -116,7 +116,8 @@ class KitItemForm(forms.ModelForm):
         if len(filled) > 1:
             raise ValidationError(
                 _(
-                    "A kit item cannot select more than one target (must be either Asset Type OR Accessory OR License OR Consumable)."
+                    "A kit item cannot select more than one target (must be either Asset Type OR Accessory OR "
+                    "License OR Consumable)."
                 )
             )
         return cleaned_data

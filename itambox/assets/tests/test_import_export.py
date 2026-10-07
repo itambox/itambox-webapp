@@ -1,9 +1,12 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from assets.models import Asset
+from core.models import Job
 
 User = get_user_model()
 
@@ -219,6 +222,45 @@ Asset Delta,TAG-004,{self.status.pk},{self.asset_type.pk}"""
         self.assertEqual(response.status_code, 302)
         self.assertIn("/jobs/", response.url)
         self.assertTrue(Asset.objects.filter(asset_tag="TAG-005").exists())
+
+    @override_settings(Q_CLUSTER={"sync": False})
+    def test_async_csv_import_calls_task_after_commit(self):
+        csv_data = f"""name,asset_tag,status,asset_type
+Asset Zeta,TAG-006,{self.status.pk},{self.asset_type.pk}"""
+        import_url = reverse("generic_import", kwargs={"app_label": "assets", "model_name": "asset"})
+        response = self.client.post(
+            import_url,
+            {
+                "active_tab": "editor",
+                "import_format": "csv",
+                "delimiter": ",",
+                "import_text": csv_data,
+                "_preview": "1",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        rows = self.client.session["import_rows"]
+
+        with patch("itambox.views.generic.import_.async_task") as before_commit:
+            with self.captureOnCommitCallbacks(execute=False) as callbacks:
+                response = self.client.post(import_url, {"_confirm": "1"})
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(len(callbacks), 1)
+            before_commit.assert_not_called()
+
+        job = Job.objects.get()
+        with patch("itambox.views.generic.import_.async_task") as at_commit:
+            callbacks[0]()
+
+        at_commit.assert_called_once_with(
+            "core.tasks.import_csv_task",
+            job.pk,
+            rows,
+            "assets",
+            "asset",
+            self.admin.pk,
+            tenant_id=None,
+        )
 
     def _run_import(self, text, import_format="csv"):
         import_url = reverse("generic_import", kwargs={"app_label": "assets", "model_name": "asset"})

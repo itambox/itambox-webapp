@@ -52,15 +52,17 @@ def generate_icon(size, output_path):
 
 
 def generate_svg(output_path):
-    svg_content = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
-  <!-- Icon Mark (Solid Green Rounded Square + White Isometric Box Silhouette) -->
-  <rect width="512" height="512" rx="128" fill="#2fb344"/>
-  <path d="M256 141 L384 205 L384 320 L256 384 L128 320 L128 205 Z" stroke="#ffffff" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M256 256 L384 205" stroke="#ffffff" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M256 256 L128 205" stroke="#ffffff" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M256 256 L256 384" stroke="#ffffff" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>
-</svg>
-"""
+    svg_content = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">\n'
+        "  <!-- Icon Mark (Solid Green Rounded Square + White Isometric Box Silhouette) -->\n"
+        '  <rect width="512" height="512" rx="128" fill="#2fb344"/>\n'
+        '  <path d="M256 141 L384 205 L384 320 L256 384 L128 320 L128 205 Z" '
+        'stroke="#ffffff" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>\n'
+        '  <path d="M256 256 L384 205" stroke="#ffffff" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>\n'
+        '  <path d="M256 256 L128 205" stroke="#ffffff" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>\n'
+        '  <path d="M256 256 L256 384" stroke="#ffffff" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>\n'
+        "</svg>\n"
+    )
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(svg_content)
     print(f"Generated SVG icon at {output_path}")

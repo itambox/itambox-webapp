@@ -1190,12 +1190,14 @@ class ReportTemplateForm(forms.ModelForm):
                 self.fields["tenant"].label = _("Scope / Tenant Filter")
                 self.fields["tenant"].empty_label = _("--------- All Tenants ---------")
                 self.fields["tenant"].help_text = _(
-                    "Select a specific tenant to restrict this report's compiled data strictly to that tenant. Choose 'All Tenants' (blank) to aggregate data globally across all tenants."
+                    "Select a specific tenant to restrict this report's compiled data strictly to that tenant. "
+                    "Choose 'All Tenants' (blank) to aggregate data globally across all tenants."
                 )
             if "filter_tenants" in self.fields:
                 self.fields["filter_tenants"].label = _("Filter Tenants (Scoping Constellation)")
                 self.fields["filter_tenants"].help_text = _(
-                    "Select one or more specific tenants to filter this report's compiled data. If none are selected, aggregates data globally across all tenants."
+                    "Select one or more specific tenants to filter this report's compiled data. If none are selected, "
+                    "aggregates data globally across all tenants."
                 )
 
     def clean(self):
@@ -1264,12 +1266,14 @@ class ScheduledReportForm(forms.ModelForm):
                 self.fields["tenant"].label = _("Scope / Tenant Filter")
                 self.fields["tenant"].empty_label = _("--------- All Tenants ---------")
                 self.fields["tenant"].help_text = _(
-                    "Select a specific tenant to restrict this scheduled report's compiled data strictly to that tenant. Choose 'All Tenants' (blank) to aggregate data globally across all tenants."
+                    "Select a specific tenant to restrict this scheduled report's compiled data strictly to that tenant. "
+                    "Choose 'All Tenants' (blank) to aggregate data globally across all tenants."
                 )
             if "filter_tenants" in self.fields:
                 self.fields["filter_tenants"].label = _("Filter Tenants (Scoping Constellation)")
                 self.fields["filter_tenants"].help_text = _(
-                    "Select one or more specific tenants to filter this scheduled report's compiled data. If none are selected, aggregates data globally across all tenants."
+                    "Select one or more specific tenants to filter this scheduled report's compiled data. If none are selected, "
+                    "aggregates data globally across all tenants."
                 )
 
         is_admin = bool(user and (user.is_superuser or getattr(user, "is_staff", False)))

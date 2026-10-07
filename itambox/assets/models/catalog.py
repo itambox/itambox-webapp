@@ -193,7 +193,8 @@ class Depreciation(StandardModel, SoftDeleteMixin):
         blank=True,
         verbose_name=_("Immediate expense threshold (GWG)"),
         help_text=_(
-            "Assets with purchase cost at or below this amount are fully expensed in the month of acquisition (e.g. 800 for German GWG)."
+            "Assets with purchase cost at or below this amount are fully expensed in the month "
+            "of acquisition (e.g. 800 for German GWG)."
         ),
     )
     description = models.TextField(blank=True, verbose_name=_("Description"))

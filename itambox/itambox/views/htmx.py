@@ -57,5 +57,6 @@ class BaseHTMXView:
                 )
             else:
                 raise ImproperlyConfigured(
-                    f"{self.__class__.__name__} or its superclasses must provide a render_to_response method or be mixed with TemplateResponseMixin."
+                    f"{self.__class__.__name__} or its superclasses must provide a render_to_response "
+                    "method or be mixed with TemplateResponseMixin."
                 )
