@@ -363,6 +363,8 @@ class RepairLoanerScopeTests(TenantTestMixin, TestCase):
 
     def setUp(self):
         self.setup_tenant_context()
+        # The checkout service resolves the deployed label; a fresh database has none.
+        baker.make(StatusLabel, type="deployed", name="Deployed")
         self.group = TenantGroup.objects.create(name="Group", slug="group")
         self.tenant.group = self.group
         self.tenant.save()
