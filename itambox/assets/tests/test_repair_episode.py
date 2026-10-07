@@ -8,10 +8,13 @@ CRUD surface and its navigation entry are gone.
 
 import datetime
 import uuid
+from unittest.mock import PropertyMock, patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.translation import gettext as _
@@ -22,7 +25,7 @@ from assets.forms.fields import selectable_repair_maintenances
 from assets.models import Asset, AssetAssignment, AssetMaintenance, AssetReservation, AssetType, StatusLabel, Warranty
 from assets.models.lifecycle import AssetDisposal
 from assets.services import checkout_asset, disposal_service_payload, dispose_asset, update_asset_disposal
-from assets.services.timeline import build_asset_timeline
+from assets.services.timeline import AssetTimeline, build_asset_timeline
 from core.models import ObjectChange
 from core.tests.mixins import TenantTestMixin
 from organization.models import AssetHolder
@@ -402,3 +405,73 @@ class RepairTimelineDetailViewTests(TenantTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "This asset stood in for")
         self.assertContains(response, "View Laptop")
+
+
+# ---------------------------------------------------------------------------
+# Recent activity card (#645)
+# ---------------------------------------------------------------------------
+
+
+class RecentActivityCardTests(TenantTestMixin, TestCase):
+    def setUp(self):
+        self.setup_tenant_context()
+        self.user = baker.make(User, is_superuser=True, is_staff=True)
+        self.client.force_login(self.user)
+        self.asset = _asset("Card Laptop", tenant=self.tenant)
+
+    def test_asset_overview_lists_the_five_newest_events_flattened(self):
+        records = [_maintenance(self.asset, start=f"2026-02-{index:02d}") for index in range(1, 7)]
+
+        response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": self.asset.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        recent_activity = response.context["recent_activity"]
+        expected_records = list(reversed(records[1:]))
+        self.assertEqual(len(recent_activity), 5)
+        self.assertEqual(
+            [event.url for event in recent_activity], [record.get_absolute_url() for record in expected_records]
+        )
+        self.assertContains(response, "Recent activity")
+        self.assertContains(response, "Show full timeline")
+        self.assertContains(response, 'href="?tab=timeline"')
+
+        rendered = response.content.decode()
+        self.assertEqual(rendered.count("asset-recent-activity-kind"), 5)
+        for event in recent_activity:
+            expected_date = '<span class="text-secondary small text-nowrap">' + event.date.isoformat() + "</span>"
+            expected_badge = (
+                '<span class="badge bg-' + event.color + '-lt asset-recent-activity-kind">' + event.label + "</span>"
+            )
+            expected_link = '<a href="' + event.url + '" class="flex-fill text-truncate">' + event.title + "</a>"
+            self.assertIn(expected_date, rendered)
+            self.assertIn(expected_badge, rendered)
+            self.assertIn(expected_link, rendered)
+
+    def test_asset_overview_shows_the_timeline_empty_state(self):
+        response = self.client.get(reverse("assets:asset_detail", kwargs={"pk": self.asset.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["recent_activity"], [])
+        self.assertContains(response, 'id="asset-recent-activity"')
+        self.assertContains(response, "Recent activity")
+        self.assertContains(response, "No lifecycle records exist for this asset yet.")
+        self.assertContains(response, "Show full timeline")
+
+    def test_asset_detail_recent_activity_does_not_add_database_queries(self):
+        _maintenance(self.asset, start="2026-02-12")
+        url = reverse("assets:asset_detail", kwargs={"pk": self.asset.pk})
+
+        # Warm process-level caches (content types, templates, translations) so
+        # the comparison measures the request itself, not first-hit setup work.
+        self.client.get(url)
+
+        with CaptureQueriesContext(connection) as baseline_queries:
+            with patch.object(AssetTimeline, "recent_events", new_callable=PropertyMock, return_value=[]):
+                baseline_response = self.client.get(url)
+        with CaptureQueriesContext(connection) as recent_queries:
+            response = self.client.get(url)
+
+        self.assertEqual(baseline_response.status_code, 200)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(recent_queries), len(baseline_queries))
+        self.assertEqual(len(response.context["recent_activity"]), 1)
