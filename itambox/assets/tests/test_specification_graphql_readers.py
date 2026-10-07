@@ -4,12 +4,15 @@ from dataclasses import dataclass
 
 import graphene
 import pytest
+from django.utils.translation import override
 from graphql import GraphQLError
 from graphql.language import ast
 
 from assets.graphql_specifications.loaders import RequestScopedSpecificationLoader
+from assets.graphql_specifications.readers import issues_for_entries, issues_for_missing_required
 from assets.graphql_specifications.scalars import DecimalScalar, SafeInteger
 from assets.graphql_specifications.types import SpecificationDefinitionType, SpecificationEntryType
+from assets.services.specifications.messages import specification_message
 from extras.services.specifications.contracts import (
     ChoiceDTO,
     ChoiceSetDTO,
@@ -102,6 +105,26 @@ def _definition() -> SpecificationDefinitionDTO:
         persisted_memberships=(),
         rendered_sections=(section,),
     )
+
+
+def test_user_errors_never_expose_internal_specification_message_keys() -> None:
+    entry = SpecificationProjectionEntryDTO(
+        key=FieldKey("legacy_value"),
+        value="invalid",
+        state="invalid",
+        reason_codes=("INVALID_TYPE",),
+        definition=None,
+    )
+    entry_issues = issues_for_entries((entry,))
+    required_issues = issues_for_missing_required((ProjectionIssueDTO("MISSING_REQUIRED", FieldKey("required")),))
+
+    assert len(entry_issues) == len(required_issues) == 1
+    assert not entry_issues[0].message.startswith("specifications.")
+    assert not required_issues[0].message.startswith("specifications.")
+    with override("de"):
+        denial_message = specification_message("specifications.object_unavailable")
+    assert "Provider-Mandanten" in denial_message
+    assert not denial_message.startswith("specifications.")
 
 
 def test_safe_integer_uses_javascript_safe_range_and_accepts_beyond_graphql_int() -> None:

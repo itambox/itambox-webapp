@@ -30,6 +30,7 @@ from ..services.specifications.commands import (
     update_asset_type_specifications,
 )
 from ..services.specifications.contracts import ExplicitFieldsetSelectionDTO
+from ..services.specifications.messages import specification_message
 from ..specification_adapters import (
     actor_context_for_user,
     create_fieldset_selection,
@@ -856,7 +857,7 @@ class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
                 )
             )
             if getattr(preview, "issues", ()):
-                raise ValidationError("; ".join(issue.message_key for issue in preview.issues))
+                raise ValidationError("; ".join(specification_message(issue.message_key) for issue in preview.issues))
             result = create_asset_type(
                 actor=actor,
                 native=native,

@@ -14,7 +14,7 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import CreateView, DetailView, FormView, ListView, UpdateView
 
-from core.context import get_current_all_accessible
+from assets.services.specifications.messages import specification_message
 from extras.definition_forms import (
     ChoiceCreateForm,
     ChoiceRetireForm,
@@ -41,6 +41,7 @@ from extras.services.definition_commands import (
 )
 from extras.services.specifications.contracts import QualifiedIdentity
 from organization.services.access_scope import ActorContextDTO, authentication_revision_for_actor
+from organization.services.catalogue_authorization import has_provider_catalogue_permission
 
 
 def _actor_for_user(user):
@@ -67,7 +68,7 @@ def _add_command_issues(form, result):
         field_name = issue.field_key or (issue.path[0] if issue.path else None)
         if field_name not in form.fields:
             field_name = None
-        form.add_error(field_name, issue.message_key)
+        form.add_error(field_name, specification_message(issue.message_key))
 
 
 class _DefinitionPermissionMixin(PermissionRequiredMixin):
@@ -75,12 +76,17 @@ class _DefinitionPermissionMixin(PermissionRequiredMixin):
     require_global_configuration = False
 
     def _has_global_configuration_scope(self):
-        return bool(self.request.user.is_superuser or get_current_all_accessible())
+        return all(
+            has_provider_catalogue_permission(self.request.user, permission)
+            for permission in self.get_permission_required()
+        )
 
     def has_permission(self):
+        if self.require_global_configuration:
+            return self._has_global_configuration_scope()
         if not super().has_permission():
             return False
-        return not self.require_global_configuration or self._has_global_configuration_scope()
+        return True
 
 
 class _LocalDefinitionMutationMixin(_DefinitionPermissionMixin):

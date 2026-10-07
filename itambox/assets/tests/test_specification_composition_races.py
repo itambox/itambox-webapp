@@ -8,7 +8,6 @@ import time
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.db import close_old_connections, connection, connections, transaction
 
@@ -26,7 +25,10 @@ from assets.services.specifications.contracts import (
     SpecificationPatchDTO,
 )
 from assets.services.specifications.locking import SPECIFICATION_CATALOGUE_LOCK_KEY, catalogue_transaction_lock
+from core.context import set_current_tenant
+from core.tests.mixins import grant
 from extras.models import CustomField, CustomFieldset, CustomFieldsetField, SpecificationLibrary
+from organization.models import Role, Tenant
 from organization.services.access_scope import ActorContextDTO, authentication_revision_for_actor
 
 User = get_user_model()
@@ -37,9 +39,15 @@ pytestmark = [pytest.mark.serial_only, pytest.mark.django_db(transaction=True)]
 def composition_race_type():
     assert connection.vendor == "postgresql"
     user = User.objects.create_user(username="composition-race-editor")
-    user.user_permissions.add(
-        Permission.objects.get(content_type=ContentType.objects.get_for_model(AssetType), codename="change_assettype")
+    provider = Tenant.objects.create(
+        name="Composition Race Provider", slug="composition-race-provider", is_provider=True
     )
+    role = Role.objects.create(
+        tenant=provider,
+        name="Composition Race Editor",
+        permissions=["assets.change_assettype"],
+    )
+    grant(user, provider, role)
     manufacturer = Manufacturer.objects.create(name="Composition race maker", slug="composition-race-maker")
     owner = AssetType.objects.create(
         manufacturer=manufacturer, model="Composition race type", slug="composition-race-type"
@@ -58,7 +66,9 @@ def composition_race_type():
         CustomFieldsetField.objects.create(fieldset=group, custom_field=field, position=1)
     AssetTypeFieldset.objects.create(asset_type=owner, fieldset=first, position=1)
     actor = ActorContextDTO(actor_id=user.pk, authentication_revision=authentication_revision_for_actor(user))
-    return owner, first, second, actor
+    set_current_tenant(provider)
+    yield owner, first, second, actor, provider.pk, role.pk
+    set_current_tenant(None)
 
 
 def _type_plan(owner, proposed_fieldset=None):
@@ -96,13 +106,14 @@ def _value(owner, actor, plan):
     )
 
 
-def _start(target):
+def _start(target, provider_id):
     arrived = queue.Queue()
     results, errors = [], []
 
     def worker():
         close_old_connections()
         try:
+            set_current_tenant(Tenant._base_manager.get(pk=provider_id))
             with connection.cursor() as cursor:
                 cursor.execute("SELECT pg_backend_pid()")
                 arrived.put(cursor.fetchone()[0])
@@ -110,6 +121,7 @@ def _start(target):
         except Exception as error:
             errors.append(error)
         finally:
+            set_current_tenant(None)
             connections["default"].close()
 
     thread = threading.Thread(target=worker)
@@ -155,7 +167,7 @@ def _finish(started):
 
 @pytest.mark.parametrize("first_writer", ["value", "composition"])
 def test_actual_composition_and_value_commands_serialize_and_reject_stale_plan(composition_race_type, first_writer):
-    owner, first, second, actor = composition_race_type
+    owner, first, second, actor, provider_id, _role_id = composition_race_type
     value_plan = _type_plan(owner)
     composition_plan = _type_plan(owner, second)
     started = None
@@ -173,7 +185,7 @@ def test_actual_composition_and_value_commands_serialize_and_reject_stale_plan(c
                     return _value(owner, actor, value_plan)
 
             assert isinstance(result, OwnerChangedDTO)
-            started = _start(target)
+            started = _start(target, provider_id)
             _assert_waiting(started[1])
     finally:
         if started is not None:
@@ -196,19 +208,21 @@ def test_actual_composition_and_value_commands_serialize_and_reject_stale_plan(c
     ],
 )
 def test_composition_reauthorizes_and_reloads_after_observed_wait(composition_race_type, change, code):
-    owner, first, second, actor = composition_race_type
+    owner, first, second, actor, provider_id, role_id = composition_race_type
     plan = _type_plan(owner, second)
     started = None
     try:
         with transaction.atomic(), catalogue_transaction_lock(exclusive=True):
-            started = _start(lambda: _composition(owner, second, actor, plan))
+            started = _start(lambda: _composition(owner, second, actor, plan), provider_id)
             _assert_waiting(started[1])
             if change == "resource":
                 AssetType._base_manager.filter(pk=owner.pk).update(model="changed while command waits")
             elif change == "definition":
                 CustomField.objects.filter(name="composition_race_note").update(label="changed while command waits")
             elif change == "permission":
-                User.objects.get(pk=actor.actor_id).user_permissions.clear()
+                role = Role.objects.get(pk=role_id)
+                role.permissions = []
+                role.save(update_fields=["permissions"])
             else:
                 User.objects.filter(pk=actor.actor_id).update(is_active=False)
     finally:
@@ -225,7 +239,7 @@ def test_composition_reauthorizes_and_reloads_after_observed_wait(composition_ra
 
 @pytest.mark.parametrize("locked_side", ["current", "proposed"])
 def test_empty_current_and_proposed_library_fieldsets_contend_before_owner_lock(composition_race_type, locked_side):
-    owner, _, _, actor = composition_race_type
+    owner, _, _, actor, provider_id, _role_id = composition_race_type
     groups = []
     libraries = []
     for suffix in ("current", "proposed"):
@@ -247,7 +261,7 @@ def test_empty_current_and_proposed_library_fieldsets_contend_before_owner_lock(
     try:
         with transaction.atomic():
             SpecificationLibrary.objects.select_for_update().get(pk=libraries[locked_side == "proposed"].pk)
-            started = _start(lambda: _composition(owner, groups[1], actor, plan))
+            started = _start(lambda: _composition(owner, groups[1], actor, plan), provider_id)
             _assert_waiting(started[1], advisory=False)
             # The waiting command must not have taken the owner lock first.
             AssetType.all_objects.select_for_update(nowait=True).get(pk=owner.pk)

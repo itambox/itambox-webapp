@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from django.contrib.auth.models import Permission
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import DEFAULT_DB_ALIAS, transaction
 
@@ -37,6 +35,7 @@ from organization.services.access_scope import (
     ResolvedAccessAuthorizationDTO,
     reauthorize_access_scope,
 )
+from organization.services.catalogue_authorization import has_provider_catalogue_permission
 
 from ._command_support import (
     json_values_equal,
@@ -72,7 +71,6 @@ from ._history_commands import (
 
 _DEFAULT_DB = DEFAULT_DB_ALIAS
 _ASSET_CHANGE_PERMISSION = "assets.change_asset"
-_ASSET_TYPE_CHANGE_CODENAME = "change_assettype"
 
 
 def _validate_type_command_inputs(
@@ -91,25 +89,6 @@ def _validate_type_command_inputs(
     revision_string(expected_resource_revision, "expected_resource_revision")
     revision_string(expected_definition_revision, "expected_definition_revision")
     return asset_type_id
-
-
-def _has_global_asset_type_permission(actor: Any) -> bool:
-    """Check a global Django model permission, never a tenant role or staff flag."""
-    if actor.is_superuser:
-        return True
-    content_type = ContentType.objects.get_for_model(AssetType)
-    permission = Permission.objects.filter(
-        content_type=content_type,
-        codename=_ASSET_TYPE_CHANGE_CODENAME,
-    ).first()
-    if permission is None:
-        return False
-    return (
-        actor.user_permissions.filter(pk=permission.pk).exists()
-        or actor.groups.filter(
-            permissions__pk=permission.pk,
-        ).exists()
-    )
 
 
 def _type_definition_or_rejection(
@@ -178,7 +157,7 @@ def _update_asset_type_locked(
         return unavailable()
 
     actor_model = reload_actor(actor)
-    if actor_model is None or not _has_global_asset_type_permission(actor_model):
+    if actor_model is None or not has_provider_catalogue_permission(actor_model, "assets.change_assettype"):
         return unavailable()
 
     plan = _type_plan_or_rejection(owner, owner_ref)

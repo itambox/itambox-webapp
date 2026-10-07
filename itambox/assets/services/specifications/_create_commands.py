@@ -28,7 +28,7 @@ from typing import Any, cast
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import DEFAULT_DB_ALIAS, IntegrityError, transaction
+from django.db import DEFAULT_DB_ALIAS, IntegrityError, models, transaction
 
 from assets.models.catalog import (
     AssetRole,
@@ -80,10 +80,10 @@ from extras.models import CustomFieldset, Tag
 from extras.services.specifications.composition import SpecificationDefinitionError
 from extras.services.specifications.contracts import QualifiedIdentity
 from organization.services.access_scope import ActorContextDTO
+from organization.services.catalogue_authorization import has_provider_catalogue_permission
 
 from ._command_support import (
     actor_change_context,
-    has_global_model_permission,
     issue,
     json_values_equal,
     load_prospective_definition,
@@ -286,12 +286,13 @@ def _validate_apply_shared_inputs(
 
 def _reloaded_authorized_actor(
     actor: ActorContextDTO,
-    model: type[object],
+    model: type[models.Model],
     codename: str,
 ):
-    """Reload the active actor and require the real global model permission."""
+    """Reload the active actor and require provider-scoped catalogue authority."""
     actor_model = reload_actor(actor)
-    if actor_model is None or not has_global_model_permission(actor_model, model, codename):
+    permission = f"{model._meta.app_label}.{codename}"
+    if actor_model is None or not has_provider_catalogue_permission(actor_model, permission):
         return None
     return actor_model
 

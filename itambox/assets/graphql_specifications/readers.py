@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from assets.services.specifications.messages import specification_message
 from extras.services.specifications.contracts import (
     FieldDefinitionDTO,
     LoadedSpecificationGraphDTO,
@@ -120,7 +121,7 @@ def issues_for_entries(entries: tuple[SpecificationProjectionEntryDTO, ...]) -> 
                     code=reason,
                     path=("specifications", str(entry.key)),
                     field_key=str(entry.key),
-                    message=f"specifications.{reason.lower()}",
+                    message=specification_message(f"specifications.{reason.lower()}"),
                 )
             )
     return tuple(issues)
@@ -132,7 +133,7 @@ def issues_for_missing_required(issues: tuple[ProjectionIssueDTO, ...]) -> tuple
             code="MISSING_REQUIRED",
             path=("specifications", str(issue.field_key)),
             field_key=str(issue.field_key),
-            message="specifications.missing_required",
+            message=specification_message("specifications.missing_required"),
         )
         for issue in issues
     )

@@ -15,12 +15,10 @@ from django.db import transaction
 
 from assets.services.specifications.locking import catalogue_transaction_lock
 from assets.services.type_library.application import (
-    _LIBRARY_MANAGE_PERMISSION,
     LibraryApplyRequest,
     LibraryApplyResult,
     _apply_library_plan_locked,
     _catalogue_reference_issues,
-    _has_global_model_permission,
     _has_library_plan_permissions,
     _reauthorize_apply_actor,
     _reload_library_actor,
@@ -49,6 +47,7 @@ from assets.services.type_library_validation import (
 from assets.services.type_library_validation.errors import ValidationIssue
 from extras.models import SpecificationLibrary, SpecificationLibraryRelease
 from organization.services.access_scope import authentication_revision_for_actor
+from organization.services.catalogue_authorization import has_provider_catalogue_permission
 
 ExportMode = Literal["original_release", "effective_snapshot", "fork"]
 
@@ -208,11 +207,9 @@ def export_library(
 def _authorize(actor: object, model: type, *, using: str) -> object:
 
     fresh_actor = _reload_library_actor(actor, using=using)
-    if fresh_actor is None or not _has_global_model_permission(
+    if fresh_actor is None or not has_provider_catalogue_permission(
         fresh_actor,
-        SpecificationLibrary,
-        _LIBRARY_MANAGE_PERMISSION,
-        using=using,
+        "extras.manage_specification_library",
     ):
         raise LibraryCommandError("OBJECT_UNAVAILABLE")
     return fresh_actor

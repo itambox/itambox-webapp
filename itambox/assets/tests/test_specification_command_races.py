@@ -6,7 +6,6 @@ import threading
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.db import close_old_connections, connection, connections, transaction
 
@@ -18,7 +17,10 @@ from assets.services.specifications._command_support import (
 from assets.services.specifications.commands import update_asset_type_specifications
 from assets.services.specifications.contracts import OwnerChangedDTO, SpecificationPatchDTO
 from assets.services.specifications.locking import catalogue_transaction_lock
+from core.context import set_current_tenant
+from core.tests.mixins import grant
 from extras.models import CustomField, CustomFieldset, CustomFieldsetField
+from organization.models import Role, Tenant
 from organization.services.access_scope import ActorContextDTO, authentication_revision_for_actor
 
 User = get_user_model()
@@ -27,12 +29,13 @@ User = get_user_model()
 @pytest.fixture
 def locked_type(db):
     user = User.objects.create_user(username="race-editor")
-    user.user_permissions.add(
-        Permission.objects.get(
-            content_type=ContentType.objects.get_for_model(AssetType),
-            codename="change_assettype",
-        )
+    provider = Tenant.objects.create(name="Race Provider", slug="race-provider", is_provider=True)
+    role = Role.objects.create(
+        tenant=provider,
+        name="Race Editor",
+        permissions=["assets.change_assettype"],
     )
+    grant(user, provider, role)
     manufacturer = Manufacturer.objects.create(name="Race maker", slug="race-maker")
     asset_type = AssetType.objects.create(
         manufacturer=manufacturer,
@@ -56,9 +59,13 @@ def locked_type(db):
     )
     CustomFieldsetField.objects.create(fieldset=fieldset, custom_field=field, position=1)
     AssetTypeFieldset.objects.create(asset_type=asset_type, fieldset=fieldset, position=1)
-    return asset_type, ActorContextDTO(
-        actor_id=user.pk,
-        authentication_revision=authentication_revision_for_actor(user),
+    return (
+        asset_type,
+        ActorContextDTO(
+            actor_id=user.pk,
+            authentication_revision=authentication_revision_for_actor(user),
+        ),
+        provider.pk,
     )
 
 
@@ -82,13 +89,15 @@ def _command(asset_type, actor, resource_revision, definition_revision, value):
     )
 
 
-def _thread_call(target, results, errors):
+def _thread_call(target, results, errors, provider_id):
     close_old_connections()
     try:
+        set_current_tenant(Tenant._base_manager.get(pk=provider_id))
         results.append(target())
     except Exception as error:  # report thread failures in the test thread
         errors.append(error)
     finally:
+        set_current_tenant(None)
         connections["default"].close()
 
 
@@ -97,7 +106,7 @@ def _thread_call(target, results, errors):
 def test_postgresql_owner_lock_coordinates_a_second_connection(locked_type):
     if connection.vendor != "postgresql":
         pytest.skip("T09-A race evidence requires PostgreSQL")
-    asset_type, actor = locked_type
+    asset_type, actor, provider_id = locked_type
     resource_revision, definition_revision = _plan(asset_type)
     ready = threading.Event()
     release = threading.Event()
@@ -120,10 +129,12 @@ def test_postgresql_owner_lock_coordinates_a_second_connection(locked_type):
     def writer():
         close_old_connections()
         try:
+            set_current_tenant(Tenant._base_manager.get(pk=provider_id))
             results.append(_command(asset_type, actor, resource_revision, definition_revision, "blocked"))
         except Exception as error:
             errors.append(error)
         finally:
+            set_current_tenant(None)
             done.set()
             connections["default"].close()
 
@@ -155,7 +166,7 @@ def test_postgresql_owner_lock_coordinates_a_second_connection(locked_type):
 def test_postgresql_shared_and_exclusive_catalogue_locks_coordinate(locked_type):
     if connection.vendor != "postgresql":
         pytest.skip("T09-A race evidence requires PostgreSQL")
-    asset_type, _actor = locked_type
+    asset_type, _actor, _provider_id = locked_type
     exclusive_ready = threading.Event()
     shared_acquired = threading.Event()
     release = threading.Event()
@@ -211,7 +222,7 @@ def test_postgresql_shared_and_exclusive_catalogue_locks_coordinate(locked_type)
 def test_postgresql_same_owner_race_has_one_winner_and_no_lost_update(locked_type):
     if connection.vendor != "postgresql":
         pytest.skip("T09-A race evidence requires PostgreSQL")
-    asset_type, actor = locked_type
+    asset_type, actor, provider_id = locked_type
     resource_revision, definition_revision = _plan(asset_type)
     barrier = threading.Barrier(2)
     results = []
@@ -224,7 +235,7 @@ def test_postgresql_same_owner_race_has_one_winner_and_no_lost_update(locked_typ
     threads = [
         threading.Thread(
             target=_thread_call,
-            args=(lambda value=value: call(value), results, errors),
+            args=(lambda value=value: call(value), results, errors, provider_id),
         )
         for value in ("first", "second")
     ]

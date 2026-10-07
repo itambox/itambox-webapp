@@ -21,6 +21,8 @@ class TestLegacySpecificationHTTPContention(TenantTestMixin, APITransactionTestC
         super().setUp()
         self.assertEqual(connection.vendor, "postgresql")
         self.setup_tenant_context(name="HTTP contention", slug="http-contention", permissions=[])
+        self.tenant.is_provider = True
+        self.tenant.save(update_fields=["is_provider"])
         field = CustomField.objects.create(
             namespace="local",
             name="http_contention_note",
@@ -64,7 +66,7 @@ class TestLegacySpecificationHTTPContention(TenantTestMixin, APITransactionTestC
                         HTTP_IF_MATCH=etag,
                     )
 
-                started = _start(request)
+                started = _start(request, self.tenant.pk)
                 _assert_waiting(started[1], advisory=False)
                 with connection.cursor() as cursor:
                     cursor.execute(
