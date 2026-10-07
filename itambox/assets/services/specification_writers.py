@@ -12,7 +12,6 @@ from assets.models import Asset
 from assets.services.specifications._command_support import (
     load_effective_definition,
     resource_revision_for_owner,
-    save_owner_in_savepoint,
     stored_values_for,
 )
 from assets.services.specifications.commands import update_asset_specifications
@@ -23,6 +22,7 @@ from assets.services.specifications.contracts import (
     SpecificationPatchDTO,
 )
 from assets.services.specifications.messages import specification_message
+from extras.services.custom_field_data import write_custom_field_data
 from organization.access import authorize_tenant_operation
 from organization.models import Tenant
 from organization.services.access_scope import (
@@ -135,10 +135,10 @@ def merge_generic_asset_data(
         proposed = {**current, **normalized}
         if proposed == current:
             return asset
-        asset.custom_field_data = proposed
-        save_owner_in_savepoint(
+        write_custom_field_data(
             asset,
-            user,
+            proposed,
+            actor=user,
             update_fields=("custom_field_data", "updated_at"),
         )
         return asset
@@ -201,8 +201,12 @@ def merge_generic_owner_data(
         merged = {**current, **normalized}
         if merged == current:
             return locked
-        locked.custom_field_data = merged
-        save_owner_in_savepoint(locked, user, update_fields=("custom_field_data", "updated_at"))
+        write_custom_field_data(
+            locked,
+            merged,
+            actor=user,
+            update_fields=("custom_field_data", "updated_at"),
+        )
         return locked
 
 

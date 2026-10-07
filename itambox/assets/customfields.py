@@ -1,6 +1,5 @@
 from dataclasses import dataclass, replace
 
-from extras.customfields import validate_custom_field_data_values
 from extras.models import CustomField, CustomFieldset
 
 
@@ -167,15 +166,11 @@ def resolve_asset_custom_fields(asset_type, stored_values=None):
     )
 
 
-def validate_asset_type_custom_field_data(asset_type):
-    validate_custom_field_data_values(
-        resolve_asset_type_custom_fields(asset_type),
-        asset_type.custom_field_data or {},
-    )
+def asset_type_custom_field_definitions(asset_type):
+    """Resolve Asset Type definitions for the shared value-data validator."""
+    return resolve_asset_type_custom_fields(asset_type)
 
 
-def validate_asset_custom_field_data(asset):
-    validate_custom_field_data_values(
-        resolve_asset_custom_fields(asset.asset_type, asset.custom_field_data),
-        asset.custom_field_data or {},
-    )
+def asset_custom_field_definitions(asset):
+    """Resolve Asset definitions for the shared value-data validator."""
+    return resolve_asset_custom_fields(asset.asset_type, asset.custom_field_data)

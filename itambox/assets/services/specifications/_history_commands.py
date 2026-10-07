@@ -374,13 +374,26 @@ def _save_history_owner(
     actor: object,
     *,
     update_fields: tuple[str, ...],
+    custom_field_data: dict[str, object] | None = None,
 ) -> None:
     """Run the normal audited save with the locked Asset's tenant scope bound."""
     if isinstance(owner, Asset):
         with override_current_tenant_scope(owner.tenant):
-            save_owner_in_savepoint(owner, actor, using=_DEFAULT_DB, update_fields=update_fields)
+            save_owner_in_savepoint(
+                owner,
+                actor,
+                using=_DEFAULT_DB,
+                update_fields=update_fields,
+                custom_field_data=custom_field_data,
+            )
         return
-    save_owner_in_savepoint(owner, actor, using=_DEFAULT_DB, update_fields=update_fields)
+    save_owner_in_savepoint(
+        owner,
+        actor,
+        using=_DEFAULT_DB,
+        update_fields=update_fields,
+        custom_field_data=custom_field_data,
+    )
 
 
 def _history_state_or_rejection(
@@ -450,9 +463,13 @@ def _apply_history_cleanup(
             resource_revision=resource_revision,
             definition_revision=definition_revision,
         )
-    owner.custom_field_data = proposed_values
     try:
-        _save_history_owner(owner, actor, update_fields=("custom_field_data", "updated_at"))
+        _save_history_owner(
+            owner,
+            actor,
+            update_fields=("custom_field_data", "updated_at"),
+            custom_field_data=proposed_values,
+        )
     except ValidationError:
         return rejected(owner_ref, issue("REFERENCE_CONFLICT"))
     return OwnerChangedDTO(

@@ -27,6 +27,7 @@ from extras.models import (
     WebhookEndpoint,
     alert_rule_channel_scope_errors,
 )
+from extras.services.custom_field_data import write_custom_field_data
 from itambox.api.base import BaseModelSerializer
 from itambox.api.fields import ContentTypeField, validate_gfk_target_tenant
 from itambox.registry import registry
@@ -103,17 +104,27 @@ class CustomFieldDataValidationMixin:
 
     def create(self, validated_data):
         patch = validated_data.pop("specification_patch", None)
-        if patch is not None:
-            validated_data["custom_field_data"] = patch["_merged"]
         with transaction.atomic():
-            return super().create(validated_data)
+            instance = super().create(validated_data)
+            if patch is not None:
+                write_custom_field_data(
+                    instance,
+                    patch["_merged"],
+                    update_fields=("custom_field_data", "updated_at"),
+                )
+            return instance
 
     def update(self, instance, validated_data):
         patch = validated_data.pop("specification_patch", None)
-        if patch is not None:
-            validated_data["custom_field_data"] = patch["_merged"]
         with transaction.atomic():
-            return super().update(instance, validated_data)
+            instance = super().update(instance, validated_data)
+            if patch is not None:
+                instance = write_custom_field_data(
+                    instance,
+                    patch["_merged"],
+                    update_fields=("custom_field_data", "updated_at"),
+                )
+            return instance
 
 
 class TagSerializer(BaseModelSerializer):

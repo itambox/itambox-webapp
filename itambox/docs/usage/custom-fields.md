@@ -208,7 +208,9 @@ For an Asset, a read-value example is:
 ```
 
 Writes use the separate `specification_patch` envelope. `set` contains values
-keyed by Field Name and `clear` contains the names to remove:
+keyed by Field Name and `clear` contains the names to remove. This transport
+contract is frozen for 1.0; composition and revision/history operations remain
+separate from the shared custom-field value-write service:
 
 ```json
 {
