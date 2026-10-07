@@ -184,38 +184,22 @@ test.describe('GraphQL API Specs', () => {
     }
   });
 
-  test('8. GraphQL mutation to create an asset with missing mandatory fields returns validation error', async ({ request }) => {
-    const mutation = `
-      mutation {
-        createAsset(input: { serialNumber: "SN123" }) {
-          asset {
-            id
-          }
-        }
-      }
-    `;
-    const response = await request.post('/graphql/', { data: { query: mutation } });
-    if (response.status() === 200 || response.status() === 400) {
-      const json = await response.json();
-      expect(json).toHaveProperty('errors');
-    }
-  });
-
-  test('9. GraphQL mutation to update a non-existent asset ID returns a clean error', async ({ request }) => {
-    const mutation = `
-      mutation {
-        updateAsset(id: "non-existent-id-9999", input: { name: "Updated Asset" }) {
-          asset {
-            id
-          }
-        }
-      }
-    `;
-    const response = await request.post('/graphql/', { data: { query: mutation } });
-    if (response.status() === 200 || response.status() === 400) {
-      const json = await response.json();
-      expect(json).toHaveProperty('errors');
-    }
+  test('8. Removed GraphQL write mutations are rejected with a validation error', async ({ page }) => {
+    // Load an authenticated page first and send the CSRF token: Django rejects
+    // session-authenticated POSTs without it, and the 403 HTML page is not JSON.
+    await page.goto('/');
+    const csrfToken = (await page.context().cookies()).find(cookie => cookie.name === 'csrftoken')?.value ?? '';
+    const mutation = `mutation { createAsset(name: "SN123") { asset { id } } }`;
+    const response = await page.request.post('/graphql/', {
+      data: { query: mutation },
+      headers: { 'X-CSRFToken': csrfToken },
+    });
+    // The GraphQL view answers an unresolvable operation with 400 and a JSON
+    // errors array (same contract as the journey GraphQL suite).
+    expect(response.status()).toBe(400);
+    const json = await response.json();
+    expect(json).toHaveProperty('errors');
+    expect(json.errors.length).toBeGreaterThan(0);
   });
 
   test('10. GraphiQL playground GET /graphql redirects unauthenticated users, allows authenticated', async ({ page, playwright }) => {
@@ -232,108 +216,6 @@ test.describe('GraphQL API Specs', () => {
     // Authenticated GET /graphql/ -> loads successfully (status < 400)
     const authResponse = await page.goto('/graphql/');
     expect(authResponse?.status()).toBeLessThan(400);
-  });
-
-  // TIER 3: Cross-Feature Combinations (combo 1)
-
-  test('11. Create/modify asset via GraphQL, verify via REST API and visible in Web UI', async ({ request, page }) => {
-    const mutation = `
-      mutation {
-        createAsset(input: { name: "GraphQL Cross-Feature Asset", assetTag: "TAG-QL-101", status: "available" }) {
-          asset {
-            id
-            name
-            assetTag
-          }
-        }
-      }
-    `;
-    
-    const response = await request.post('/graphql/', { data: { query: mutation } });
-    
-    if (response.status() === 200) {
-      const json = await response.json();
-      expect(json).not.toHaveProperty('errors');
-      const assetId = json.data.createAsset.asset.id;
-
-      // 1. Verify via REST API
-      const restResponse = await request.get(`/api/v1/assets/assets/${assetId}/`);
-      expect(restResponse.status()).toBe(200);
-      const restJson = await restResponse.json();
-      expect(restJson.name).toBe("GraphQL Cross-Feature Asset");
-
-      // 2. Verify visible in Web UI
-      await page.goto(`/assets/assets/${assetId}/`);
-      await expect(page.locator('h1, h2, td')).toContainText("GraphQL Cross-Feature Asset");
-    } else {
-      console.log(`Cross-Feature Combination skipped/failed due to unimplemented mutation: ${response.status()}`);
-    }
-  });
-
-  // TIER 4: Real-World Scenarios (workload 1)
-
-  test('12. Real-World workload 1: Complete hardware lifecycle (create, allocate, query, audit)', async ({ request }) => {
-    // 1. Create asset, software, and license
-    const mutation = `
-      mutation {
-        createAsset(input: { name: "Lifecycle Asset", assetTag: "TAG-LIFE-01" }) {
-          asset { id }
-        }
-        createSoftware(input: { name: "Lifecycle Software" }) {
-          software { id }
-        }
-        createLicense(input: { name: "Lifecycle License", seats: 10 }) {
-          license { id }
-        }
-      }
-    `;
-    const response = await request.post('/graphql/', { data: { query: mutation } });
-    
-    if (response.status() === 200) {
-      const json = await response.json();
-      if (!json.errors) {
-        const assetId = json.data.createAsset.asset.id;
-        const licenseId = json.data.createLicense.license.id;
-
-        // 2. Assign license to asset
-        const assignMutation = `
-          mutation {
-            assignLicense(input: { licenseId: "${licenseId}", assetId: "${assetId}" }) {
-              assignment { id }
-            }
-          }
-        `;
-        const assignResponse = await request.post('/graphql/', { data: { query: assignMutation } });
-        expect(assignResponse.status()).toBe(200);
-
-        // 3. Query whole chain via GraphQL
-        const chainQuery = `
-          query {
-            asset(id: "${assetId}") {
-              id
-              name
-              licenseAssignments {
-                license {
-                  id
-                  name
-                }
-              }
-            }
-          }
-        `;
-        const chainResponse = await request.post('/graphql/', { data: { query: chainQuery } });
-        const chainJson = await chainResponse.json();
-        expect(chainJson.data.asset.licenseAssignments.length).toBeGreaterThan(0);
-
-        // 4. Verify audit log/changelog
-        const changelogResponse = await request.get('/api/v1/core/changelogs/?object_id=' + assetId);
-        expect(changelogResponse.status()).toBe(200);
-        const changelogJson = await changelogResponse.json();
-        expect(changelogJson.results.length).toBeGreaterThan(0);
-      }
-    } else {
-      console.log(`GraphQL lifecycle skipped/failed due to unimplemented endpoint: ${response.status()}`);
-    }
   });
 
 });

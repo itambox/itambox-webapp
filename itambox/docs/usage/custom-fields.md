@@ -232,12 +232,12 @@ addressed inside the `set`/`clear` operation, for example
 
 ---
 
-For a GraphQL composition change, obtain the prospective preconditions from
+For a composition change, obtain the prospective preconditions from
 `POST /api/assets/asset-types/{id}/composition-preview/`, submitting the intended
-`fieldsets` and `specification_patch`. Pass its `expected_resource_revision` and
-`expected_definition_revision` to `setAssetTypeComposition`. A revision from the
-current definition query describes the old composition, not the proposed one.
-The preview is read-only; the mutation still rechecks both submitted revisions.
+`fieldsets` and `specification_patch`. Submit its `expected_resource_revision` and
+`expected_definition_revision` with the composition write. A revision from the
+current definition describes the old composition, not the proposed one.
+The preview is read-only; the write still rechecks both submitted revisions.
 
 ## Type Libraries
 
@@ -331,22 +331,12 @@ unresolved references are not silently redirected to another Field.
   members' targets, activation and lifecycle. Target binding alone does not
   select a Fieldset. An explicitly empty composition remains empty.
 
-### GraphQL retained-history export confirmation
+### Library export confirmation
 
-`exportLibrary(namespace: String!, mode: LibraryExportMode!, acknowledgeRetainedHistory: Boolean = false)`
-uses the same authorization and export validation as REST. For an effective snapshot that
-contains retained history, pass `acknowledgeRetainedHistory: true` explicitly. Omission,
-`false`, and `null` do not consent and return `RETAINED_HISTORY_ACK_REQUIRED`.
-Selecting `EFFECTIVE_SNAPSHOT` alone is not consent. Confirmation does not bypass
-permissions or make unknown or structurally invalid historical content exportable.
-Exports that do not require confirmation keep their existing behavior.
-
-```graphql
-mutation {
-  exportLibrary(namespace: "example", mode: EFFECTIVE_SNAPSHOT, acknowledgeRetainedHistory: true) {
-    documentText
-    semanticDigest
-    userErrors { code path }
-  }
-}
-```
+`POST /api/assets/type-libraries/export/` takes `namespace`, `mode` and an explicit
+`acknowledge_retained_history` flag. For an effective snapshot that contains retained
+history, pass `acknowledge_retained_history: true`. Omission and `false` do not consent
+and the request is refused. Selecting `effective_snapshot` alone is not consent.
+Confirmation does not bypass permissions or make unknown or structurally invalid
+historical content exportable. Exports that do not require confirmation keep their
+existing behavior. GraphQL no longer exposes library export or any other write.

@@ -377,30 +377,75 @@ export interface paths {
     delete: operations["extras_alert_rules_destroy"];
     patch: operations["extras_alert_rules_partial_update"];
   };
+  "/api/extras/custom-field-choice-sets/": {
+    get: operations["extras_custom_field_choice_sets_list"];
+    post: operations["extras_custom_field_choice_sets_create"];
+  };
+  "/api/extras/custom-field-choice-sets/{id}/": {
+    get: operations["extras_custom_field_choice_sets_retrieve"];
+    patch: operations["extras_custom_field_choice_sets_partial_update"];
+  };
+  "/api/extras/custom-field-choice-sets/{id}/choices/": {
+    post: operations["extras_custom_field_choice_sets_choices_create"];
+  };
+  "/api/extras/custom-field-choice-sets/{id}/deprecate/": {
+    post: operations["extras_custom_field_choice_sets_deprecate_create"];
+  };
+  "/api/extras/custom-field-choice-sets/{id}/reorder/": {
+    post: operations["extras_custom_field_choice_sets_reorder_create"];
+  };
+  "/api/extras/custom-field-choices/": {
+    get: operations["extras_custom_field_choices_list"];
+  };
+  "/api/extras/custom-field-choices/{id}/": {
+    get: operations["extras_custom_field_choices_retrieve"];
+    patch: operations["extras_custom_field_choices_partial_update"];
+  };
+  "/api/extras/custom-field-choices/{id}/deprecate/": {
+    post: operations["extras_custom_field_choices_deprecate_create"];
+  };
   "/api/extras/custom-fields/": {
+    /** @description Replace the generic model write path with definition-command calls. */
     get: operations["extras_custom_fields_list"];
+    /** @description Replace the generic model write path with definition-command calls. */
     put: operations["extras_custom_fields_update_bulk"];
+    /** @description Replace the generic model write path with definition-command calls. */
     post: operations["extras_custom_fields_create"];
+    /** @description Replace the generic model write path with definition-command calls. */
     delete: operations["extras_custom_fields_destroy_bulk"];
+    /** @description Replace the generic model write path with definition-command calls. */
     patch: operations["extras_custom_fields_partial_update_bulk"];
   };
   "/api/extras/custom-fields/{id}/": {
+    /** @description Replace the generic model write path with definition-command calls. */
     get: operations["extras_custom_fields_retrieve"];
+    /** @description Replace the generic model write path with definition-command calls. */
     put: operations["extras_custom_fields_update"];
+    /** @description Replace the generic model write path with definition-command calls. */
     delete: operations["extras_custom_fields_destroy"];
+    /** @description Replace the generic model write path with definition-command calls. */
     patch: operations["extras_custom_fields_partial_update"];
   };
   "/api/extras/custom-fieldsets/": {
+    /** @description Replace the generic model write path with definition-command calls. */
     get: operations["extras_custom_fieldsets_list"];
+    /** @description Replace the generic model write path with definition-command calls. */
     put: operations["extras_custom_fieldsets_update_bulk"];
+    /** @description Replace the generic model write path with definition-command calls. */
     post: operations["extras_custom_fieldsets_create"];
+    /** @description Replace the generic model write path with definition-command calls. */
     delete: operations["extras_custom_fieldsets_destroy_bulk"];
+    /** @description Replace the generic model write path with definition-command calls. */
     patch: operations["extras_custom_fieldsets_partial_update_bulk"];
   };
   "/api/extras/custom-fieldsets/{id}/": {
+    /** @description Replace the generic model write path with definition-command calls. */
     get: operations["extras_custom_fieldsets_retrieve"];
+    /** @description Replace the generic model write path with definition-command calls. */
     put: operations["extras_custom_fieldsets_update"];
+    /** @description Replace the generic model write path with definition-command calls. */
     delete: operations["extras_custom_fieldsets_destroy"];
+    /** @description Replace the generic model write path with definition-command calls. */
     patch: operations["extras_custom_fieldsets_partial_update"];
   };
   "/api/extras/dashboards/": {
@@ -2630,6 +2675,38 @@ export interface components {
      * @enum {string}
      */
     ChannelTypeEnum: "email" | "in_app" | "slack" | "teams";
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    ChoiceEntryInputRequest: {
+      key: string;
+      label: string;
+    };
+    ChoiceRead: {
+      id: number;
+      choice_set: number;
+      key: string;
+      label: string;
+      position: number;
+      lifecycle: components["schemas"]["LifecycleEnum"];
+      replaced_by: string | null;
+      resource_revision: string;
+    };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    ChoiceSetCreateInputRequest: {
+      namespace: string;
+      slug: string;
+      label: string;
+      choices?: components["schemas"]["ChoiceEntryInputRequest"][];
+    };
+    ChoiceSetRead: {
+      id: number;
+      namespace: string;
+      slug: string;
+      label: string;
+      lifecycle: components["schemas"]["LifecycleEnum"];
+      replaced_by: string | null;
+      choices: readonly components["schemas"]["ChoiceRead"][];
+      resource_revision: string;
+    };
     Component: {
       id: number;
       name: string;
@@ -3225,7 +3302,7 @@ export interface components {
       /** Display Label */
       label: string;
       help_text?: string;
-      field_type?: components["schemas"]["FieldTypeEnum"];
+      field_type?: components["schemas"]["CustomFieldFieldTypeEnum"];
       field_type_display: string;
       activation: components["schemas"]["ActivationEnum"];
       quantity_kind?: string | null;
@@ -3249,6 +3326,54 @@ export interface components {
       /** Format: date-time */
       updated_at: string;
     };
+    /**
+     * @description * `text` - text
+     * * `integer` - integer
+     * * `decimal` - decimal
+     * * `date` - date
+     * * `boolean` - boolean
+     * * `single-select` - single-select
+     * * `multi-select` - multi-select
+     * @enum {string}
+     */
+    CustomFieldCreateInputFieldTypeEnum: "text" | "integer" | "decimal" | "date" | "boolean" | "single-select" | "multi-select";
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    CustomFieldCreateInputRequest: {
+      namespace: string;
+      local_key: string;
+      label: string;
+      object_types: string[];
+      field_type?: components["schemas"]["CustomFieldCreateInputFieldTypeEnum"];
+      activation?: components["schemas"]["ActivationEnum"];
+      help_text?: string;
+      quantity_kind?: string | null;
+      canonical_unit?: string | null;
+      /** Format: decimal */
+      minimum_value?: string | null;
+      /** Format: decimal */
+      maximum_value?: string | null;
+      regex?: string | null;
+      decimal_scale?: number | null;
+      max_values?: number | null;
+      text_max_length?: number | null;
+      validation_rule?: string | null;
+      required?: boolean;
+      nullable?: boolean;
+      mappings?: unknown[];
+      choice_set?: number | null;
+      replaced_by?: string | null;
+    };
+    /**
+     * @description * `text` - Text
+     * * `integer` - Integer
+     * * `decimal` - Decimal
+     * * `date` - Date
+     * * `boolean` - Boolean
+     * * `single-select` - Single select
+     * * `multi-select` - Multi select
+     * @enum {string}
+     */
+    CustomFieldFieldTypeEnum: "text" | "integer" | "decimal" | "date" | "boolean" | "single-select" | "multi-select";
     CustomFieldRequest: {
       /**
        * Field Name
@@ -3259,7 +3384,7 @@ export interface components {
       /** Display Label */
       label: string;
       help_text?: string;
-      field_type?: components["schemas"]["FieldTypeEnum"];
+      field_type?: components["schemas"]["CustomFieldFieldTypeEnum"];
       activation: components["schemas"]["ActivationEnum"];
       quantity_kind?: string | null;
       canonical_unit?: string | null;
@@ -3278,6 +3403,16 @@ export interface components {
       choice_set?: number | null;
       object_types?: string[];
     };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    CustomFieldUpdateInputRequest: {
+      label?: string;
+      help_text?: string;
+      activation?: components["schemas"]["ActivationEnum"];
+      required?: boolean;
+      mappings?: unknown[];
+      object_types?: string[];
+      replaced_by?: string;
+    };
     CustomFieldset: {
       id: number;
       /** @default local */
@@ -3291,12 +3426,27 @@ export interface components {
       /** Format: date-time */
       updated_at: string;
     };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    CustomFieldsetCreateInputRequest: {
+      namespace: string;
+      slug: string;
+      label?: string;
+      description?: string;
+      field_identities?: string[];
+      replaced_by?: string | null;
+    };
     CustomFieldsetRequest: {
       /** @default local */
       namespace?: string;
       slug: string;
       label?: string;
       description?: string;
+    };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    CustomFieldsetUpdateInputRequest: {
+      label?: string;
+      description?: string;
+      replaced_by?: string;
     };
     Dashboard: {
       id: number;
@@ -3439,17 +3589,6 @@ export interface components {
       action_config?: unknown;
       enabled?: boolean;
     };
-    /**
-     * @description * `text` - Text
-     * * `integer` - Integer
-     * * `decimal` - Decimal
-     * * `date` - Date
-     * * `boolean` - Boolean
-     * * `single-select` - Single select
-     * * `multi-select` - Multi select
-     * @enum {string}
-     */
-    FieldTypeEnum: "text" | "integer" | "decimal" | "date" | "boolean" | "single-select" | "multi-select";
     GenericObject: {
       object_type: string;
       object_id: number;
@@ -3827,6 +3966,12 @@ export interface components {
       installed_software_id?: number | null;
       notes?: string;
     };
+    /**
+     * @description * `active` - Active
+     * * `deprecated` - Deprecated
+     * @enum {string}
+     */
+    LifecycleEnum: "active" | "deprecated";
     Location: {
       id: number;
       /** Format: uri */
@@ -4401,6 +4546,40 @@ export interface components {
        */
       previous?: string | null;
       results: components["schemas"]["Category"][];
+      /** @description True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP and the real total is larger. Use `start` (keyset cursor) pagination to iterate the full result set. */
+      count_capped?: boolean;
+    };
+    PaginatedChoiceReadList: {
+      /** @example 123 */
+      count: number | null;
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?offset=400&limit=100
+       */
+      next?: string | null;
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?offset=200&limit=100
+       */
+      previous?: string | null;
+      results: components["schemas"]["ChoiceRead"][];
+      /** @description True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP and the real total is larger. Use `start` (keyset cursor) pagination to iterate the full result set. */
+      count_capped?: boolean;
+    };
+    PaginatedChoiceSetReadList: {
+      /** @example 123 */
+      count: number | null;
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?offset=400&limit=100
+       */
+      next?: string | null;
+      /**
+       * Format: uri
+       * @example http://api.example.org/accounts/?offset=200&limit=100
+       */
+      previous?: string | null;
+      results: components["schemas"]["ChoiceSetRead"][];
       /** @description True when `count` was capped at ITAMBOX_PAGINATOR_COUNT_CAP and the real total is larger. Use `start` (keyset cursor) pagination to iterate the full result set. */
       count_capped?: boolean;
     };
@@ -5741,7 +5920,7 @@ export interface components {
       /** Display Label */
       label?: string;
       help_text?: string;
-      field_type?: components["schemas"]["FieldTypeEnum"];
+      field_type?: components["schemas"]["CustomFieldFieldTypeEnum"];
       activation?: components["schemas"]["ActivationEnum"];
       quantity_kind?: string | null;
       canonical_unit?: string | null;
@@ -5760,12 +5939,28 @@ export interface components {
       choice_set?: number | null;
       object_types?: string[];
     };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    PatchedCustomFieldUpdateInputRequest: {
+      label?: string;
+      help_text?: string;
+      activation?: components["schemas"]["ActivationEnum"];
+      required?: boolean;
+      mappings?: unknown[];
+      object_types?: string[];
+      replaced_by?: string;
+    };
     PatchedCustomFieldsetRequest: {
       /** @default local */
       namespace?: string;
       slug?: string;
       label?: string;
       description?: string;
+    };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    PatchedCustomFieldsetUpdateInputRequest: {
+      label?: string;
+      description?: string;
+      replaced_by?: string;
     };
     PatchedDashboardRequest: {
       /** @description Ordered list of widget config dicts */
@@ -5831,6 +6026,10 @@ export interface components {
       name?: string;
       description?: string;
       tenant_id?: number | null;
+    };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    PatchedLabelInputRequest: {
+      label?: string;
     };
     PatchedLicenseRequest: {
       /** @description Descriptive name for the license (e.g., Visio Pro 2021 - EA Renewal FY24) */
@@ -6337,6 +6536,10 @@ export interface components {
       slug: string;
       parent_id?: number | null;
       description?: string;
+    };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    ReorderInputRequest: {
+      keys: string[];
     };
     SCIMAuthenticationScheme: {
       name: string;
@@ -17755,6 +17958,533 @@ export interface operations {
       };
     };
   };
+  extras_custom_field_choice_sets_list: {
+    parameters: {
+      query?: {
+        /** @description Number of results to return per page. */
+        limit?: number;
+        /** @description The initial index from which to return the results. */
+        offset?: number;
+        /** @description Keyset/cursor pagination: return results with pk >= start, ordered by pk. Skips the (capped) row count and stays O(page) regardless of table size — use this instead of offset/limit for bulk export or iterating large collections. Follow the `next` link to walk subsequent pages. */
+        start?: number;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["PaginatedChoiceSetReadList"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  extras_custom_field_choice_sets_create: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ChoiceSetCreateInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ChoiceSetCreateInputRequest"];
+        "multipart/form-data": components["schemas"]["ChoiceSetCreateInputRequest"];
+      };
+    };
+    responses: {
+      201: {
+        content: {
+          "application/json": components["schemas"]["ChoiceSetRead"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  extras_custom_field_choice_sets_retrieve: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this custom field choice set. */
+        id: number;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["ChoiceSetRead"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  extras_custom_field_choice_sets_partial_update: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this custom field choice set. */
+        id: number;
+      };
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedLabelInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedLabelInputRequest"];
+        "multipart/form-data": components["schemas"]["PatchedLabelInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["ChoiceSetRead"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  extras_custom_field_choice_sets_choices_create: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this custom field choice set. */
+        id: number;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ChoiceEntryInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ChoiceEntryInputRequest"];
+        "multipart/form-data": components["schemas"]["ChoiceEntryInputRequest"];
+      };
+    };
+    responses: {
+      201: {
+        content: {
+          "application/json": components["schemas"]["ChoiceRead"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  extras_custom_field_choice_sets_deprecate_create: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this custom field choice set. */
+        id: number;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["ChoiceSetRead"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  extras_custom_field_choice_sets_reorder_create: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this custom field choice set. */
+        id: number;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ReorderInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ReorderInputRequest"];
+        "multipart/form-data": components["schemas"]["ReorderInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["ChoiceSetRead"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  extras_custom_field_choices_list: {
+    parameters: {
+      query?: {
+        /** @description Number of results to return per page. */
+        limit?: number;
+        /** @description The initial index from which to return the results. */
+        offset?: number;
+        /** @description Keyset/cursor pagination: return results with pk >= start, ordered by pk. Skips the (capped) row count and stays O(page) regardless of table size — use this instead of offset/limit for bulk export or iterating large collections. Follow the `next` link to walk subsequent pages. */
+        start?: number;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["PaginatedChoiceReadList"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  extras_custom_field_choices_retrieve: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this custom field choice. */
+        id: number;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["ChoiceRead"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  extras_custom_field_choices_partial_update: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this custom field choice. */
+        id: number;
+      };
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["PatchedLabelInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedLabelInputRequest"];
+        "multipart/form-data": components["schemas"]["PatchedLabelInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["ChoiceRead"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      401: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      403: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  extras_custom_field_choices_deprecate_create: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this custom field choice. */
+        id: number;
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["ChoiceRead"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fields_list: {
     parameters: {
       query?: {
@@ -17807,6 +18537,7 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fields_update_bulk: {
     requestBody: {
       content: {
@@ -17859,12 +18590,13 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fields_create: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["CustomFieldRequest"];
-        "application/x-www-form-urlencoded": components["schemas"]["CustomFieldRequest"];
-        "multipart/form-data": components["schemas"]["CustomFieldRequest"];
+        "application/json": components["schemas"]["CustomFieldCreateInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["CustomFieldCreateInputRequest"];
+        "multipart/form-data": components["schemas"]["CustomFieldCreateInputRequest"];
       };
     };
     responses: {
@@ -17911,6 +18643,7 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fields_destroy_bulk: {
     responses: {
       /** @description No response body */
@@ -17949,6 +18682,7 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fields_partial_update_bulk: {
     requestBody?: {
       content: {
@@ -18001,6 +18735,7 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fields_retrieve: {
     parameters: {
       path: {
@@ -18040,6 +18775,7 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fields_update: {
     parameters: {
       path: {
@@ -18047,11 +18783,11 @@ export interface operations {
         id: number;
       };
     };
-    requestBody: {
+    requestBody?: {
       content: {
-        "application/json": components["schemas"]["CustomFieldRequest"];
-        "application/x-www-form-urlencoded": components["schemas"]["CustomFieldRequest"];
-        "multipart/form-data": components["schemas"]["CustomFieldRequest"];
+        "application/json": components["schemas"]["CustomFieldUpdateInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["CustomFieldUpdateInputRequest"];
+        "multipart/form-data": components["schemas"]["CustomFieldUpdateInputRequest"];
       };
     };
     responses: {
@@ -18104,6 +18840,7 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fields_destroy: {
     parameters: {
       path: {
@@ -18154,6 +18891,7 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fields_partial_update: {
     parameters: {
       path: {
@@ -18163,9 +18901,9 @@ export interface operations {
     };
     requestBody?: {
       content: {
-        "application/json": components["schemas"]["PatchedCustomFieldRequest"];
-        "application/x-www-form-urlencoded": components["schemas"]["PatchedCustomFieldRequest"];
-        "multipart/form-data": components["schemas"]["PatchedCustomFieldRequest"];
+        "application/json": components["schemas"]["PatchedCustomFieldUpdateInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedCustomFieldUpdateInputRequest"];
+        "multipart/form-data": components["schemas"]["PatchedCustomFieldUpdateInputRequest"];
       };
     };
     responses: {
@@ -18218,6 +18956,7 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fieldsets_list: {
     parameters: {
       query?: {
@@ -18260,6 +18999,7 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fieldsets_update_bulk: {
     requestBody: {
       content: {
@@ -18312,12 +19052,13 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fieldsets_create: {
     requestBody: {
       content: {
-        "application/json": components["schemas"]["CustomFieldsetRequest"];
-        "application/x-www-form-urlencoded": components["schemas"]["CustomFieldsetRequest"];
-        "multipart/form-data": components["schemas"]["CustomFieldsetRequest"];
+        "application/json": components["schemas"]["CustomFieldsetCreateInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["CustomFieldsetCreateInputRequest"];
+        "multipart/form-data": components["schemas"]["CustomFieldsetCreateInputRequest"];
       };
     };
     responses: {
@@ -18364,6 +19105,7 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fieldsets_destroy_bulk: {
     responses: {
       /** @description No response body */
@@ -18402,6 +19144,7 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fieldsets_partial_update_bulk: {
     requestBody?: {
       content: {
@@ -18454,6 +19197,7 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fieldsets_retrieve: {
     parameters: {
       path: {
@@ -18493,6 +19237,7 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fieldsets_update: {
     parameters: {
       path: {
@@ -18500,11 +19245,11 @@ export interface operations {
         id: number;
       };
     };
-    requestBody: {
+    requestBody?: {
       content: {
-        "application/json": components["schemas"]["CustomFieldsetRequest"];
-        "application/x-www-form-urlencoded": components["schemas"]["CustomFieldsetRequest"];
-        "multipart/form-data": components["schemas"]["CustomFieldsetRequest"];
+        "application/json": components["schemas"]["CustomFieldsetUpdateInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["CustomFieldsetUpdateInputRequest"];
+        "multipart/form-data": components["schemas"]["CustomFieldsetUpdateInputRequest"];
       };
     };
     responses: {
@@ -18557,6 +19302,7 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fieldsets_destroy: {
     parameters: {
       path: {
@@ -18607,6 +19353,7 @@ export interface operations {
       };
     };
   };
+  /** @description Replace the generic model write path with definition-command calls. */
   extras_custom_fieldsets_partial_update: {
     parameters: {
       path: {
@@ -18616,9 +19363,9 @@ export interface operations {
     };
     requestBody?: {
       content: {
-        "application/json": components["schemas"]["PatchedCustomFieldsetRequest"];
-        "application/x-www-form-urlencoded": components["schemas"]["PatchedCustomFieldsetRequest"];
-        "multipart/form-data": components["schemas"]["PatchedCustomFieldsetRequest"];
+        "application/json": components["schemas"]["PatchedCustomFieldsetUpdateInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["PatchedCustomFieldsetUpdateInputRequest"];
+        "multipart/form-data": components["schemas"]["PatchedCustomFieldsetUpdateInputRequest"];
       };
     };
     responses: {

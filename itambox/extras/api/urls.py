@@ -1,5 +1,6 @@
 from itambox.api.routers import ITAMBoxRouter
 
+from .choice_sets import CustomFieldChoiceSetViewSet, CustomFieldChoiceViewSet
 from .views import (
     AlertLogViewSet,
     AlertRuleViewSet,
@@ -21,6 +22,8 @@ router.register(r"tags", TagViewSet)
 router.register(r"dashboards", DashboardViewSet, basename="dashboard")
 router.register(r"custom-fields", CustomFieldViewSet)
 router.register(r"custom-fieldsets", CustomFieldsetViewSet)
+router.register(r"custom-field-choice-sets", CustomFieldChoiceSetViewSet)
+router.register(r"custom-field-choices", CustomFieldChoiceViewSet)
 router.register(r"event-rules", EventRuleViewSet)
 router.register(r"webhook-endpoints", WebhookEndpointViewSet)
 router.register(r"webhook-deliveries", WebhookDeliveryViewSet, basename="webhookdelivery")
