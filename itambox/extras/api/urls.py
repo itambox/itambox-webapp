@@ -1,6 +1,6 @@
-from .choice_sets import CustomFieldChoiceSetViewSet, CustomFieldChoiceViewSet
 from itambox.api.routers import ITAMBoxRouter
 
+from .choice_sets import CustomFieldChoiceSetViewSet, CustomFieldChoiceViewSet
 from .views import (
     AlertLogViewSet,
     AlertRuleViewSet,
