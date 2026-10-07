@@ -38,7 +38,7 @@ from core.tasks.resource_grants import (
 )
 from core.tasks.utils import RetryableTaskError, TaskStatus, TerminalTaskError
 from core.tests.mixins import TenantTestMixin
-from extras.models import Event
+from extras.models import Event, EventRule
 from inventory.models import Accessory, AccessoryStock
 from organization.admin import TenantResourceGrantExpiryRevocationAdmin
 from organization.models import (
@@ -150,6 +150,14 @@ class ResourceGrantExpiryTests(TestCase):
         assert evidence.triggering_valid_until == deadline
 
     def test_d9_expiry_event_is_minimal_and_emitted_once(self):
+        # Events are only recorded for models some rule subscribes to (#621).
+        EventRule.objects.create(
+            name="grant lifecycle",
+            model=ContentType.objects.get_for_model(TenantResourceGrant),
+            events=["delete"],
+            action_type=EventRule.ACTION_NOTIFICATION,
+            enabled=True,
+        )
         cutoff = timezone.now()
         grant = self._grant(valid_until=cutoff)
         run = self._run(cutoff)
@@ -661,6 +669,14 @@ class ResourceGrantRollbackTests(TenantTestMixin, TestCase):
             dispatch_stale_at=cutoff + datetime.timedelta(minutes=1),
         )
         sweep_expired_resource_grants(self.tenant.pk, run.pk, 1)
+        # Events are only recorded for models some rule subscribes to (#621).
+        EventRule.objects.create(
+            name="grant lifecycle",
+            model=ContentType.objects.get_for_model(TenantResourceGrant),
+            events=["restore"],
+            action_type=EventRule.ACTION_NOTIFICATION,
+            enabled=True,
+        )
 
     def test_s16_command_restores_one_grant_after_clearing_deadline(self):
         evidence_count = TenantResourceGrantExpiryRevocation._base_manager.filter(grant=self.grant).count()

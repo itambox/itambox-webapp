@@ -26,7 +26,8 @@
   "itambox/extras/tests/test_definition_boundary_regressions.py",
   "itambox/extras/tests/test_events.py",
   "itambox/extras/tests/test_specification_definition_commands.py",
-  "itambox/extras/tests/test_specification_definition_races.py"
+  "itambox/extras/tests/test_specification_definition_races.py",
+  "itambox/organization/tests/test_resource_grant_expiry.py"
  ],
  "baseline_tests": [
   "itambox/assets/api/tests/test_error_boundary_disclosure.py",
