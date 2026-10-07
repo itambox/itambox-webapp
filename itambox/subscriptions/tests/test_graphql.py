@@ -140,8 +140,8 @@ class SubscriptionsGraphQLTestCase(TestCase):
         context = self.get_context(self.user, self.tenant)
         documents = (
             'mutation { createSubscription(name: "X") { subscription { id } } }',
-            f'mutation {{ suspendSubscription(id: {self.subscription.pk}) {{ subscription {{ id }} }} }}',
-            f'mutation {{ deleteSubscriptionAssignment(id: {self.assignment.pk}) {{ success }} }}',
+            f"mutation {{ suspendSubscription(id: {self.subscription.pk}) {{ subscription {{ id }} }} }}",
+            f"mutation {{ deleteSubscriptionAssignment(id: {self.assignment.pk}) {{ success }} }}",
             'mutation { createAccessory(name: "X") { accessory { id } } }',
             'mutation { createLicense(name: "X") { license { id } } }',
             'mutation { createSoftware(name: "X") { software { id } } }',
