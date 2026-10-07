@@ -24,6 +24,33 @@ class _Abort(Exception):
         self.result = result
 
 
+def _check_reorder(choice_set, choices, keys, expected_resource_revision, using):
+    """Return a rejection for stale revisions or non-permutations, else ``None``."""
+    if str(resource_revision_for_definition(choice_set, using=using)) != expected_resource_revision:
+        return reject_for(choice_set, issue("STALE_RESOURCE", message_key="specifications.stale_resource"))
+    if set(keys) != set(choices):
+        return reject_for(choice_set, issue("REFERENCE_CONFLICT", path=("keys",)))
+    return None
+
+
+def _apply_positions(actor, choices, keys, using):
+    """Move each choice to its new position; return the first rejection or ``None``."""
+    for position, key in enumerate(keys, start=1):
+        choice = choices[key]
+        if choice.position == position:
+            continue
+        result = update_custom_field_choice(
+            actor=actor,
+            choice_id=choice.pk,
+            expected_resource_revision=ResourceRevision(str(resource_revision_for_definition(choice, using=using))),
+            changes=CustomFieldChoiceUpdateInputDTO(position=position),
+            using=using,
+        )
+        if isinstance(result, DefinitionRejectedDTO):
+            return result
+    return None
+
+
 def reorder_custom_field_choices(
     *,
     actor: ActorContextDTO,
@@ -42,25 +69,11 @@ def reorder_custom_field_choices(
     try:
         with transaction.atomic(using=using):
             choices = {c.key: c for c in choice_set.choices.using(using).all()}
-            if str(resource_revision_for_definition(choice_set, using=using)) != expected_resource_revision:
-                raise _Abort(reject_for(choice_set, issue("STALE_RESOURCE", message_key="specifications.stale_resource")))
-            if set(keys) != set(choices):
-                raise _Abort(reject_for(choice_set, issue("REFERENCE_CONFLICT", path=("keys",))))
-            for position, key in enumerate(keys, start=1):
-                choice = choices[key]
-                if choice.position == position:
-                    continue
-                result = update_custom_field_choice(
-                    actor=actor,
-                    choice_id=choice.pk,
-                    expected_resource_revision=ResourceRevision(
-                        str(resource_revision_for_definition(choice, using=using))
-                    ),
-                    changes=CustomFieldChoiceUpdateInputDTO(position=position),
-                    using=using,
-                )
-                if isinstance(result, DefinitionRejectedDTO):
-                    raise _Abort(result)
+            rejected = _check_reorder(choice_set, choices, keys, expected_resource_revision, using)
+            if rejected is None:
+                rejected = _apply_positions(actor, choices, keys, using)
+            if rejected is not None:
+                raise _Abort(rejected)
             choice_set.refresh_from_db(using=using)
             result = update_custom_field_choice_set(
                 actor=actor,
