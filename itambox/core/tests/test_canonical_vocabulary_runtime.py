@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from assets.customfields import validate_asset_type_custom_field_data
 from assets.models import AssetType, Category, CategoryDefaultFieldset, Manufacturer
 from assets.services.specifications.core_vocabulary import get_core_vocabulary
 from core.management.commands.seed_data import Command as SeedDataCommand
+from extras.customfields import validate_custom_field_data_owner
 from extras.models import CustomField, CustomFieldChoiceSet, CustomFieldset, CustomFieldsetField
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -87,7 +87,7 @@ def test_seeded_asset_type_values_validate_against_deterministic_category_defaul
         assert set(asset_type.custom_field_data) <= active_keys, asset_type.slug
         assert "input_voltage" not in asset_type.custom_field_data, asset_type.slug
         assert asset_type.custom_field_data.get("storage_medium") != "nvme_ssd", asset_type.slug
-        validate_asset_type_custom_field_data(asset_type)
+        validate_custom_field_data_owner(asset_type)
 
 
 def test_runtime_seed_refuses_local_fieldset_membership_collision():

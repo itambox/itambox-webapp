@@ -222,7 +222,6 @@ def _persist_replacement(
                 )
             update_fields: list[str] = []
             if values_changed:
-                owner.custom_field_data = proposed_values
                 update_fields.append("custom_field_data")
             update_fields.append("updated_at")
             save_owner_in_savepoint(
@@ -230,6 +229,7 @@ def _persist_replacement(
                 actor,
                 using=_DEFAULT_DB,
                 update_fields=update_fields,
+                custom_field_data=proposed_values if values_changed else None,
             )
     except (ValidationError, IntegrityError):
         return rejected(

@@ -13,6 +13,8 @@ from django.utils.translation import gettext_lazy as _
 from core.mixins import suppress_custom_field_data_validation
 from extras.definition_contract import validate_custom_field_regex
 from extras.models import CustomField
+from extras.services.custom_field_data import write_custom_field_data
+from itambox.registry import registry
 
 JCS_INTEGER_MIN = -9007199254740991
 JCS_INTEGER_MAX = 9007199254740991
@@ -372,8 +374,13 @@ def custom_fields_for_model(model, include_inactive=False):
     return queryset
 
 
-def validate_generic_custom_field_data(instance):
-    definitions = custom_fields_for_model(type(instance), include_inactive=True)
+def validate_custom_field_data_owner(instance):
+    """Validate one owner's stored values through the common definition/value path."""
+    provider = registry.get_custom_field_data_definition_provider(type(instance))
+    if provider is None:
+        definitions = custom_fields_for_model(type(instance), include_inactive=True)
+    else:
+        definitions = provider(instance)
     validate_custom_field_data_values(definitions, instance.custom_field_data or {})
 
 
@@ -506,13 +513,15 @@ class CustomFieldModelFormMixin:
                 continue
             submitted[definition.name] = value
         if self.custom_field_definitions:
-            instance.custom_field_data = apply_custom_field_patch(
+            proposed = apply_custom_field_patch(
                 getattr(instance, "custom_field_data", None) or {},
                 self.custom_field_definitions.values(),
                 submitted,
                 clear_keys=clear_keys,
             )
+            write_custom_field_data(instance, proposed, commit=commit)
         if commit:
-            instance.save()
+            if not self.custom_field_definitions:
+                instance.save()
             self.save_m2m()
         return instance
