@@ -129,10 +129,6 @@ class LabelInputSerializer(StrictInputSerializer):
     label = serializers.CharField(allow_blank=True)
 
 
-class EmptyInputSerializer(StrictInputSerializer):
-    pass
-
-
 class ReorderInputSerializer(StrictInputSerializer):
     keys = serializers.ListField(child=serializers.CharField(), allow_empty=True)
 
@@ -232,10 +228,9 @@ class CustomFieldChoiceSetViewSet(_RevisionETagMixin, ITAMBoxReadOnlyModelViewSe
             return error_response((issue("INVALID_TYPE"),))
         return _command_error(result) or self._present(choice_set.pk)
 
-    @extend_schema(request=EmptyInputSerializer, responses={200: ChoiceSetReadSerializer})
-    @action(detail=True, methods=["post"], url_path="deprecate", serializer_class=EmptyInputSerializer)
+    @extend_schema(request=None, responses={200: ChoiceSetReadSerializer})
+    @action(detail=True, methods=["post"], url_path="deprecate")
     def deprecate(self, request, pk=None):
-        EmptyInputSerializer(data=request.data).is_valid(raise_exception=True)
         revision, missing = _revision_or_response(request)
         if missing is not None:
             return missing
@@ -327,10 +322,9 @@ class CustomFieldChoiceViewSet(_RevisionETagMixin, ITAMBoxReadOnlyModelViewSet):
             return error_response((issue("INVALID_TYPE"),))
         return _command_error(result) or self._present(choice.pk)
 
-    @extend_schema(request=EmptyInputSerializer, responses={200: ChoiceReadSerializer})
-    @action(detail=True, methods=["post"], url_path="deprecate", serializer_class=EmptyInputSerializer)
+    @extend_schema(request=None, responses={200: ChoiceReadSerializer})
+    @action(detail=True, methods=["post"], url_path="deprecate")
     def deprecate(self, request, pk=None):
-        EmptyInputSerializer(data=request.data).is_valid(raise_exception=True)
         revision, missing = _revision_or_response(request)
         if missing is not None:
             return missing

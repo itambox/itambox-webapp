@@ -33,19 +33,36 @@ def _check_reorder(choice_set, choices, keys, expected_resource_revision, using)
     return None
 
 
+def _set_position(actor, choice, position, using):
+    """Persist one new position through the definition command."""
+    return update_custom_field_choice(
+        actor=actor,
+        choice_id=choice.pk,
+        expected_resource_revision=ResourceRevision(str(resource_revision_for_definition(choice, using=using))),
+        changes=CustomFieldChoiceUpdateInputDTO(position=position),
+        using=using,
+    )
+
+
 def _apply_positions(actor, choices, keys, using):
-    """Move each choice to its new position; return the first rejection or ``None``."""
-    for position, key in enumerate(keys, start=1):
-        choice = choices[key]
-        if choice.position == position:
-            continue
-        result = update_custom_field_choice(
-            actor=actor,
-            choice_id=choice.pk,
-            expected_resource_revision=ResourceRevision(str(resource_revision_for_definition(choice, using=using))),
-            changes=CustomFieldChoiceUpdateInputDTO(position=position),
-            using=using,
-        )
+    """Move each choice to its new position; return the first rejection or ``None``.
+
+    ``CustomFieldChoice`` carries a unique ``(choice_set, position)`` constraint
+    that the definition command validates immediately, so writing a new position
+    straight onto a taken slot is rejected as a transient collision. Movers are
+    parked above every current position first; the final pass then only writes
+    into slots that are free (either vacated by a mover or already correct).
+    """
+    movers = [(position, choices[key]) for position, key in enumerate(keys, start=1) if choices[key].position != position]
+    if not movers:
+        return None
+    park_base = max([choice.position for choice in choices.values()] + [len(keys)]) + 1
+    for index, (_, choice) in enumerate(movers, start=1):
+        result = _set_position(actor, choice, park_base + index, using)
+        if isinstance(result, DefinitionRejectedDTO):
+            return result
+    for position, choice in movers:
+        result = _set_position(actor, choice, position, using)
         if isinstance(result, DefinitionRejectedDTO):
             return result
     return None

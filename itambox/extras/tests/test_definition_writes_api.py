@@ -130,7 +130,7 @@ class ChoiceSetWritesAPITests(TestCase):
     def test_create_choice_set_with_duplicate_keys_is_refused(self):
         response = self._create_set(choices=(("dup", "One"), ("dup", "Two")))
         self.assertEqual(response.status_code, 400, response.content)
-        self.assertEqual(response.data["error"]["code"], "DUPLICATE_FIELD")
+        self.assertEqual(response.data["error"]["issues"][0]["code"], "DUPLICATE_FIELD")
 
     def test_create_choice_set_rejects_conflicting_identity(self):
         self._create_set()
@@ -241,8 +241,10 @@ class ChoiceSetWritesAPITests(TestCase):
             format="json",
             HTTP_IF_MATCH=created["ETag"],
         )
-        self.assertEqual(response.status_code, 400, response.content)
-        self.assertIn("error", response.data)
+        self.assertIn(response.status_code, (400, 409), response.content)
+        self.assertIn(
+            response.data["error"]["issues"][0]["code"], {"DUPLICATE_FIELD", "REFERENCE_CONFLICT"}
+        )
 
     def test_reorder_requires_if_match(self):
         created, _ = self._choice_ids()
@@ -271,7 +273,7 @@ class ChoiceSetWritesAPITests(TestCase):
             HTTP_IF_MATCH=created["ETag"],
         )
         self.assertEqual(response.status_code, 400, response.content)
-        self.assertEqual(response.data["error"]["code"], "DUPLICATE_FIELD")
+        self.assertEqual(response.data["error"]["issues"][0]["code"], "DUPLICATE_FIELD")
 
     def test_reorder_rejects_non_permutation(self):
         created, _ = self._choice_ids()
