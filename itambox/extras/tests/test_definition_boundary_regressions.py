@@ -6,7 +6,9 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 
+from core.context import set_current_tenant
 from core.models import ObjectChange
+from core.tests.mixins import grant
 from extras.models import CustomField, CustomFieldChoice, CustomFieldChoiceSet, CustomFieldset
 from extras.services import definition_commands as commands
 from extras.services._definition_command_support import resource_revision_for_definition
@@ -20,6 +22,7 @@ from extras.services.definition_command_contracts import (
     CustomFieldsetUpdateInputDTO,
     CustomFieldUpdateInputDTO,
 )
+from organization.models import Role, Tenant
 from organization.services.access_scope import ActorContextDTO, authentication_revision_for_actor
 
 
@@ -50,7 +53,23 @@ def test_mapping_input_is_recursively_detached_and_immutable(updating):
 @pytest.fixture
 def definition_objects(db):
     user = get_user_model().objects.create_user(username="definition-boundary-editor")
-    user.user_permissions.add(*Permission.objects.filter(content_type__app_label="extras"))
+    provider = Tenant.objects.create(
+        name="Definition Boundary Provider",
+        slug="definition-boundary-provider",
+        is_provider=True,
+    )
+    role = Role.objects.create(
+        tenant=provider,
+        name="Definition Boundary Editor",
+        permissions=[
+            f"{app_label}.{codename}"
+            for app_label, codename in Permission.objects.filter(content_type__app_label="extras").values_list(
+                "content_type__app_label", "codename"
+            )
+        ],
+    )
+    grant(user, provider, role)
+    set_current_tenant(provider)
     actor = ActorContextDTO(actor_id=user.pk, authentication_revision=authentication_revision_for_actor(user))
     field = commands.create_custom_field(actor=actor, definition=_field_input())
     fieldset = commands.create_custom_fieldset(
@@ -69,7 +88,8 @@ def definition_objects(db):
     )
     results = {"field": field, "fieldset": fieldset, "choice_set": choice_set, "choice": choice}
     assert all(result.outcome == "created" for result in results.values())
-    return user, actor, results
+    yield user, role, actor, results
+    set_current_tenant(None)
 
 
 _FAMILIES = {
@@ -88,13 +108,14 @@ _FAMILIES = {
 @pytest.mark.parametrize("kind", tuple(_FAMILIES))
 @pytest.mark.parametrize("operation", ["update", "deprecate"])
 def test_denied_existing_and_missing_definition_are_indistinguishable(definition_objects, kind, operation):
-    user, actor, objects = definition_objects
+    user, role, actor, objects = definition_objects
     model, suffix, id_name, changes_type = _FAMILIES[kind]
     created = objects[kind]
     row = model.objects.get(pk=created.definition_id)
     before_timestamp = row.updated_at
     before_changes = ObjectChange._base_manager.count()
-    user.user_permissions.clear()
+    role.permissions = []
+    role.save(update_fields=["permissions"])
     command = getattr(commands, f"{operation}_{suffix}")
     kwargs = {"actor": actor, id_name: row.pk, "expected_resource_revision": created.resource_revision}
     if operation == "update":
@@ -115,7 +136,7 @@ def test_denied_existing_and_missing_definition_are_indistinguishable(definition
 
 @pytest.mark.parametrize("kind", tuple(_FAMILIES))
 def test_authorized_update_has_a_positive_path_and_true_no_op(definition_objects, kind):
-    _user, actor, objects = definition_objects
+    _user, _role, actor, objects = definition_objects
     model, suffix, id_name, changes_type = _FAMILIES[kind]
     created = objects[kind]
     command = getattr(commands, f"update_{suffix}")
@@ -140,7 +161,7 @@ def test_authorized_update_has_a_positive_path_and_true_no_op(definition_objects
 
 
 def test_fieldset_retirement_has_a_positive_path(definition_objects):
-    _user, actor, objects = definition_objects
+    _user, _role, actor, objects = definition_objects
     created = objects["fieldset"]
     retired = commands.deprecate_custom_fieldset(
         actor=actor, fieldset_id=created.definition_id, expected_resource_revision=created.resource_revision
@@ -150,7 +171,7 @@ def test_fieldset_retirement_has_a_positive_path(definition_objects):
 
 
 def test_mapping_storage_preserves_json_types_and_input_snapshot(definition_objects):
-    _user, actor, objects = definition_objects
+    _user, _role, actor, objects = definition_objects
     created = objects["field"]
     original = {"values": [True]}
     change = CustomFieldUpdateInputDTO(mappings=(original,))

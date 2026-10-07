@@ -3,11 +3,17 @@ from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.test import SimpleTestCase, TestCase
 
+from core.context import (
+    set_current_all_accessible,
+    set_current_membership,
+    set_current_tenant,
+    set_current_tenant_group,
+)
+from core.tests.mixins import grant
 from extras.services._definition_command_support import (
     DefinitionCommandError,
     _canonical,
@@ -15,7 +21,6 @@ from extras.services._definition_command_support import (
     close_integrity_error,
     close_validation_error,
     ensure_actor,
-    has_global_model_permission,
     identity_for,
     issue,
     lock_choice_dependencies,
@@ -63,26 +68,52 @@ from extras.services.definition_commands import (
     update_custom_field_choice_set,
     update_custom_fieldset,
 )
+from organization.models import Role, Tenant
 from organization.services.access_scope import ActorContextDTO, authentication_revision_for_actor
+from organization.services.catalogue_authorization import has_provider_catalogue_permission
+
+_DEFINITION_PERMISSIONS = (
+    "extras.add_customfield",
+    "extras.change_customfield",
+    "extras.add_customfieldset",
+    "extras.change_customfieldset",
+    "extras.add_customfieldchoiceset",
+    "extras.change_customfieldchoiceset",
+    "extras.add_customfieldchoice",
+    "extras.change_customfieldchoice",
+)
+
+
+def _provider_definition_authority(user):
+    provider = Tenant.objects.create(
+        name=f"{user.username} Provider",
+        slug=f"{user.username}-provider",
+        is_provider=True,
+    )
+    role = Role.objects.create(
+        tenant=provider,
+        name=f"{user.username} Definition Manager",
+        permissions=list(_DEFINITION_PERMISSIONS),
+    )
+    grant(user, provider, role)
+    set_current_tenant(provider)
+    set_current_membership(None)
+    set_current_tenant_group(None)
+    set_current_all_accessible(False)
+    return provider, role
 
 
 class FieldDefinitionCommandTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username="definition-admin", password="test-password")
-        permissions = Permission.objects.filter(
-            content_type__app_label="extras",
-            codename__in={
-                "add_customfield",
-                "change_customfield",
-                "add_customfieldset",
-                "change_customfieldset",
-                "add_customfieldchoiceset",
-                "change_customfieldchoiceset",
-                "add_customfieldchoice",
-                "change_customfieldchoice",
-            },
-        )
-        self.user.user_permissions.add(*permissions)
+        self.provider, self.role = _provider_definition_authority(self.user)
+
+    def tearDown(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+        set_current_tenant_group(None)
+        set_current_all_accessible(False)
+        super().tearDown()
 
     def actor(self):
         self.user.refresh_from_db()
@@ -128,7 +159,8 @@ class FieldDefinitionCommandTests(TestCase):
     def test_staff_or_tenant_local_authority_without_global_model_permission_is_denied(self):
         from extras.models import CustomField
 
-        self.user.user_permissions.clear()
+        self.role.permissions = []
+        self.role.save(update_fields=["permissions"])
         self.user.is_staff = True
         self.user.save(update_fields=["is_staff"])
 
@@ -483,21 +515,14 @@ class DefinitionLifecycleCommandTests(TestCase):
 
     def setUp(self):
         self.user = get_user_model().objects.create_user(username="definition-command-admin", password="test-password")
-        self.user.user_permissions.add(
-            *Permission.objects.filter(
-                content_type__app_label="extras",
-                codename__in={
-                    "add_customfield",
-                    "change_customfield",
-                    "add_customfieldset",
-                    "change_customfieldset",
-                    "add_customfieldchoiceset",
-                    "change_customfieldchoiceset",
-                    "add_customfieldchoice",
-                    "change_customfieldchoice",
-                },
-            )
-        )
+        self.provider, self.role = _provider_definition_authority(self.user)
+
+    def tearDown(self):
+        set_current_tenant(None)
+        set_current_membership(None)
+        set_current_tenant_group(None)
+        set_current_all_accessible(False)
+        super().tearDown()
 
     def actor(self):
         self.user.refresh_from_db()
@@ -1252,6 +1277,6 @@ class DefinitionLifecycleCommandTests(TestCase):
         self.assertIsNone(reload_actor(replace(actor, authentication_revision="stale-revision")))
         principal = reload_actor(actor)
         self.assertEqual(principal.pk, self.user.pk)
-        self.assertTrue(has_global_model_permission(principal, CustomField, "change_customfield", using="default"))
-        self.assertFalse(has_global_model_permission(principal, CustomField, "delete_customfield", using="default"))
-        self.assertFalse(has_global_model_permission(principal, CustomField, "frobnicate_customfield", using="default"))
+        self.assertTrue(has_provider_catalogue_permission(principal, "extras.change_customfield"))
+        self.assertFalse(has_provider_catalogue_permission(principal, "extras.delete_customfield"))
+        self.assertFalse(has_provider_catalogue_permission(principal, "extras.frobnicate_customfield"))

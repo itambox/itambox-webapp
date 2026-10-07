@@ -12,9 +12,17 @@ from django.test import TestCase
 from django.urls import reverse
 
 from assets.api.tests.test_type_library_http import _snapshot_rows
-from assets.models import AssetType, Manufacturer
+from assets.models import AssetType, Category, Manufacturer
 from assets.tests.test_type_library_validation import _release_document
-from extras.models import CustomField, SpecificationLibrary
+from core.tests.mixins import TenantTestMixin
+from extras.models import (
+    CustomField,
+    CustomFieldChoice,
+    CustomFieldChoiceSet,
+    CustomFieldset,
+    SpecificationLibrary,
+)
+from organization.models import Role, Tenant
 
 
 class T22LibraryBrowserWorkflowTests(TestCase):
@@ -258,3 +266,130 @@ class T22LibraryBrowserWorkflowTests(TestCase):
         self.client.force_login(actor)
         response = self.client.get(reverse("assets:type_library_detail", kwargs={"pk": 999999}))
         self.assertEqual(response.status_code, 403)
+
+
+class T22ProviderScopedLibraryRouteTests(TenantTestMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.setup_tenant_context(name="T22 provider", slug="t22-provider")
+        self.tenant.is_provider = True
+        self.tenant.save(update_fields=["is_provider"])
+        self.tenant_role.permissions = self._provider_permissions()
+        self.tenant_role.save(update_fields=["permissions"])
+        self.client_login_to_tenant(self.tenant_user, self.tenant)
+        self.addCleanup(self.clear_tenant_context)
+
+    @staticmethod
+    def _provider_permissions() -> list[str]:
+        models = (
+            CustomField,
+            CustomFieldChoiceSet,
+            CustomFieldChoice,
+            CustomFieldset,
+            AssetType,
+            Category,
+            Manufacturer,
+        )
+        permissions = {"extras.manage_specification_library", "extras.view_specificationlibrary"}
+        permissions.update(
+            f"{model._meta.app_label}.{action}_{model._meta.model_name}"
+            for model in models
+            for action in ("add", "change", "view")
+        )
+        return sorted(permissions)
+
+    @staticmethod
+    def _document(release: int = 1) -> dict[str, object]:
+        document = copy.deepcopy(_release_document())
+        document["library"]["release"] = release  # type: ignore[index]
+        return document
+
+    def _upload(self, document: dict[str, object]):
+        return self.client.post(
+            reverse("assets:type_library_import"),
+            {
+                "document": SimpleUploadedFile(
+                    "library.json",
+                    json.dumps(document, ensure_ascii=False).encode("utf-8"),
+                    content_type="application/json",
+                )
+            },
+        )
+
+    def _apply_preview(self, response):
+        form = response.context["apply_form"]
+        data = {field.name: field.value() for field in form.hidden_fields()}
+        for name, field in form.fields.items():
+            if name.startswith("resolution_"):
+                data[name] = field.initial or "abort"
+        data["action"] = "apply"
+        return self.client.post(reverse("assets:type_library_import"), data)
+
+    def test_provider_role_can_preview_apply_list_detail_and_export(self):
+        preview = self._upload(self._document())
+        self.assertEqual(preview.status_code, 200)
+        self.assertFalse(SpecificationLibrary.objects.exists())
+
+        applied = self._apply_preview(preview)
+        self.assertEqual(applied.status_code, 200)
+        self.assertContains(applied, "The Library was applied successfully.")
+        library = SpecificationLibrary.objects.get(namespace="acme")
+
+        listing = self.client.get(reverse("assets:type_library_list"))
+        self.assertEqual(listing.status_code, 200)
+        self.assertContains(listing, "acme")
+        detail = self.client.get(reverse("assets:type_library_detail", kwargs={"pk": library.pk}))
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, "Immutable release history")
+        exported = self.client.post(
+            reverse("assets:type_library_export", kwargs={"pk": library.pk}),
+            {"mode": "original_release"},
+        )
+        self.assertEqual(exported.status_code, 200)
+        self.assertEqual(json.loads(exported.content)["kind"], "itambox.type-library.release")
+
+    def test_provider_without_grant_cannot_access_library_routes(self):
+        library = SpecificationLibrary.objects.create(namespace="global", label="Global library")
+        actor = get_user_model().objects.create_user(username="t22-provider-no-grant", password="unused")
+        self.client_login_to_tenant(actor, self.tenant)
+
+        self.assertEqual(self.client.get(reverse("assets:type_library_list")).status_code, 403)
+        self.assertEqual(
+            self.client.get(reverse("assets:type_library_detail", kwargs={"pk": library.pk})).status_code,
+            403,
+        )
+        self.assertEqual(self._upload(self._document()).status_code, 403)
+        self.assertEqual(
+            self.client.post(
+                reverse("assets:type_library_export", kwargs={"pk": library.pk}),
+                {"mode": "original_release"},
+            ).status_code,
+            403,
+        )
+
+    def test_customer_tenant_grant_cannot_authorize_global_library_routes(self):
+        library = SpecificationLibrary.objects.create(namespace="global", label="Global library")
+        customer = Tenant.objects.create(name="T22 customer", slug="t22-customer")
+        actor = get_user_model().objects.create_user(username="t22-customer-grant", password="unused")
+        role = Role.objects.create(
+            tenant=customer,
+            name="Customer library role",
+            permissions=["extras.manage_specification_library", "extras.view_specificationlibrary"],
+        )
+        membership = self.grant(actor, customer, role).membership
+        self.client_login_to_tenant(actor, customer)
+        self.set_active_tenant(customer, membership)
+
+        self.assertEqual(self.client.get(reverse("assets:type_library_list")).status_code, 403)
+        self.assertEqual(
+            self.client.get(reverse("assets:type_library_detail", kwargs={"pk": library.pk})).status_code,
+            403,
+        )
+        self.assertEqual(self._upload(self._document()).status_code, 403)
+        self.assertEqual(
+            self.client.post(
+                reverse("assets:type_library_export", kwargs={"pk": library.pk}),
+                {"mode": "original_release"},
+            ).status_code,
+            403,
+        )

@@ -54,7 +54,9 @@ from assets.services.specifications.commands import (
     apply_category_defaults,
     cleanup_asset_history,
     cleanup_asset_type_history,
+    preview_apply_category_defaults,
     preview_asset_history_cleanup,
+    preview_asset_type_create,
     preview_asset_type_history_cleanup,
     set_asset_type_composition,
     set_category_defaults,
@@ -81,6 +83,7 @@ from .serializers import (
     AssetRoleSerializer,
     AssetSerializer,
     AssetTagSequenceSerializer,
+    AssetTypeCreatePreviewSerializer,
     AssetTypeSerializer,
     CategorySerializer,
     DepreciationSerializer,
@@ -91,6 +94,8 @@ from .serializers import (
 )
 from .specification_api import (
     ApplyCategoryDefaultsInputSerializer,
+    ApplyCategoryDefaultsPreviewInputSerializer,
+    AssetTypePreviewResponseSerializer,
     CategoryDefaultFieldsetsInputSerializer,
     CompositionInputSerializer,
     HistoryCleanupInputSerializer,
@@ -100,6 +105,7 @@ from .specification_api import (
     category_default_payload,
     command_result_response,
     composition_preview_payload,
+    create_fieldset_selection_from_values,
     create_missing_precondition_paths,
     definition_for_owner,
     error_response,
@@ -452,6 +458,32 @@ class AssetTypeViewSet(SpecificationCommandUpdateMixin, ITAMBoxModelViewSet):
             return missing_precondition_response(*paths)
         return super().create(request, *args, **kwargs)
 
+    @extend_schema(
+        request=AssetTypeCreatePreviewSerializer,
+        responses={status.HTTP_200_OK: AssetTypePreviewResponseSerializer},
+    )
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="create-preview",
+        serializer_class=AssetTypeCreatePreviewSerializer,
+    )
+    def create_preview(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        fieldsets = create_fieldset_selection_from_values(
+            data.get("fieldsets"),
+            omitted="fieldsets" not in data,
+        )
+        result = preview_asset_type_create(
+            actor=actor_context_for_user(request.user),
+            native=serializer._native_input(data),
+            fieldsets=fieldsets,
+            patch=patch_from_validated(data.get("specification_patch")),
+        )
+        return preview_result_response(result)
+
     @action(detail=True, methods=["get"], url_path="specification-definition")
     def specification_definition(self, request, pk=None):
         target = request.query_params.get("target")
@@ -583,6 +615,31 @@ class AssetTypeViewSet(SpecificationCommandUpdateMixin, ITAMBoxModelViewSet):
         if hasattr(result, "resource_revision"):
             response["ETag"] = etag_for_revision(result.resource_revision)
         return response
+
+    @extend_schema(
+        request=ApplyCategoryDefaultsPreviewInputSerializer,
+        responses={status.HTTP_200_OK: AssetTypePreviewResponseSerializer},
+    )
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="apply-category-defaults-preview",
+        serializer_class=ApplyCategoryDefaultsPreviewInputSerializer,
+    )
+    def apply_category_defaults_preview(self, request, pk=None):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        resource_revision = if_match_revision(request)
+        if resource_revision is None:
+            return missing_precondition_response(("If-Match",))
+        owner = self.get_object()
+        result = preview_apply_category_defaults(
+            actor=actor_context_for_user(request.user),
+            asset_type_id=owner.pk,
+            expected_resource_revision=ResourceRevision(resource_revision),
+            patch=patch_from_validated(serializer.validated_data.get("specification_patch")),
+        )
+        return preview_result_response(result)
 
     @action(
         detail=True,

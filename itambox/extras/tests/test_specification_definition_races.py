@@ -9,7 +9,6 @@ from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.db import close_old_connections, connection, connections
 
@@ -18,17 +17,20 @@ from assets.services.specifications._command_support import load_effective_defin
 from assets.services.specifications.commands import update_asset_type_specifications
 from assets.services.specifications.contracts import OwnerChangedDTO, SpecificationPatchDTO
 from assets.services.specifications.locking import SPECIFICATION_CATALOGUE_LOCK_KEY, catalogue_transaction_lock
+from core.context import set_current_tenant
+from core.tests.mixins import grant
 from extras.models import CustomField, CustomFieldset, CustomFieldsetField
 from extras.services._definition_command_support import resource_revision_for_definition
 from extras.services.definition_command_contracts import CustomFieldUpdateInputDTO
 from extras.services.definition_commands import update_custom_field
+from organization.models import Role, Tenant
 from organization.services.access_scope import ActorContextDTO, authentication_revision_for_actor
 
 User = get_user_model()
 pytestmark = [pytest.mark.serial_only, pytest.mark.django_db(transaction=True)]
 
 
-def _start_worker(target):
+def _start_worker(target, provider_id):
     arrived = queue.Queue()
     results = []
     errors = []
@@ -36,6 +38,7 @@ def _start_worker(target):
     def worker():
         close_old_connections()
         try:
+            set_current_tenant(Tenant._base_manager.get(pk=provider_id))
             with connection.cursor() as cursor:
                 cursor.execute("SELECT pg_backend_pid()")
                 arrived.put(cursor.fetchone()[0])
@@ -43,6 +46,7 @@ def _start_worker(target):
         except Exception as error:
             errors.append(error)
         finally:
+            set_current_tenant(None)
             connections["default"].close()
 
     thread = threading.Thread(target=worker)
@@ -105,16 +109,13 @@ def _assert_shared_lock_waiting(pid, blocker_pid):
 def definition_race_kit():
     assert connection.vendor == "postgresql"
     user = User.objects.create_user(username="definition-race-editor")
-    user.user_permissions.add(
-        Permission.objects.get(
-            content_type=ContentType.objects.get_for_model(CustomField),
-            codename="change_customfield",
-        ),
-        Permission.objects.get(
-            content_type=ContentType.objects.get_for_model(AssetType),
-            codename="change_assettype",
-        ),
+    provider = Tenant.objects.create(name="Definition Race Provider", slug="definition-race-provider", is_provider=True)
+    role = Role.objects.create(
+        tenant=provider,
+        name="Definition Race Editor",
+        permissions=["extras.change_customfield", "assets.change_assettype"],
     )
+    grant(user, provider, role)
     manufacturer = Manufacturer.objects.create(name="Definition race maker", slug="definition-race-maker")
     asset_type = AssetType.objects.create(
         manufacturer=manufacturer,
@@ -142,11 +143,13 @@ def definition_race_kit():
         actor_id=user.pk,
         authentication_revision=authentication_revision_for_actor(user),
     )
-    return asset_type, field, actor
+    set_current_tenant(provider)
+    yield asset_type, field, actor, provider.pk
+    set_current_tenant(None)
 
 
 def test_exclusive_definition_and_shared_value_commands_observe_catalogue_contention(definition_race_kit):
-    asset_type, field, actor = definition_race_kit
+    asset_type, field, actor, provider_id = definition_race_kit
     owner = AssetType.all_objects.get(pk=asset_type.pk)
     definition, _definitions = load_effective_definition(
         owner.pk,
@@ -178,7 +181,8 @@ def test_exclusive_definition_and_shared_value_commands_observe_catalogue_conten
                     field_id=field.pk,
                     expected_resource_revision=field_revision,
                     changes=CustomFieldUpdateInputDTO(),
-                )
+                ),
+                provider_id,
             )
             assert exclusive_ready.wait(10), "definition command did not acquire the exclusive catalogue lock"
             value_started = _start_worker(
@@ -191,7 +195,8 @@ def test_exclusive_definition_and_shared_value_commands_observe_catalogue_conten
                         set_values={"definition_race_value": "serialized"},
                         clear_keys=(),
                     ),
-                )
+                ),
+                provider_id,
             )
             assert definition_started[1] != value_started[1]
             _assert_shared_lock_waiting(value_started[1], definition_started[1])

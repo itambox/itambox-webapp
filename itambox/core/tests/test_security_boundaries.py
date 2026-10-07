@@ -91,31 +91,6 @@ class SecurityBoundariesTestCase(TestCase):
         data = response.json()
         self.assertIsNone(data["data"]["asset"])
 
-    def test_graphql_cross_tenant_mutation_denied(self):
-        self.client.force_login(self.user_a)
-        session = self.client.session
-        session["active_tenant_id"] = self.tenant_a.pk
-        session.save()
-
-        # Try mutating Tenant B's asset
-        query = f"""
-        mutation {{
-            updateAsset(id: "{self.asset_b.pk}", name: "Hacked Name") {{
-                asset {{
-                    id
-                    name
-                }}
-            }}
-        }}
-        """
-        response = self.client.post(
-            reverse("graphql"), data=json.dumps({"query": query}), content_type="application/json"
-        )
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertIsNotNone(data.get("errors"))
-        self.assertIn("Permission denied", data["errors"][0]["message"])
-
     def test_rest_api_cross_tenant_mutation_denied(self):
         self.client.force_login(self.user_a)
         session = self.client.session

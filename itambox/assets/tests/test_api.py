@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
@@ -6,7 +8,7 @@ from rest_framework.test import APITestCase
 from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel, Supplier, Warranty
 from core.tests.mixins import grant
 from licenses.models import License, LicenseSeatAssignment
-from organization.models import AssetHolder, Location, Membership, Role, Site, Tenant, TenantGroup
+from organization.models import AssetHolder, Location, Role, Site, Tenant, TenantGroup
 from software.models import Software
 from users.models import Token
 
@@ -128,6 +130,35 @@ class ITAMBoxAPITestCase(APITestCase):
         # Verify asset is checked in
         self.asset_a.refresh_from_db()
         self.assertIsNone(self.asset_a.active_assignment)
+
+    def test_asset_money_api_accepts_decimal_string_and_number_without_precision_loss(self):
+        self.client.force_authenticate(user=self.superuser)
+        asset_url = reverse("api:assets_api:asset-detail", kwargs={"pk": self.asset_a.pk})
+        for field in ("purchase_cost", "salvage_value"):
+            for value in ("19.99", 19.99):
+                with self.subTest(field=field, value=value):
+                    current = self.client.get(asset_url)
+                    response = self.client.patch(
+                        asset_url,
+                        {field: value},
+                        format="json",
+                        HTTP_IF_MATCH=current["ETag"],
+                    )
+                    self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+                    self.asset_a.refresh_from_db()
+                    self.assertEqual(getattr(self.asset_a, field), Decimal("19.99"))
+
+            current = self.client.get(asset_url)
+            invalid = self.client.patch(
+                asset_url,
+                {field: "19.999"},
+                format="json",
+                HTTP_IF_MATCH=current["ETag"],
+            )
+            self.assertEqual(invalid.status_code, status.HTTP_400_BAD_REQUEST, invalid.data)
+            self.assertIn(field, invalid.data)
+            self.asset_a.refresh_from_db()
+            self.assertEqual(getattr(self.asset_a, field), Decimal("19.99"))
 
     def test_checkout_requires_change_not_add_perm(self):
         """WS1-6: checkout is a state change -> requires assets.change_asset, not the

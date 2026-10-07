@@ -6,7 +6,6 @@ from datetime import timedelta
 from unittest import TestCase
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase as DjangoTestCase
 from django.utils import timezone
@@ -27,6 +26,7 @@ from assets.services.specifications.contracts import (
     OwnerChangedDTO,
     OwnerNoOpDTO,
 )
+from core.context import set_current_tenant
 from core.models import ObjectChange
 from extras.models import CustomField, CustomFieldset, CustomFieldsetField
 from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant
@@ -59,18 +59,18 @@ class HistorySupportUnitTests(TestCase):
 
 class SpecificationHistoryCommandTests(DjangoTestCase):
     def setUp(self):
-        self.tenant = Tenant.objects.create(name="History tenant", slug="history-tenant")
+        self.tenant = Tenant.objects.create(name="History tenant", slug="history-tenant", is_provider=True)
         self.other_tenant = Tenant.objects.create(name="Other history tenant", slug="other-history-tenant")
         self.user = User.objects.create_user(username="history-editor")
         membership = Membership.objects.create(user=self.user, tenant=self.tenant)
-        role = Role.objects.create(
+        self.role = Role.objects.create(
             tenant=self.tenant,
             name="History editor",
-            permissions=["assets.change_asset"],
+            permissions=["assets.change_asset", "assets.change_assettype"],
         )
         self.grant = RoleGrant.objects.create(
             membership=membership,
-            role=role,
+            role=self.role,
             reason="T10 history test authorization",
             valid_until=timezone.now() + timedelta(days=1),
         )
@@ -119,12 +119,11 @@ class SpecificationHistoryCommandTests(DjangoTestCase):
             asset_type=self.asset_type,
         )
         Asset._base_manager.filter(pk=self.other_asset.pk).update(custom_field_data={"asset_ghost": "secret"})
-        self.user.user_permissions.add(
-            Permission.objects.get(
-                content_type=ContentType.objects.get_for_model(AssetType),
-                codename="change_assettype",
-            )
-        )
+        set_current_tenant(self.tenant)
+
+    def tearDown(self):
+        set_current_tenant(None)
+        super().tearDown()
 
     def _actor(self):
         return ActorContextDTO(

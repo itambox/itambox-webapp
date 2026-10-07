@@ -596,14 +596,6 @@
       "count": 1
     },
     {
-      "path": "itambox/assets/tests/test_api.py",
-      "code": "F401",
-      "message": "'organization.models.Membership' imported but unused",
-      "source": "from organization.models import AssetHolder, Location, Membership, Role, Site, Tenant, TenantGroup",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/assets/tests/test_audit_cadence.py",
       "code": "F401",
       "message": "'django.test.RequestFactory' imported but unused",
@@ -649,110 +641,6 @@
       "message": "module level import not at top of file",
       "source": "from assets.forms.assettype_form import AssetTypeForm",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_graphql.py",
-      "code": "B907",
-      "message": "'self.asset_a.id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "mutation_delete = f'''\n        mutation {{\n            deleteAsset(id: \"{self.asset_a.id}\") {{\n                success\n            }}\n        }}\n        '''",
-      "context": "Module:body/ClassDef:GraphQLTestCase:body/FunctionDef:test_crud_asset_update_delete:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_graphql.py",
-      "code": "B907",
-      "message": "'self.asset_a.id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "mutation_update = f'''\n        mutation {{\n            updateAsset(\n                id: \"{self.asset_a.id}\",\n                name: \"Updated Asset A\"\n            ) {{\n                asset {{\n                    name\n                }}\n            }}\n        }}\n        '''",
-      "context": "Module:body/ClassDef:GraphQLTestCase:body/FunctionDef:test_crud_asset_update_delete:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_graphql.py",
-      "code": "B907",
-      "message": "'self.asset_type.id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "mutation = f'''\n        mutation {{\n            createAsset(\n                name: \"Illegal Asset A\",\n                assetTag: \"TAG-ILLEGAL-A\",\n                assetTypeId: \"{self.asset_type.id}\",\n                statusId: \"{self.status.id}\",\n                locationId: \"{self.location_b.id}\"\n            ) {{\n                asset {{\n                    name\n                }}\n            }}\n        }}\n        '''",
-      "context": "Module:body/ClassDef:GraphQLTestCase:body/FunctionDef:test_mutations_cross_tenant_foreign_key_fails:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_graphql.py",
-      "code": "B907",
-      "message": "'self.asset_type.id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "mutation = f'''\n        mutation {{\n            createAsset(\n                name: \"New Asset A\",\n                assetTag: \"TAG-NEW-A\",\n                assetTypeId: \"{self.asset_type.id}\",\n                statusId: \"{self.status.id}\",\n                locationId: \"{self.location_a.id}\"\n            ) {{\n                asset {{\n                    name\n                    tenant {{\n                        slug\n                    }}\n                }}\n            }}\n        }}\n        '''",
-      "context": "Module:body/ClassDef:GraphQLTestCase:body/FunctionDef:test_mutations_create_and_validation:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_graphql.py",
-      "code": "B907",
-      "message": "'self.location_a.id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "mutation = f'''\n        mutation {{\n            createAsset(\n                name: \"New Asset A\",\n                assetTag: \"TAG-NEW-A\",\n                assetTypeId: \"{self.asset_type.id}\",\n                statusId: \"{self.status.id}\",\n                locationId: \"{self.location_a.id}\"\n            ) {{\n                asset {{\n                    name\n                    tenant {{\n                        slug\n                    }}\n                }}\n            }}\n        }}\n        '''",
-      "context": "Module:body/ClassDef:GraphQLTestCase:body/FunctionDef:test_mutations_create_and_validation:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_graphql.py",
-      "code": "B907",
-      "message": "'self.location_b.id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "mutation = f'''\n        mutation {{\n            createAsset(\n                name: \"Illegal Asset A\",\n                assetTag: \"TAG-ILLEGAL-A\",\n                assetTypeId: \"{self.asset_type.id}\",\n                statusId: \"{self.status.id}\",\n                locationId: \"{self.location_b.id}\"\n            ) {{\n                asset {{\n                    name\n                }}\n            }}\n        }}\n        '''",
-      "context": "Module:body/ClassDef:GraphQLTestCase:body/FunctionDef:test_mutations_cross_tenant_foreign_key_fails:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_graphql.py",
-      "code": "B907",
-      "message": "'self.status.id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "mutation = f'''\n        mutation {{\n            createAsset(\n                name: \"Illegal Asset A\",\n                assetTag: \"TAG-ILLEGAL-A\",\n                assetTypeId: \"{self.asset_type.id}\",\n                statusId: \"{self.status.id}\",\n                locationId: \"{self.location_b.id}\"\n            ) {{\n                asset {{\n                    name\n                }}\n            }}\n        }}\n        '''",
-      "context": "Module:body/ClassDef:GraphQLTestCase:body/FunctionDef:test_mutations_cross_tenant_foreign_key_fails:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_graphql.py",
-      "code": "B907",
-      "message": "'self.status.id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "mutation = f'''\n        mutation {{\n            createAsset(\n                name: \"New Asset A\",\n                assetTag: \"TAG-NEW-A\",\n                assetTypeId: \"{self.asset_type.id}\",\n                statusId: \"{self.status.id}\",\n                locationId: \"{self.location_a.id}\"\n            ) {{\n                asset {{\n                    name\n                    tenant {{\n                        slug\n                    }}\n                }}\n            }}\n        }}\n        '''",
-      "context": "Module:body/ClassDef:GraphQLTestCase:body/FunctionDef:test_mutations_create_and_validation:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_graphql_adversarial.py",
-      "code": "B907",
-      "message": "'self.asset_b.id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "mutation = f'''\n        mutation {{\n            deleteAsset(id: \"{self.asset_b.id}\") {{\n                success\n            }}\n        }}\n        '''",
-      "context": "Module:body/ClassDef:GraphQLAdversarialTestCase:body/FunctionDef:test_cross_tenant_delete_asset:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_graphql_adversarial.py",
-      "code": "B907",
-      "message": "'self.asset_b.id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "mutation = f'''\n        mutation {{\n            updateAsset(\n                id: \"{self.asset_b.id}\",\n                name: \"Hacked Name\"\n            ) {{\n                asset {{\n                    name\n                }}\n            }}\n        }}\n        '''",
-      "context": "Module:body/ClassDef:GraphQLAdversarialTestCase:body/FunctionDef:test_cross_tenant_update_asset:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_graphql_adversarial.py",
-      "code": "B907",
-      "message": "'self.asset_type.id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "mutation = f'''\n        mutation {{\n            createAsset(\n                name: \"Asset A with Location B\",\n                assetTag: \"TAG-CROSS-LOC\",\n                assetTypeId: \"{self.asset_type.id}\",\n                statusId: \"{self.status.id}\",\n                locationId: \"{self.location_b.id}\"\n            ) {{\n                asset {{\n                    name\n                }}\n            }}\n        }}\n        '''",
-      "context": "Module:body/ClassDef:GraphQLAdversarialTestCase:body/FunctionDef:test_cross_tenant_create_asset_with_foreign_key:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_graphql_adversarial.py",
-      "code": "B907",
-      "message": "'self.location_b.id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "mutation = f'''\n        mutation {{\n            createAsset(\n                name: \"Asset A with Location B\",\n                assetTag: \"TAG-CROSS-LOC\",\n                assetTypeId: \"{self.asset_type.id}\",\n                statusId: \"{self.status.id}\",\n                locationId: \"{self.location_b.id}\"\n            ) {{\n                asset {{\n                    name\n                }}\n            }}\n        }}\n        '''",
-      "context": "Module:body/ClassDef:GraphQLAdversarialTestCase:body/FunctionDef:test_cross_tenant_create_asset_with_foreign_key:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_graphql_adversarial.py",
-      "code": "B907",
-      "message": "'self.status.id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "mutation = f'''\n        mutation {{\n            createAsset(\n                name: \"Asset A with Location B\",\n                assetTag: \"TAG-CROSS-LOC\",\n                assetTypeId: \"{self.asset_type.id}\",\n                statusId: \"{self.status.id}\",\n                locationId: \"{self.location_b.id}\"\n            ) {{\n                asset {{\n                    name\n                }}\n            }}\n        }}\n        '''",
-      "context": "Module:body/ClassDef:GraphQLAdversarialTestCase:body/FunctionDef:test_cross_tenant_create_asset_with_foreign_key:body",
       "count": 1
     },
     {
@@ -3793,14 +3681,6 @@
       "message": "'pytest' imported but unused",
       "source": "import pytest",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_security_boundaries.py",
-      "code": "B907",
-      "message": "'self.asset_b.pk' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "query = f\"\"\"\n        mutation {{\n            updateAsset(id: \"{self.asset_b.pk}\", name: \"Hacked Name\") {{\n                asset {{\n                    id\n                    name\n                }}\n            }}\n        }}\n        \"\"\"",
-      "context": "Module:body/ClassDef:SecurityBoundariesTestCase:body/FunctionDef:test_graphql_cross_tenant_mutation_denied:body",
       "count": 1
     },
     {

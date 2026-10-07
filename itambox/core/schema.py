@@ -22,9 +22,8 @@ query_bases = [
     subscriptions.schema.Query,
 ]
 
-mutation_bases = [
-    assets.schema.Mutation,
-]
+# Core apps expose no GraphQL mutations (writes are REST-only, #612); only plugins may contribute any.
+mutation_bases = []
 
 # Dynamically import plugin schemas
 for plugin_name in getattr(settings, "PLUGINS", []):
@@ -44,9 +43,12 @@ for plugin_name in getattr(settings, "PLUGINS", []):
         logger.warning("GraphQL contribution disabled for plugin %s (%s)", plugin_name, type(exc).__name__)
 
 query_bases.append(graphene.ObjectType)
-mutation_bases.append(graphene.ObjectType)
 
 Query = type("Query", tuple(query_bases), {})
-Mutation = type("Mutation", tuple(mutation_bases), {})
+if mutation_bases:
+    mutation_bases.append(graphene.ObjectType)
+    Mutation = type("Mutation", tuple(mutation_bases), {})
+else:
+    Mutation = None
 
 schema = graphene.Schema(query=Query, mutation=Mutation)

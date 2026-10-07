@@ -33,11 +33,13 @@ from assets.services.specifications.contracts import (
     HistoryCleanupPreviewDTO,
     OwnerRefDTO,
     SpecificationGraphLoadRequest,
+    SpecificationPatchDTO,
     SpecificationProjectionRequest,
     SpecificationResolutionRequest,
     StoredSpecificationEntryDTO,
 )
 from assets.services.specifications.loader import load_specification_graph
+from assets.services.specifications.messages import specification_message
 from assets.specification_adapters import patch_from_mapping
 from extras.services.specifications.composition import resolve_specification_definition
 from extras.services.specifications.contracts import (
@@ -64,30 +66,6 @@ from organization.services.access_scope import (
 
 _MISSING_PRECONDITION_STATUS = status.HTTP_428_PRECONDITION_REQUIRED
 _STALE_STATUS = status.HTTP_412_PRECONDITION_FAILED
-
-_MESSAGE_TEXT = {
-    "specifications.invalid_type": "The submitted value has an invalid type.",
-    "specifications.invalid_decimal": "Enter a decimal value with no more than three decimal places.",
-    "specifications.invalid_range": "The submitted value is outside the allowed range.",
-    "specifications.invalid_date": "Enter a valid date.",
-    "specifications.invalid_choice": "Select a valid choice.",
-    "specifications.required_field": "This field is required.",
-    "specifications.unknown_field_key": "The field key is not part of this specification.",
-    "specifications.read_only_field": "This field is read-only.",
-    "specifications.conflict_clear_overlap": "A field cannot be set and cleared in the same patch.",
-    "specifications.duplicate_field": "The field occurs more than once.",
-    "specifications.immutable_definition": "The definition is immutable.",
-    "specifications.ownership_conflict": "The submitted object is not owned by this scope.",
-    "specifications.reference_conflict": "A referenced object is not available.",
-    "specifications.dependency_retirement": "A referenced dependency cannot be retired.",
-    "specifications.unsupported_structure": "The specification structure cannot be resolved.",
-    "specifications.stale_resource": "The resource changed after the plan was created.",
-    "specifications.stale_definition": "The effective definition changed after the plan was created.",
-    "specifications.stale_plan": "The preview plan is no longer valid.",
-    "specifications.export_blocked": "The requested export is blocked.",
-    "specifications.object_unavailable": "The requested object is unavailable.",
-    "specifications.missing_precondition": "A required write precondition is missing.",
-}
 
 
 class StrictInputSerializer(serializers.Serializer):
@@ -178,8 +156,23 @@ class ApplyCategoryDefaultsInputSerializer(StrictInputSerializer):
     specification_patch = SpecificationPatchInputSerializer(required=False)
 
 
+class ApplyCategoryDefaultsPreviewInputSerializer(StrictInputSerializer):
+    specification_patch = SpecificationPatchInputSerializer(required=False)
+
+
+class AssetTypePreviewResponseSerializer(serializers.Serializer):
+    preview_token = serializers.CharField(allow_null=True)
+    definition = serializers.JSONField()
+    expected_definition_revision = serializers.CharField()
+    expected_resource_revision = serializers.CharField(allow_null=True)
+    expected_category_default_snapshot_revision = serializers.CharField(allow_null=True)
+    consumes_category_defaults = serializers.BooleanField()
+    issues = serializers.ListField(child=serializers.DictField())
+    can_apply = serializers.BooleanField()
+
+
 def _message(message_key: str) -> str:
-    return _MESSAGE_TEXT.get(message_key, message_key.rsplit(".", 1)[-1].replace("_", " ").capitalize())
+    return specification_message(message_key)
 
 
 def _transport_path(issue_dto: DomainIssueDTO) -> tuple[str, ...]:
@@ -677,7 +670,7 @@ def create_fieldset_selection_from_values(
     values: Sequence[str] | None,
     *,
     omitted: bool,
-) -> object:
+) -> FieldsetSelectionDTO:
     """Construct the presence-sensitive create DTO from parsed transport data."""
 
     if omitted:
@@ -689,7 +682,7 @@ def create_fieldset_selection_from_values(
     return FieldsetSelectionDTO(presence="explicit", identities=explicit.identities)
 
 
-def patch_from_validated(value: Mapping[str, object] | None) -> object:
+def patch_from_validated(value: Mapping[str, object] | None) -> SpecificationPatchDTO:
     return patch_from_mapping(None if value is None else {"set": value.get("set", {}), "clear": value.get("clear", [])})
 
 
@@ -739,6 +732,8 @@ def expected_revision_or_missing(
 
 __all__ = [
     "ApplyCategoryDefaultsInputSerializer",
+    "ApplyCategoryDefaultsPreviewInputSerializer",
+    "AssetTypePreviewResponseSerializer",
     "CategoryDefaultFieldsetsInputSerializer",
     "CompositionInputSerializer",
     "HistoryCleanupInputSerializer",

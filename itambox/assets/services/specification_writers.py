@@ -22,6 +22,7 @@ from assets.services.specifications.contracts import (
     DestinationAssetTypeSelectionDTO,
     SpecificationPatchDTO,
 )
+from assets.services.specifications.messages import specification_message
 from organization.access import authorize_tenant_operation
 from organization.models import Tenant
 from organization.services.access_scope import (
@@ -74,7 +75,7 @@ def _authorization_for_asset(*, user: object, tenant_id: int | None) -> Resolved
 
 def _require_command_success(result: object) -> object:
     if isinstance(result, CommandRejectedDTO):
-        messages = [issue.message_key for issue in result.issues]
+        messages = [specification_message(issue.message_key) for issue in result.issues]
         raise ValidationError("; ".join(messages) or "The specification command was rejected.")
     return result
 

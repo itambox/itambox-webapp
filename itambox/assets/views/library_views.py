@@ -24,11 +24,7 @@ from assets.library_forms import (
     resolution_field_name,
     serialize_library_plan,
 )
-from assets.services.type_library.application import (
-    LibraryApplyError,
-    LibraryApplyRequest,
-    _has_library_model_permission,
-)
+from assets.services.type_library.application import LibraryApplyError, LibraryApplyRequest
 from assets.services.type_library.commands import (
     LibraryCommandError,
     apply_library,
@@ -39,20 +35,14 @@ from assets.services.type_library.exporting import LibraryExportError
 from core.tables.constants import TABLE_EMPTY_VALUE
 from extras.models import SpecificationLibrary
 from organization.services.access_scope import authentication_revision_for_actor
+from organization.services.catalogue_authorization import has_provider_catalogue_permission
 
 _MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
 _REFRESH_AFTER_APPLY_ERRORS = frozenset({"STALE_PLAN", "OBJECT_UNAVAILABLE", "CONFLICT"})
 
 
 def _permission_codename(user: object, codename: str) -> bool:
-    return bool(
-        _has_library_model_permission(
-            user,
-            SpecificationLibrary,
-            codename,
-            using="default",
-        )
-    )
+    return has_provider_catalogue_permission(user, f"extras.{codename}")
 
 
 def _format_issue(issue: object) -> str:

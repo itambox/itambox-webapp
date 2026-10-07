@@ -6,7 +6,6 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -25,12 +24,17 @@ from assets.services.specifications.commands import (
     update_asset_type_specifications,
 )
 from assets.services.specifications.contracts import (
+    AssetTypeId,
     CommandRejectedDTO,
+    DefinitionRevision,
     DestinationAssetTypeSelectionDTO,
     OwnerChangedDTO,
+    OwnerMutationResult,
     OwnerNoOpDTO,
+    ResourceRevision,
     SpecificationPatchDTO,
 )
+from core.context import override_current_tenant_scope
 from core.models import ObjectChange
 from extras.models import CustomField, CustomFieldset, CustomFieldsetField, Event, SpecificationLibrary
 from organization.models import Membership, Role, RoleGrant, RoleGrantScope, Tenant
@@ -51,6 +55,7 @@ class SpecificationValueCommandTests(TestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name="Value tenant", slug="value-tenant")
         self.other_tenant = Tenant.objects.create(name="Other tenant", slug="other-tenant")
+        self.provider = Tenant.objects.create(name="Value provider", slug="value-provider", is_provider=True)
         self.user = User.objects.create_user(username="value-editor")
         membership = Membership.objects.create(user=self.user, tenant=self.tenant)
         role = Role.objects.create(
@@ -68,18 +73,29 @@ class SpecificationValueCommandTests(TestCase):
             role_grant=grant,
             scope_type=RoleGrantScope.SCOPE_OWN,
         )
+        self.provider_membership = Membership.objects.create(user=self.user, tenant=self.provider)
+        self.provider_role = Role.objects.create(
+            tenant=self.provider,
+            name="Provider value editor",
+            permissions=["assets.change_assettype"],
+        )
+        provider_grant = RoleGrant.objects.create(
+            membership=self.provider_membership,
+            role=self.provider_role,
+            reason="Provider catalogue test authorization",
+            valid_until=timezone.now() + timedelta(days=1),
+        )
+        RoleGrantScope.objects.create(
+            role_grant=provider_grant,
+            scope_type=RoleGrantScope.SCOPE_OWN,
+        )
         self.manufacturer = Manufacturer.objects.create(name="Value maker", slug="value-maker")
         self.type = AssetType.objects.create(
             manufacturer=self.manufacturer,
             model="Value type",
             slug="value-type",
         )
-        self.user.user_permissions.add(
-            Permission.objects.get(
-                content_type=ContentType.objects.get_for_model(AssetType),
-                codename="change_assettype",
-            )
-        )
+
         AssetTagSequence.objects.create(
             tenant=self.tenant,
             prefix="VALUE-",
@@ -155,6 +171,24 @@ class SpecificationValueCommandTests(TestCase):
             authentication_revision=authentication_revision_for_actor(user),
         )
 
+    def _provider_type_update(
+        self,
+        *,
+        actor: ActorContextDTO,
+        asset_type_id: AssetTypeId,
+        expected_resource_revision: ResourceRevision,
+        expected_definition_revision: DefinitionRevision,
+        patch: SpecificationPatchDTO,
+    ) -> OwnerMutationResult:
+        with override_current_tenant_scope(self.provider, self.provider_membership):
+            return update_asset_type_specifications(
+                actor=actor,
+                asset_type_id=asset_type_id,
+                expected_resource_revision=expected_resource_revision,
+                expected_definition_revision=expected_definition_revision,
+                patch=patch,
+            )
+
     def _asset_authorization(self):
         actor = self._actor()
         request = AccessScopeResolutionRequestDTO(
@@ -225,14 +259,15 @@ class SpecificationValueCommandTests(TestCase):
         self.assertIn(library.pk, relevant_library_ids((self.type.pk,), "asset"))
 
     def test_staff_and_tenant_permission_cannot_replace_global_type_permission(self):
-        self.user.user_permissions.clear()
         self.user.is_staff = True
         self.user.save(update_fields=["is_staff"])
+        self.provider_role.permissions = []
+        self.provider_role.save(update_fields=["permissions"])
         role = Role.objects.get(tenant=self.tenant, name="Value editor")
         role.permissions = ["assets.change_asset", "assets.change_assettype"]
         role.save(update_fields=["permissions"])
         resource_revision, definition_revision = self._type_plan()
-        result = update_asset_type_specifications(
+        result = self._provider_type_update(
             actor=self._actor(),
             asset_type_id=self.type.pk,
             expected_resource_revision=resource_revision,
@@ -248,7 +283,7 @@ class SpecificationValueCommandTests(TestCase):
     def test_changed_definition_rejects_stale_plan_before_saving(self):
         resource_revision, definition_revision = self._type_plan()
         CustomField.objects.filter(pk=self.asset_type_field.pk).update(label="Changed label")
-        result = update_asset_type_specifications(
+        result = self._provider_type_update(
             actor=self._actor(),
             asset_type_id=self.type.pk,
             expected_resource_revision=resource_revision,
@@ -262,7 +297,7 @@ class SpecificationValueCommandTests(TestCase):
 
     def test_type_update_uses_pure_patch_and_attributes_existing_audit(self):
         resource_revision, definition_revision = self._type_plan()
-        result = update_asset_type_specifications(
+        result = self._provider_type_update(
             actor=self._actor(self.user),
             asset_type_id=self.type.pk,
             expected_resource_revision=resource_revision,
@@ -283,7 +318,7 @@ class SpecificationValueCommandTests(TestCase):
 
     def test_no_op_does_not_advance_timestamp_or_audit_or_event(self):
         resource_revision, definition_revision = self._type_plan()
-        first = update_asset_type_specifications(
+        first = self._provider_type_update(
             actor=self._actor(self.user),
             asset_type_id=self.type.pk,
             expected_resource_revision=resource_revision,
@@ -299,7 +334,7 @@ class SpecificationValueCommandTests(TestCase):
             model=ContentType.objects.get_for_model(AssetType),
         ).count()
 
-        no_op = update_asset_type_specifications(
+        no_op = self._provider_type_update(
             actor=self._actor(self.user),
             asset_type_id=self.type.pk,
             expected_resource_revision=first.resource_revision,
@@ -321,7 +356,7 @@ class SpecificationValueCommandTests(TestCase):
 
     def test_stale_resource_is_rejected_before_value_write(self):
         resource_revision, definition_revision = self._type_plan()
-        changed = update_asset_type_specifications(
+        changed = self._provider_type_update(
             actor=self._actor(self.user),
             asset_type_id=self.type.pk,
             expected_resource_revision=resource_revision,
@@ -331,7 +366,7 @@ class SpecificationValueCommandTests(TestCase):
         self.assertIsInstance(changed, OwnerChangedDTO)
         before = AssetType.all_objects.get(pk=self.type.pk).custom_field_data
 
-        rejected = update_asset_type_specifications(
+        rejected = self._provider_type_update(
             actor=self._actor(self.user),
             asset_type_id=self.type.pk,
             expected_resource_revision=resource_revision,
@@ -347,7 +382,7 @@ class SpecificationValueCommandTests(TestCase):
         AssetType.all_objects.filter(pk=self.type.pk).update(custom_field_data={"legacy_key": "retained"})
         resource_revision, definition_revision = self._type_plan()
 
-        result = update_asset_type_specifications(
+        result = self._provider_type_update(
             actor=self._actor(self.user),
             asset_type_id=self.type.pk,
             expected_resource_revision=resource_revision,
@@ -370,7 +405,7 @@ class SpecificationValueCommandTests(TestCase):
             SpecificationPatchDTO(set_values={"legacy_key": "changed"}, clear_keys=()),
             SpecificationPatchDTO(set_values={}, clear_keys=("legacy_key",)),
         ):
-            result = update_asset_type_specifications(
+            result = self._provider_type_update(
                 actor=self._actor(self.user),
                 asset_type_id=self.type.pk,
                 expected_resource_revision=resource_revision,
@@ -397,7 +432,7 @@ class SpecificationValueCommandTests(TestCase):
             SpecificationPatchDTO(set_values={"asset_type_note": "changed"}, clear_keys=()),
             SpecificationPatchDTO(set_values={}, clear_keys=("asset_type_note",)),
         ):
-            result = update_asset_type_specifications(
+            result = self._provider_type_update(
                 actor=self._actor(self.user),
                 asset_type_id=self.type.pk,
                 expected_resource_revision=resource_revision,
@@ -437,7 +472,7 @@ class SpecificationValueCommandTests(TestCase):
         AssetType.all_objects.filter(pk=self.type.pk).update(custom_field_data={"asset_type_flag": 0})
         resource_revision, definition_revision = self._type_plan()
 
-        result = update_asset_type_specifications(
+        result = self._provider_type_update(
             actor=self._actor(self.user),
             asset_type_id=self.type.pk,
             expected_resource_revision=resource_revision,

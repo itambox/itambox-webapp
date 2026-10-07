@@ -31,7 +31,7 @@ _REFERENCE_KINDS = ("role", "depreciation", "tag")
 
 @pytest.fixture
 def reference_kit(create_race_kit):
-    manufacturer, category, first, _second, actor = create_race_kit
+    manufacturer, category, first, _second, actor, provider_id = create_race_kit
     role = AssetRole.objects.create(name="Reference role", slug="reference-role")
     depreciation = Depreciation.objects.create(name="Reference depreciation", months=12)
     tag = Tag.objects.create(name="Reference tag", slug="reference-tag")
@@ -45,6 +45,7 @@ def reference_kit(create_race_kit):
     )
     return {
         "actor": actor,
+        "provider_id": provider_id,
         "native": native,
         "first": first,
         "deleter": deleter,
@@ -210,7 +211,7 @@ def test_create_waits_for_rest_reference_delete_then_rechecks_liveness(reference
     try:
         with transaction.atomic():
             _delete_reference(kit, kind)
-            started = _start(lambda: _create(kit["actor"], kit["native"], preview))
+            started = _start(lambda: _create(kit["actor"], kit["native"], preview), kit["provider_id"])
             _assert_reference_wait(started[1], kit[kind][0])
             assert not started[2] and not started[3]
             transaction.set_rollback(rollback_delete)
@@ -235,7 +236,7 @@ def test_rest_reference_delete_waits_for_create_transaction(reference_kit, kind,
         with transaction.atomic():
             result = _create(kit["actor"], kit["native"], preview)
             _assert_created(result, kit)
-            started = _start(lambda: _delete_reference(kit, kind))
+            started = _start(lambda: _delete_reference(kit, kind), kit["provider_id"])
             _assert_reference_wait(started[1], kit[kind][0])
             assert not started[2] and not started[3]
             transaction.set_rollback(rollback_create)
