@@ -2,7 +2,6 @@
 
 import json
 
-import pytest
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -31,14 +30,14 @@ class GraphQLReadOnlyJourneyTests(JourneyMixin, TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
 
-    @pytest.mark.xfail(strict=True, reason="GraphQL still exposes mutations (#602)")
-    def test_any_mutation_operation_is_rejected_even_for_a_fully_authorised_role(self):
+    def test_removed_asset_mutations_are_rejected_even_for_a_fully_authorised_role(self):
         asset = self.make_asset(name="Journey GraphQL Asset")
 
         created = self._post('mutation { createAsset(name: "Journey GraphQL Created") { asset { id } } }')
         deleted = self._post("mutation { deleteAsset(id: %s) { success } }" % json.dumps(str(asset.pk)))
 
         for response in (created, deleted):
-            self.assertIn("errors", response.json(), "a mutation operation was accepted")
+            self.assertEqual(response.status_code, 400)
+            self.assertIn("errors", response.json(), "a removed asset mutation field was accepted")
         self.assertFalse(Asset.objects.filter(name="Journey GraphQL Created").exists())
         self.assertTrue(Asset.objects.filter(pk=asset.pk).exists())

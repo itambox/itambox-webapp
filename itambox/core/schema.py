@@ -23,7 +23,6 @@ query_bases = [
 ]
 
 mutation_bases = [
-    assets.schema.Mutation,
     software.schema.Mutation,
     licenses.schema.Mutation,
     inventory.schema.Mutation,

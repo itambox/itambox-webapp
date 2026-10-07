@@ -113,6 +113,10 @@ export interface paths {
     /** @description Use the canonical resource digest for specification-aware objects. */
     post: operations["assets_asset_types_apply_category_defaults_create"];
   };
+  "/api/assets/asset-types/{id}/apply-category-defaults-preview/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
+    post: operations["assets_asset_types_apply_category_defaults_preview_create"];
+  };
   "/api/assets/asset-types/{id}/composition/": {
     /** @description Use the canonical resource digest for specification-aware objects. */
     put: operations["assets_asset_types_composition_update"];
@@ -132,6 +136,10 @@ export interface paths {
   "/api/assets/asset-types/{id}/specification-history/cleanup-preview/": {
     /** @description Use the canonical resource digest for specification-aware objects. */
     post: operations["assets_asset_types_specification_history_cleanup_preview_create"];
+  };
+  "/api/assets/asset-types/create-preview/": {
+    /** @description Use the canonical resource digest for specification-aware objects. */
+    post: operations["assets_asset_types_create_preview_create"];
   };
   "/api/assets/assets/": {
     /** @description Use the canonical resource digest for specification-aware objects. */
@@ -1914,6 +1922,10 @@ export interface components {
       expected_category_default_snapshot_revision?: string;
       specification_patch?: components["schemas"]["SpecificationPatchInputRequest"];
     };
+    /** @description Reject unknown/read-only request members instead of silently dropping them. */
+    ApplyCategoryDefaultsPreviewInputRequest: {
+      specification_patch?: components["schemas"]["SpecificationPatchInputRequest"];
+    };
     AssetAssignment: {
       id: number;
       asset: components["schemas"]["NestedAsset"];
@@ -2464,6 +2476,40 @@ export interface components {
       created_at: string;
       /** Format: date-time */
       updated_at: string;
+    };
+    /** @description Strict native create payload used by the non-persisting preview action. */
+    AssetTypeCreatePreviewInputRequest: {
+      manufacturer_id: number;
+      model: string;
+      slug: string;
+      /** @description Manufacturer part number or SKU */
+      part_number?: string;
+      /**
+       * EOL (Months)
+       * @description Lifespan in months before EOL replacement
+       */
+      eol_months?: number | null;
+      category?: number | null;
+      assetrole_id?: number | null;
+      depreciation_id?: number | null;
+      fieldsets?: string[];
+      specification_patch?: unknown;
+      /** @description Allow users to request assets of this type */
+      requestable?: boolean;
+      description?: string;
+      comments?: string;
+    };
+    AssetTypePreviewResponse: {
+      preview_token: string | null;
+      definition: unknown;
+      expected_definition_revision: string;
+      expected_resource_revision: string | null;
+      expected_category_default_snapshot_revision: string | null;
+      consumes_category_defaults: boolean;
+      issues: {
+          [key: string]: unknown;
+        }[];
+      can_apply: boolean;
     };
     AssetTypeRequest: {
       model: string;
@@ -10565,6 +10611,59 @@ export interface operations {
     };
   };
   /** @description Use the canonical resource digest for specification-aware objects. */
+  assets_asset_types_apply_category_defaults_preview_create: {
+    parameters: {
+      path: {
+        /** @description A unique integer value identifying this Asset Type. */
+        id: number;
+      };
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["ApplyCategoryDefaultsPreviewInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["ApplyCategoryDefaultsPreviewInputRequest"];
+        "multipart/form-data": components["schemas"]["ApplyCategoryDefaultsPreviewInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["AssetTypePreviewResponse"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  /** @description Use the canonical resource digest for specification-aware objects. */
   assets_asset_types_composition_update: {
     parameters: {
       path: {
@@ -10840,6 +10939,47 @@ export interface operations {
       };
       /** @description The request could not be completed. */
       404: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      409: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      412: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+      /** @description The request could not be completed. */
+      428: {
+        content: {
+          "application/json": components["schemas"]["APIError"];
+        };
+      };
+    };
+  };
+  /** @description Use the canonical resource digest for specification-aware objects. */
+  assets_asset_types_create_preview_create: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AssetTypeCreatePreviewInputRequest"];
+        "application/x-www-form-urlencoded": components["schemas"]["AssetTypeCreatePreviewInputRequest"];
+        "multipart/form-data": components["schemas"]["AssetTypeCreatePreviewInputRequest"];
+      };
+    };
+    responses: {
+      200: {
+        content: {
+          "application/json": components["schemas"]["AssetTypePreviewResponse"];
+        };
+      };
+      /** @description The request could not be completed. */
+      400: {
         content: {
           "application/json": components["schemas"]["APIError"];
         };

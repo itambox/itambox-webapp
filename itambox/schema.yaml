@@ -4128,6 +4128,71 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIError'
+  /api/assets/asset-types/{id}/apply-category-defaults-preview/:
+    post:
+      operationId: assets_asset_types_apply_category_defaults_preview_create
+      description: Use the canonical resource digest for specification-aware objects.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this Asset Type.
+        required: true
+      tags:
+      - assets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyCategoryDefaultsPreviewInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ApplyCategoryDefaultsPreviewInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ApplyCategoryDefaultsPreviewInputRequest'
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetTypePreviewResponse'
+          description: ''
+        '400':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
   /api/assets/asset-types/{id}/composition/:
     put:
       operationId: assets_asset_types_composition_update
@@ -4465,6 +4530,59 @@ paths:
               schema:
                 $ref: '#/components/schemas/APIError'
         '404':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '412':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '428':
+          description: The request could not be completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /api/assets/asset-types/create-preview/:
+    post:
+      operationId: assets_asset_types_create_preview_create
+      description: Use the canonical resource digest for specification-aware objects.
+      tags:
+      - assets
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetTypeCreatePreviewInputRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AssetTypeCreatePreviewInputRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssetTypeCreatePreviewInputRequest'
+        required: true
+      security:
+      - TokenAuth: []
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetTypePreviewResponse'
+          description: ''
+        '400':
           description: The request could not be completed.
           content:
             application/json:
@@ -39301,6 +39419,13 @@ components:
           minLength: 1
         specification_patch:
           $ref: '#/components/schemas/SpecificationPatchInputRequest'
+    ApplyCategoryDefaultsPreviewInputRequest:
+      type: object
+      description: Reject unknown/read-only request members instead of silently dropping
+        them.
+      properties:
+        specification_patch:
+          $ref: '#/components/schemas/SpecificationPatchInputRequest'
     AssetAssignment:
       type: object
       properties:
@@ -40532,6 +40657,97 @@ components:
       - specifications
       - tags
       - updated_at
+    AssetTypeCreatePreviewInputRequest:
+      type: object
+      description: Strict native create payload used by the non-persisting preview
+        action.
+      properties:
+        manufacturer_id:
+          type: integer
+          writeOnly: true
+        model:
+          type: string
+          minLength: 1
+          maxLength: 255
+        slug:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: ^[-a-zA-Z0-9_]+$
+        part_number:
+          type: string
+          description: Manufacturer part number or SKU
+          maxLength: 100
+        eol_months:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+          title: EOL (Months)
+          description: Lifespan in months before EOL replacement
+        category:
+          type: integer
+          nullable: true
+        assetrole_id:
+          type: integer
+          writeOnly: true
+          nullable: true
+        depreciation_id:
+          type: integer
+          writeOnly: true
+          nullable: true
+        fieldsets:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          writeOnly: true
+        specification_patch:
+          writeOnly: true
+        requestable:
+          type: boolean
+          description: Allow users to request assets of this type
+        description:
+          type: string
+        comments:
+          type: string
+      required:
+      - manufacturer_id
+      - model
+      - slug
+    AssetTypePreviewResponse:
+      type: object
+      properties:
+        preview_token:
+          type: string
+          nullable: true
+        definition: {}
+        expected_definition_revision:
+          type: string
+        expected_resource_revision:
+          type: string
+          nullable: true
+        expected_category_default_snapshot_revision:
+          type: string
+          nullable: true
+        consumes_category_defaults:
+          type: boolean
+        issues:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        can_apply:
+          type: boolean
+      required:
+      - can_apply
+      - consumes_category_defaults
+      - definition
+      - expected_category_default_snapshot_revision
+      - expected_definition_revision
+      - expected_resource_revision
+      - issues
+      - preview_token
     AssetTypeRequest:
       type: object
       properties:
