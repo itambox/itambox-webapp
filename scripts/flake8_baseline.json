@@ -7372,22 +7372,6 @@
       "count": 1
     },
     {
-      "path": "itambox/subscriptions/tests/test_graphql.py",
-      "code": "F401",
-      "message": "'django.core.exceptions.PermissionDenied' imported but unused",
-      "source": "from django.core.exceptions import PermissionDenied",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/tests/test_graphql.py",
-      "code": "F401",
-      "message": "'graphql.GraphQLError' imported but unused",
-      "source": "from graphql import GraphQLError",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/subscriptions/tests/test_views.py",
       "code": "E402",
       "message": "module level import not at top of file",

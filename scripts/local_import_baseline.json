@@ -2260,18 +2260,6 @@
       "count": 1
     },
     {
-      "path": "itambox/subscriptions/schema.py",
-      "context": "FunctionDef:_resolve_cost_center",
-      "statement": "from django.apps import apps",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/schema.py",
-      "context": "FunctionDef:_resolve_owner",
-      "statement": "from organization.models import Membership",
-      "count": 1
-    },
-    {
       "path": "itambox/subscriptions/tables.py",
       "context": "ClassDef:SubscriptionTable/FunctionDef:render_status",
       "statement": "from itambox.utils import get_status_color",
