@@ -238,30 +238,9 @@ query {
 }
 ```
 
-### Mutation example: create an asset
+### Writes are REST-only
 
-The built-in asset mutations are `createAsset`, `updateAsset`, and `deleteAsset`. Assignment and check-out workflows are not exposed as GraphQL asset mutations.
-
-```graphql
-mutation {
-  createAsset(
-    name: "Laptop-002"
-    assetTag: "IT-002"
-    serialNumber: "SN123457"
-    statusId: "2"
-    locationId: "3"
-  ) {
-    asset {
-      id
-      name
-      assetTag
-      serialNumber
-    }
-  }
-}
-```
-
-Validation and authorization failures are returned through the standard GraphQL top-level `errors` array; there is no mutation-specific `errors` field in the built-in asset schema.
+The GraphQL schema is read-only: the built-in schema publishes no mutation root, and every former write mutation (assets, inventory, licenses, software, subscriptions and asset specifications) was removed in favor of REST. Create, update and delete assets through `POST/PATCH/DELETE /api/assets/assets/`; the other domains have the same REST resources, and choice sets and choices are available under `/api/extras/custom-field-choice-sets/` and `/api/extras/custom-field-choices/`. Plugins may still contribute their own mutation root.
 
 ## Destructive workflow safety
 
