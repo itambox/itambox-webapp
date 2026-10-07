@@ -129,14 +129,14 @@ class AssetDisposal(FileAttachmentMixin, JournalingMixin, SoftDeleteMixin, Chang
         help_text=_("Disposal was carried out by an authorised WEEE recycler."),
     )
     notes = models.TextField(blank=True, verbose_name=_("Notes"))
-    episode = models.ForeignKey(
-        "assets.RepairEpisode",
+    maintenance = models.ForeignKey(
+        "assets.AssetMaintenance",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="disposals",
-        verbose_name=_("Repair Episode"),
-        help_text=_("Optional: the repair/replacement episode this record belongs to."),
+        verbose_name=_("Repair Maintenance"),
+        help_text=_("Optional: the repair maintenance this disposal closes out."),
     )
 
     # Cancellation: an erroneous disposal is CORRECTED, never erased.
@@ -207,6 +207,8 @@ class AssetDisposal(FileAttachmentMixin, JournalingMixin, SoftDeleteMixin, Chang
 
     def clean(self):
         super().clean()
+        if self.maintenance_id and self.asset_id and self.maintenance.asset.tenant_id != self.asset.tenant_id:
+            raise ValidationError({"maintenance": _("The maintenance must belong to the same tenant as the asset.")})
         reason = (self.cancellation_reason or "").strip()
         if self.cancelled_at is not None:
             errors = {}
@@ -375,15 +377,6 @@ class AssetReservation(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, Bas
     )
     purpose = models.CharField(max_length=255, blank=True, verbose_name=_("Purpose"))
     notes = models.TextField(blank=True, verbose_name=_("Notes"))
-    episode = models.ForeignKey(
-        "assets.RepairEpisode",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="reservations",
-        verbose_name=_("Repair Episode"),
-        help_text=_("Optional: the repair/replacement episode this record belongs to."),
-    )
 
     class Meta:
         ordering = ["start_date"]

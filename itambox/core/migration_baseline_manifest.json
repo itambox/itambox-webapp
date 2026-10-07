@@ -64,8 +64,8 @@
     "users.0100_issue88_shard_62_users_relations"
   ],
   "current_leaf_ids": [
+    "assets.0122_repair_maintenance_anchor",
     "compliance.0107_custodyreceipt_assignment_superseded",
-    "extras.0127_retire_report_designer_legacy",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "procurement.0103_remove_fulfillmentlink_unique_request_po_line_link_and_more",
     "subscriptions.0103_unified_vendor_cutover",
@@ -361,6 +361,7 @@
     "assets.0119_warranty_supplier",
     "assets.0120_repair_episode",
     "assets.0121_supplier_scoping_and_commercial_fields",
+    "assets.0122_repair_maintenance_anchor",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -406,8 +407,8 @@
     "users.0103_oidcidentity"
   ],
   "post_transition_leaf_ids": [
+    "assets.0122_repair_maintenance_anchor",
     "compliance.0107_custodyreceipt_assignment_superseded",
-    "extras.0127_retire_report_designer_legacy",
     "inventory.0101_alter_accessoryassignment_options_and_more",
     "procurement.0103_remove_fulfillmentlink_unique_request_po_line_link_and_more",
     "subscriptions.0103_unified_vendor_cutover",

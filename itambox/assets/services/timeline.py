@@ -1,13 +1,13 @@
-"""Read-only builder for the asset lifecycle timeline (#504).
+"""Read-only builder for the asset lifecycle timeline (#504, #644).
 
 The timeline merges the records of an asset's lifecycle story into one
-chronological list: maintenance records, warranties, reservations, disposals and
-status changes. Records that carry an optional repair-episode link are grouped
-under that episode — the group shows every record linked to the episode,
+chronological list: maintenance records, warranties, reservations, assignments
+and loans, disposals and status changes. The repair maintenance is the anchor of
+a repair story: every record linked to it - the loan issued to the asset's holder
+and the disposal that closes the unit out - is grouped under that maintenance,
 whichever asset of the story owns it, so one page tells the whole story.
 Everything else falls back to a flat chronological order, which is exactly what
-assets without any episode links (all records written before the feature
-existed) render as.
+assets without any repair link render as.
 
 The builder is presentation-supporting read logic: it composes localized display
 strings and never writes.
@@ -22,7 +22,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 from django.utils.translation import gettext as _
 
-from assets.models import AssetMaintenance, AssetReservation, RepairEpisode, StatusLabel
+from assets.models import AssetAssignment, AssetMaintenance, AssetReservation, StatusLabel
 from assets.models.lifecycle import AssetDisposal
 from core.models import ObjectChange
 
@@ -32,6 +32,8 @@ from core.models import ObjectChange
 _KIND_MAINTENANCE = "maintenance"
 _KIND_WARRANTY = "warranty"
 _KIND_RESERVATION = "reservation"
+_KIND_ASSIGNMENT = "assignment"
+_KIND_LOAN = "loan"
 _KIND_DISPOSAL = "disposal"
 _KIND_STATUS = "status"
 
@@ -39,8 +41,10 @@ _KIND_ORDER = {
     _KIND_MAINTENANCE: 0,
     _KIND_WARRANTY: 1,
     _KIND_RESERVATION: 2,
-    _KIND_STATUS: 3,
-    _KIND_DISPOSAL: 4,
+    _KIND_ASSIGNMENT: 3,
+    _KIND_LOAN: 4,
+    _KIND_STATUS: 5,
+    _KIND_DISPOSAL: 6,
 }
 
 # The changelog action through which asset status changes are recorded.
@@ -62,20 +66,21 @@ class TimelineEvent:
     title: str
     parts: list[str] = field(default_factory=list)
     url: str = ""
-    episode_id: int | None = None
+    maintenance_id: int | None = None
 
 
 @dataclass(frozen=True)
 class TimelineGroup:
-    """The events of one repair episode, in chronological order."""
+    """The records of one repair maintenance, in chronological order."""
 
-    episode: RepairEpisode
+    maintenance: AssetMaintenance
+    substitute_assets: list
     events: list[TimelineEvent]
 
 
 @dataclass(frozen=True)
 class AssetTimeline:
-    """Grouped episode events plus the ungrouped chronological fallback."""
+    """Grouped repair events plus the ungrouped chronological fallback."""
 
     groups: list[TimelineGroup] = field(default_factory=list)
     ungrouped: list[TimelineEvent] = field(default_factory=list)
@@ -85,50 +90,55 @@ class AssetTimeline:
         return sum(len(group.events) for group in self.groups) + len(self.ungrouped)
 
     @property
-    def has_episodes(self) -> bool:
+    def has_groups(self) -> bool:
         return bool(self.groups)
 
 
 def build_asset_timeline(asset) -> AssetTimeline:
     """Collect and group the timeline events for one asset."""
     own_events = _collect_asset_events(asset)
-    episodes = _episodes_for_asset(asset)
-    if not episodes:
+    maintenances = _maintenances_for_asset(asset)
+    if not maintenances:
         return AssetTimeline(ungrouped=_sorted_events(own_events))
 
     grouped: dict[int, list[TimelineEvent]] = {}
-    seen: set[tuple[str, str]] = set()
+    seen: set[tuple[str, str, datetime.date]] = set()
     ungrouped_own: list[TimelineEvent] = []
-    episode_pks = {episode.pk for episode in episodes}
+    maintenance_pks = {maintenance.pk for maintenance in maintenances}
     for event in own_events:
-        if event.episode_id is not None and event.episode_id in episode_pks:
-            grouped.setdefault(event.episode_id, []).append(event)
+        if event.maintenance_id is not None and event.maintenance_id in maintenance_pks:
+            grouped.setdefault(event.maintenance_id, []).append(event)
             seen.add(_event_key(event))
         else:
             ungrouped_own.append(event)
 
-    for event in _collect_episode_events(episodes, asset):
+    for event in _collect_linked_events(maintenances, asset):
         key = _event_key(event)
         if key in seen:
             continue
         seen.add(key)
-        grouped.setdefault(event.episode_id, []).append(event)
+        grouped.setdefault(event.maintenance_id, []).append(event)
 
     groups = [
-        TimelineGroup(episode=episode, events=_sorted_events(grouped.get(episode.pk, []))) for episode in episodes
+        TimelineGroup(
+            maintenance=maintenance,
+            substitute_assets=_substitute_assets(maintenance),
+            events=_sorted_events(grouped.get(maintenance.pk, [])),
+        )
+        for maintenance in maintenances
     ]
     groups.sort(key=_group_sort_date)
     return AssetTimeline(groups=groups, ungrouped=_sorted_events(ungrouped_own))
 
 
-def _event_key(event: TimelineEvent) -> tuple[str, str]:
-    return (event.kind, event.url)
+def _event_key(event: TimelineEvent) -> tuple[str, str, datetime.date]:
+    return (event.kind, event.url, event.date)
 
 
 def _group_sort_date(group: TimelineGroup) -> datetime.date:
     if group.events:
         return group.events[0].date
-    return group.episode.created_at.date()
+    return group.maintenance.start_date
 
 
 def _sorted_events(events: list[TimelineEvent]) -> list[TimelineEvent]:
@@ -137,28 +147,42 @@ def _sorted_events(events: list[TimelineEvent]) -> list[TimelineEvent]:
 
 def _collect_asset_events(asset) -> list[TimelineEvent]:
     events: list[TimelineEvent] = []
-    for maintenance in asset.maintenances.all():
-        events.append(_maintenance_event(maintenance, episode_id=maintenance.episode_id))
+    for maintenance in AssetMaintenance.objects.filter(asset=asset).select_related("asset"):
+        events.append(_maintenance_event(maintenance))
     for warranty in asset.warranties.all():
         events.append(_warranty_event(warranty))
     for reservation in asset.reservations.all().select_related("reserved_for"):
-        events.append(_reservation_event(reservation, episode_id=reservation.episode_id))
-    for disposal in AssetDisposal.all_objects.filter(asset=asset):
-        events.append(_disposal_event(disposal, episode_id=disposal.episode_id))
+        events.append(_reservation_event(reservation))
+    for assignment in asset.assignments.select_related("assigned_user", "assigned_location", "assigned_asset"):
+        events.append(_assignment_event(assignment))
+    # unscoped: the timeline shows a soft-deleted disposal as recycle-bin evidence
+    for disposal in AssetDisposal.all_objects.filter(asset=asset).select_related("asset"):
+        events.append(_disposal_event(disposal))
     events.extend(_status_events(asset))
     return events
 
 
-def _collect_episode_events(episodes: list[RepairEpisode], asset) -> list[TimelineEvent]:
-    """Every record linked to one of the asset's episodes, whichever asset owns it."""
+def _collect_linked_events(maintenances: list[AssetMaintenance], asset) -> list[TimelineEvent]:
+    """Every record linked to one of the asset's repair maintenances, whichever asset owns it."""
     events: list[TimelineEvent] = []
-    for maintenance in AssetMaintenance.objects.filter(episode__in=episodes).select_related("asset"):
-        events.append(_maintenance_event(maintenance, page_asset=asset, episode_id=maintenance.episode_id))
-    for reservation in AssetReservation.objects.filter(episode__in=episodes).select_related("asset", "reserved_for"):
-        events.append(_reservation_event(reservation, page_asset=asset, episode_id=reservation.episode_id))
-    for disposal in AssetDisposal.all_objects.filter(episode__in=episodes).select_related("asset"):
-        events.append(_disposal_event(disposal, page_asset=asset, episode_id=disposal.episode_id))
+    for maintenance in maintenances:
+        events.append(_maintenance_event(maintenance, page_asset=asset))
+    linked_assignments = AssetAssignment.objects.filter(maintenance__in=maintenances).select_related(
+        "asset", "assigned_user", "assigned_location", "assigned_asset"
+    )
+    for assignment in linked_assignments:
+        events.append(_assignment_event(assignment, page_asset=asset))
+    # unscoped: a soft-deleted disposal linked to the repair is still its evidence
+    linked_disposals = AssetDisposal.all_objects.filter(maintenance__in=maintenances).select_related("asset")
+    for disposal in linked_disposals:
+        events.append(_disposal_event(disposal, page_asset=asset))
     return events
+
+
+def _substitute_assets(maintenance: AssetMaintenance) -> list:
+    """The units that stood in for the repaired asset (the repair's loans)."""
+    loans = AssetAssignment.objects.filter(maintenance=maintenance, is_loan=True).select_related("asset")
+    return [assignment.asset for assignment in loans]
 
 
 def _asset_part(record, page_asset) -> list[str]:
@@ -168,7 +192,7 @@ def _asset_part(record, page_asset) -> list[str]:
     return [_("Asset: %(asset)s") % {"asset": str(record.asset)}]
 
 
-def _maintenance_event(maintenance: AssetMaintenance, page_asset=None, episode_id=None) -> TimelineEvent:
+def _maintenance_event(maintenance: AssetMaintenance, page_asset=None) -> TimelineEvent:
     parts = [maintenance.get_status_display()]
     if maintenance.completion_date:
         parts.append(_("Completed %(date)s") % {"date": maintenance.completion_date.isoformat()})
@@ -182,7 +206,7 @@ def _maintenance_event(maintenance: AssetMaintenance, page_asset=None, episode_i
         title=maintenance.get_maintenance_type_display(),
         parts=parts,
         url=maintenance.get_absolute_url(),
-        episode_id=episode_id,
+        maintenance_id=maintenance.pk,
     )
 
 
@@ -199,7 +223,7 @@ def _warranty_event(warranty) -> TimelineEvent:
     )
 
 
-def _reservation_event(reservation: AssetReservation, page_asset=None, episode_id=None) -> TimelineEvent:
+def _reservation_event(reservation: AssetReservation, page_asset=None) -> TimelineEvent:
     holder = str(reservation.reserved_for) if reservation.reserved_for_id else _("(no holder)")
     parts = [
         reservation.get_status_display(),
@@ -215,11 +239,35 @@ def _reservation_event(reservation: AssetReservation, page_asset=None, episode_i
         title=_("Reserved for %(holder)s") % {"holder": holder},
         parts=parts,
         url=reservation.get_absolute_url(),
-        episode_id=episode_id,
     )
 
 
-def _disposal_event(disposal: AssetDisposal, page_asset=None, episode_id=None) -> TimelineEvent:
+def _assignment_event(assignment: AssetAssignment, page_asset=None) -> TimelineEvent:
+    """A checkout, or - when it is flagged as a loan - one loan of the story (#644)."""
+    target = assignment.assigned_target
+    parts = [_("Loan") if assignment.is_loan else _("Handover")]
+    parts.append(_("Active") if assignment.is_active else _("Ended"))
+    if assignment.due_date:
+        parts.append(_("Due %(date)s") % {"date": assignment.due_date.isoformat()})
+    if assignment.is_overdue:
+        parts.append(_("Overdue"))
+    if assignment.returned_at:
+        parts.append(_("Returned %(date)s") % {"date": assignment.returned_at.isoformat()})
+    parts.extend(_asset_part(assignment, page_asset))
+    return TimelineEvent(
+        date=assignment.checked_out_at.date(),
+        kind=_KIND_LOAN if assignment.is_loan else _KIND_ASSIGNMENT,
+        icon="mdi-account-arrow-right" if assignment.is_loan else "mdi-account-check",
+        color="orange" if assignment.is_loan else "teal",
+        label=_("Loan") if assignment.is_loan else _("Assignment"),
+        title=_("Checked out to %(target)s") % {"target": target if target is not None else _("(no target)")},
+        parts=parts,
+        url=assignment.get_absolute_url(),
+        maintenance_id=assignment.maintenance_id,
+    )
+
+
+def _disposal_event(disposal: AssetDisposal, page_asset=None) -> TimelineEvent:
     parts = []
     if disposal.is_cancelled:
         parts.append(_("Cancelled"))
@@ -237,7 +285,7 @@ def _disposal_event(disposal: AssetDisposal, page_asset=None, episode_id=None) -
         title=disposal.get_disposal_method_display(),
         parts=parts,
         url=disposal.get_absolute_url(),
-        episode_id=episode_id,
+        maintenance_id=disposal.maintenance_id,
     )
 
 
@@ -287,9 +335,15 @@ def _status_labels(label_ids: set) -> dict:
     return dict(StatusLabel.all_objects.filter(pk__in=label_ids).values_list("pk", "name"))
 
 
-def _episodes_for_asset(asset) -> list[RepairEpisode]:
+def _maintenances_for_asset(asset) -> list[AssetMaintenance]:
+    """The repair maintenances of the asset's story (#644).
+
+    Its own repairs, plus the repairs its loans belong to - the loaner of a repair
+    shows the same group as the unit that was under repair.
+    """
     return list(
-        RepairEpisode.objects.filter(Q(asset=asset) | Q(substitute_asset=asset))
-        .select_related("asset", "substitute_asset")
-        .order_by("-created_at")
+        AssetMaintenance.objects.filter(Q(asset=asset) | Q(assignments__asset=asset))
+        .distinct()
+        .select_related("asset")
+        .order_by("-start_date")
     )

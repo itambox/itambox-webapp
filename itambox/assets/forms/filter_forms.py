@@ -11,7 +11,6 @@ from ..filters import (
     CategoryFilterSet,
     DepreciationFilterSet,
     ManufacturerFilterSet,
-    RepairEpisodeFilterSet,
     StatusLabelFilterSet,
     SupplierFilterSet,
     WarrantyFilterSet,
@@ -122,7 +121,3 @@ class WarrantyFilterForm(FilterForm):
 
 class AssetReservationFilterForm(FilterForm):
     filterset_class = AssetReservationFilterSet
-
-
-class RepairEpisodeFilterForm(FilterForm):
-    filterset_class = RepairEpisodeFilterSet

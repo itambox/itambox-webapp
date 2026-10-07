@@ -275,7 +275,7 @@ class MigrationBaselineManifestTests(SimpleTestCase):
         self.assertEqual(len(manifest["historical_ids"]), 262)
         self.assertEqual(len(manifest["replacement_ids"]), 62)
         self.assertEqual(len(manifest["replacement_target_ids"]), 262)
-        self.assertEqual(len(manifest["post_transition_ids"]), 54)
+        self.assertEqual(len(manifest["post_transition_ids"]), 55)
         self.assertTrue(
             {
                 "assets.0102_asset_type_composition_schema",
@@ -284,6 +284,7 @@ class MigrationBaselineManifestTests(SimpleTestCase):
                 "assets.0107_asset_type_specification_guards",
                 "assets.0118_assetdisposal_cancellation_reason_and_more",
                 "assets.0121_supplier_scoping_and_commercial_fields",
+                "assets.0122_repair_maintenance_anchor",
                 "extras.0114_asset_type_definition_library_schema",
                 "extras.0115_asset_type_definition_conversion",
                 "extras.0116_asset_type_definition_cutover",
@@ -294,6 +295,7 @@ class MigrationBaselineManifestTests(SimpleTestCase):
         self.assertEqual(
             manifest["post_transition_leaf_ids"],
             [
+                "assets.0122_repair_maintenance_anchor",
                 "compliance.0107_custodyreceipt_assignment_superseded",
                 "extras.0127_retire_report_designer_legacy",
                 "inventory.0101_alter_accessoryassignment_options_and_more",
