@@ -1,3 +1,6 @@
+from dataclasses import dataclass
+from typing import Any, Optional
+
 from django.apps import apps
 from django.core.exceptions import FieldDoesNotExist, FieldError
 from django.db import models
@@ -29,6 +32,152 @@ from core.context import (  # noqa: F401 -- re-exported for existing importers
     set_current_tenant_group,
 )
 from core.tenant_scope import accessible_tenant_ids, get_ancestor_tenant_group_ids
+
+_AMBIENT = object()
+
+
+@dataclass(frozen=True)
+class Scope:
+    """One resolved tenant scope, the explicit input of ``for_scope``.
+
+    ``kind`` is exactly one of:
+
+    * ``TENANT``: one active tenant (``tenant``);
+    * ``GROUP``: one active tenant group subtree (``group``);
+    * ``ALL_ACCESSIBLE``: the canonical accessible tenant set of ``user``;
+    * ``SYSTEM``: no tenant restriction (superuser, migrations, background
+      work, the pre-tenant bootstrap);
+    * ``DENIED``: an authenticated non-superuser without a resolved or with a
+      contradictory scope; resolves to nothing.
+    """
+
+    kind: str
+    user: Any = None
+    tenant: Any = None
+    group: Any = None
+
+    TENANT = "tenant"
+    GROUP = "group"
+    ALL_ACCESSIBLE = "all_accessible"
+    SYSTEM = "system"
+    DENIED = "denied"
+
+    @classmethod
+    def current(cls) -> "Scope":
+        """Resolve the ambient contextvars into one ``Scope`` value."""
+        tenant = get_current_tenant()
+        group = get_current_tenant_group()
+        all_accessible = get_current_all_accessible()
+        user = get_current_user()
+        if tenant or group or all_accessible:
+            if get_current_scope_conflict(user):
+                return cls(cls.DENIED, user=user)
+            if tenant:
+                return cls(cls.TENANT, user=user, tenant=tenant)
+            if group:
+                return cls(cls.GROUP, user=user, group=group)
+            return cls(cls.ALL_ACCESSIBLE, user=user)
+        if user is not None and not getattr(user, "is_superuser", False):
+            return cls(cls.DENIED, user=user)
+        return cls(cls.SYSTEM, user=user)
+
+
+@dataclass(frozen=True)
+class TenantScopeDeclaration:
+    """Introspectable per-model scoping declaration.
+
+    ``strategy`` is ``SELF_TENANT`` / ``SELF_GROUP`` (the model is the tenant
+    or tenant-group tree itself), ``FIELD`` (direct ``tenant`` field),
+    ``LOOKUP`` (``tenant_lookup`` ORM path) or ``NONE`` (no tenant column).
+    """
+
+    strategy: str
+    lookup: Optional[str] = None
+    allow_global: bool = False
+    deny_global: bool = False
+    has_tenant_group: bool = False
+    has_filter_tenants: bool = False
+
+    SELF_TENANT = "self_tenant"
+    SELF_GROUP = "self_group"
+    FIELD = "field"
+    LOOKUP = "lookup"
+    NONE = "none"
+
+
+def _has_field(model, name) -> bool:
+    try:
+        model._meta.get_field(name)
+    except FieldDoesNotExist:
+        return False
+    return True
+
+
+def tenant_scope_declaration(model) -> TenantScopeDeclaration:
+    """The scoping declaration of ``model``.
+
+    A model that IS the tenant or tenant-group tree states so with
+    ``tenant_scope_self = "tenant" | "group"``; every other model is declared
+    by its ``tenant`` field or its ``tenant_lookup`` path, with
+    ``allow_global_tenant`` / ``deny_global_tenant`` as the global-row policy.
+    """
+    own = getattr(model, "tenant_scope_self", None)
+    if own == "tenant":
+        return TenantScopeDeclaration(TenantScopeDeclaration.SELF_TENANT)
+    if own == "group":
+        return TenantScopeDeclaration(TenantScopeDeclaration.SELF_GROUP)
+    lookup = getattr(model, "tenant_lookup", None)
+    has_tenant = _has_field(model, "tenant")
+    if has_tenant:
+        strategy = TenantScopeDeclaration.FIELD
+    elif lookup:
+        strategy = TenantScopeDeclaration.LOOKUP
+    else:
+        strategy = TenantScopeDeclaration.NONE
+    return TenantScopeDeclaration(
+        strategy=strategy,
+        lookup=None if has_tenant else lookup,
+        allow_global=bool(getattr(model, "allow_global_tenant", False)),
+        deny_global=bool(getattr(model, "deny_global_tenant", False)),
+        has_tenant_group=_has_field(model, "tenant_group"),
+        has_filter_tenants=has_tenant and _has_field(model, "filter_tenants"),
+    )
+
+
+def _descendant_group_ids(group_id):
+    """Ids of ``group_id`` and its live descendants, memoized per context.
+
+    ``_base_manager`` (unscoped): TenantGroup.objects is itself tenant-scoped,
+    so using it here would recurse back into the scoping. ``exclude(seen)``: a
+    parent cycle in bad data must terminate the walk, not hang every scoped
+    request (mirrors the cycle-safe walk in
+    ``organization.access.get_descendant_tenant_group_ids``).
+    """
+    if not group_id:
+        return []
+    cache = _descendant_group_ids_cache.get()
+    if cache is None:
+        cache = {}
+        _descendant_group_ids_cache.set(cache)
+    if group_id in cache:
+        return cache[group_id]
+    TenantGroup = apps.get_model("organization", "TenantGroup")
+    descendant_ids = [group_id]
+    seen = {group_id}
+    to_check = [group_id]
+    while to_check:
+        children = list(
+            TenantGroup._base_manager.filter(parent_id__in=to_check, deleted_at__isnull=True)
+            .exclude(pk__in=seen)
+            .values_list("pk", flat=True)
+        )
+        if not children:
+            break
+        seen.update(children)
+        descendant_ids.extend(children)
+        to_check = children
+    cache[group_id] = descendant_ids
+    return descendant_ids
 
 
 class SoftDeleteQuerySet(models.QuerySet):
@@ -70,7 +219,7 @@ class TenantScopingQuerySet(models.QuerySet):
         return group_ids
 
     @staticmethod
-    def _group_scope_tenant_ids(active_group, get_descendant_group_ids, Tenant):
+    def _group_scope_tenant_ids(active_group, get_descendant_group_ids, Tenant, user=_AMBIENT):
         """Resolve allowed tenant ids for an active tenant-group scope.
 
         A member's group scope must cover EVERY tenant they can reach in the
@@ -91,7 +240,8 @@ class TenantScopingQuerySet(models.QuerySet):
         covered by the same write-invalidation without any change there.
         """
         allowed_group_ids = get_descendant_group_ids(active_group.pk)
-        user = get_current_user()
+        if user is _AMBIENT:
+            user = get_current_user()
         if user and user.is_superuser:
             return list(
                 Tenant._base_manager.filter(
@@ -125,18 +275,18 @@ class TenantScopingQuerySet(models.QuerySet):
             ).values_list("pk", flat=True)
         )
 
-    def _resolve_allowed_tenant_ids(self, active_tenant, active_group, get_descendant_group_ids, Tenant):
+    def _resolve_allowed_tenant_ids(self, scope, get_descendant_group_ids, Tenant):
         """Resolve the allowed tenant id set for whichever scope (single
-        tenant / group / all-accessible) is currently active.
+        tenant / group / all-accessible) the ``Scope`` carries.
         """
-        if active_tenant:
-            return [active_tenant.pk]
-        if active_group:
-            return self._group_scope_tenant_ids(active_group, get_descendant_group_ids, Tenant)
+        if scope.kind == Scope.TENANT:
+            return [scope.tenant.pk]
+        if scope.kind == Scope.GROUP:
+            return self._group_scope_tenant_ids(scope.group, get_descendant_group_ids, Tenant, user=scope.user)
         # "All accessible tenants" scope: no single tenant or group is active,
         # but the request is NOT global. This never returns the unscoped
         # queryset, so it can never widen into the superuser/global view.
-        return self._all_accessible_tenant_ids(get_current_user())
+        return self._all_accessible_tenant_ids(scope.user)
 
     @staticmethod
     def _all_accessible_tenant_ids(user):
@@ -184,206 +334,127 @@ class TenantScopingQuerySet(models.QuerySet):
         return result
 
     def filter_by_tenant(self) -> QuerySet:
-        active_tenant = get_current_tenant()
-        active_group = get_current_tenant_group()
-        all_accessible = get_current_all_accessible()
+        """Scope this queryset to the ambient request/task context.
 
-        if active_tenant or active_group or all_accessible:
-            current_user = get_current_user()
-            if get_current_scope_conflict(current_user):
-                return self.none()
+        Thin adapter over ``for_scope``: the ambient contextvars are resolved
+        once into a ``Scope`` and the explicit path does the work.
+        """
+        return self.for_scope(Scope.current())
 
-            Tenant = apps.get_model("organization", "Tenant")
+    def for_scope(self, scope) -> QuerySet:
+        """Scope this queryset to an explicit ``Scope`` value.
 
-            def get_descendant_group_ids(group_id):
-                if not group_id:
-                    return []
-                cache = _descendant_group_ids_cache.get()
-                if cache is None:
-                    cache = {}
-                    _descendant_group_ids_cache.set(cache)
-                if group_id in cache:
-                    return cache[group_id]
-
-                TenantGroup = apps.get_model("organization", "TenantGroup")
-                descendant_ids = [group_id]
-                seen = {group_id}
-                to_check = [group_id]
-                while to_check:
-                    # _base_manager (unscoped): TenantGroup.objects is itself
-                    # tenant-scoped now, so using it here would recurse back into
-                    # filter_by_tenant. The descendant walk needs the true tree.
-                    # exclude(seen): a parent cycle in bad data must terminate the
-                    # walk, not hang every scoped request (mirrors the cycle-safe
-                    # walk in organization.access.get_descendant_tenant_group_ids).
-                    children = list(
-                        TenantGroup._base_manager.filter(parent_id__in=to_check, deleted_at__isnull=True)
-                        .exclude(pk__in=seen)
-                        .values_list("pk", flat=True)
-                    )
-                    if not children:
-                        break
-                    seen.update(children)
-                    descendant_ids.extend(children)
-                    to_check = children
-                cache[group_id] = descendant_ids
-                return descendant_ids
-
-            allowed_tenant_ids = self._resolve_allowed_tenant_ids(
-                active_tenant,
-                active_group,
-                get_descendant_group_ids,
-                Tenant,
-            )
-
-            # If the query is for the Tenant model itself:
-            if self.model._meta.model_name == "tenant":
-                return self.filter(pk__in=allowed_tenant_ids)
-
-            # If the query is for the TenantGroup model itself: a user may see the
-            # groups that contain a tenant they are a member of, plus those groups'
-            # ancestors (the path to the root) for navigation. Superusers and
-            # system/anonymous contexts see all. The parent walk uses
-            # _base_manager so it does not recurse through this (scoped) manager.
-            if self.model._meta.model_name == "tenantgroup":
-                # apps.get_model instead of a module-top import: core.managers
-                # cannot import organization at load time (circular).
-                tg_user = current_user
-                TenantGroupModel = apps.get_model("organization", "TenantGroup")
-
-                def expand_to_ancestors(seed_ids):
-                    # Walk parent links up to the root so the path to every visible
-                    # group stays navigable. _base_manager (unscoped): don't recurse
-                    # back through this (scoped) manager.
-                    visible_ids = set()
-                    frontier = set(seed_ids)
-                    while frontier:
-                        visible_ids |= frontier
-                        parent_ids = set(
-                            TenantGroupModel._base_manager.filter(pk__in=frontier, deleted_at__isnull=True).values_list(
-                                "parent_id", flat=True
-                            )
-                        )
-                        parent_ids.discard(None)
-                        frontier = parent_ids - visible_ids
-                    return visible_ids
-
-                # An explicit group scope is a "show only this group" filter: the
-                # TenantGroup list is restricted to the scoped group's subtree
-                # (descendants) plus its ancestors (path to root, for navigation) —
-                # for everyone, superusers included. This mirrors how the Tenant
-                # list is already restricted to the scoped group's tenants under a
-                # group scope. Without it, activating a group scope still leaked
-                # every other (sibling/unrelated) group's row into the list.
-                if active_group:
-                    scope_ids = expand_to_ancestors(get_descendant_group_ids(active_group.pk))
-                    if tg_user is None or getattr(tg_user, "is_superuser", False):
-                        return self.filter(pk__in=scope_ids)
-                    # A member never sees a group none of their ACCESSIBLE tenants
-                    # sit in (e.g. a descendant/sibling group inside the scoped
-                    # subtree): intersect the scope with the groups of every tenant
-                    # they can reach (direct, UserGroup, or managed) plus ancestors.
-                    # The scoped group itself always survives — middleware only grants
-                    # a group scope to a member who can access a tenant in it.
-                    member_group_ids = self._member_visible_group_ids(tg_user)
-                    return self.filter(pk__in=(scope_ids & expand_to_ancestors(member_group_ids)))
-
-                # No explicit group scope (single-tenant scope): superusers and
-                # system/anonymous contexts see all; a member sees the groups
-                # containing a tenant they can ACCESS (direct, UserGroup, or
-                # managed), plus those groups' ancestors.
-                if tg_user is None or getattr(tg_user, "is_superuser", False):
-                    return self
-                member_group_ids = self._member_visible_group_ids(tg_user)
-                return self.filter(pk__in=expand_to_ancestors(member_group_ids))
-
-            allowed_group_ids = []
-            if active_group:
-                allowed_group_ids = get_descendant_group_ids(active_group.pk)
-            elif active_tenant and active_tenant.group:
-                allowed_group_ids = get_descendant_group_ids(active_tenant.group.pk)
-
-            qs = self
-
-            # Filter by tenant group if field exists
-            try:
-                self.model._meta.get_field("tenant_group")
-                group_ids = allowed_group_ids
-                if all_accessible and not active_tenant and not active_group:
-                    # Derived from the canonical accessible_tenant_ids, so no extra
-                    # RBAC resolution; only runs for the (few) models that carry a
-                    # tenant_group field.
-                    group_ids = self._all_accessible_group_ids(
-                        current_user,
-                        allowed_tenant_ids,
-                        Tenant,
-                    )
-                qs = qs.filter(models.Q(tenant_group_id__in=group_ids) | models.Q(tenant_group__isnull=True))
-            except FieldDoesNotExist:
-                # Models without tenant-group support retain the tenant-only queryset.
-                qs = self
-
-            # Filter by tenant if field exists
-            try:
-                self.model._meta.get_field("tenant")
-                allow_global = getattr(self.model, "allow_global_tenant", False)
-                try:
-                    self.model._meta.get_field("filter_tenants")
-                    if allow_global:
-                        qs = qs.filter(
-                            models.Q(tenant_id__in=allowed_tenant_ids)
-                            | models.Q(filter_tenants__id__in=allowed_tenant_ids)
-                            | (models.Q(tenant__isnull=True) & models.Q(filter_tenants__isnull=True))
-                        ).distinct()
-                    else:
-                        qs = qs.filter(
-                            models.Q(tenant_id__in=allowed_tenant_ids)
-                            | models.Q(filter_tenants__id__in=allowed_tenant_ids)
-                        ).distinct()
-                except FieldDoesNotExist:
-                    if allow_global:
-                        qs = qs.filter(models.Q(tenant_id__in=allowed_tenant_ids) | models.Q(tenant__isnull=True))
-                    else:
-                        qs = qs.filter(tenant_id__in=allowed_tenant_ids)
-            except FieldDoesNotExist:
-                # Models that derive their tenant through a relation rather than a
-                # direct `tenant` field (e.g. assignments/stock keyed off their
-                # parent item) declare `tenant_lookup`, an ORM path to the owning
-                # tenant (e.g. 'asset__tenant'). Scope through it so these rows
-                # cannot leak or be mutated across tenants. Rows whose parent has
-                # no tenant (global/shared catalogue items) remain visible.
-                tenant_lookup = getattr(self.model, "tenant_lookup", None)
-                if tenant_lookup:
-                    # Children of a global (tenant=None) parent stay visible by
-                    # default — e.g. stock/allocations of a shared-catalogue
-                    # Component, or items of a global Kit template — because a
-                    # global catalogue parent is a normal, intended pattern.
-                    # Non-catalogue derived models that must NEVER be cross-tenant
-                    # visible (e.g. LicenseSeatAssignment, where a global license
-                    # is an anomaly an attacker can mint) opt OUT via
-                    # `deny_global_tenant = True`, so a tenant=None parent does not
-                    # expose the child to every tenant.
-                    cond = models.Q(**{f"{tenant_lookup}_id__in": allowed_tenant_ids})
-                    if not getattr(self.model, "deny_global_tenant", False):
-                        cond |= models.Q(**{f"{tenant_lookup}__isnull": True})
-                    qs = qs.filter(cond)
-
-            return qs
-
-        # Fail closed: a request bound to an authenticated, non-superuser
-        # principal that reaches this point has NO resolved tenant context.
-        # Returning the unscoped queryset here would leak every tenant's rows
-        # (and allow cross-tenant writes/deletes via .get(pk=...)). Scope it to
-        # nothing instead. Superusers keep the global view, and system /
-        # anonymous contexts (migrations, background tasks with no bound user,
-        # the pre-tenant bootstrap in TenantMiddleware) are unaffected — those
-        # paths legitimately operate without a tenant. Note Membership
-        # uses the default (unscoped) manager, so tenant resolution itself is
-        # not affected by this guard.
-        user = get_current_user()
-        if user is not None and not getattr(user, "is_superuser", False):
+        The per-model behaviour comes from the model's scoping declaration
+        (``tenant_scope_declaration``), never from the model's name.
+        """
+        if scope.kind == Scope.DENIED:
+            # Fail closed: an authenticated, non-superuser principal with no
+            # resolved (or a contradictory) tenant context sees nothing.
             return self.none()
-        return self
+        if scope.kind == Scope.SYSTEM:
+            # Superusers, migrations, background tasks and the pre-tenant
+            # bootstrap legitimately operate without a tenant.
+            return self
+
+        declaration = tenant_scope_declaration(self.model)
+        Tenant = apps.get_model("organization", "Tenant")
+        get_descendant_group_ids = _descendant_group_ids
+        allowed_tenant_ids = self._resolve_allowed_tenant_ids(scope, get_descendant_group_ids, Tenant)
+        if declaration.strategy == TenantScopeDeclaration.SELF_TENANT:
+            return self.filter(pk__in=allowed_tenant_ids)
+        if declaration.strategy == TenantScopeDeclaration.SELF_GROUP:
+            return self._scope_tenant_group_rows(scope, get_descendant_group_ids)
+
+        qs = self._scope_by_group_field(scope, declaration, allowed_tenant_ids, get_descendant_group_ids, Tenant)
+        if declaration.strategy == TenantScopeDeclaration.FIELD:
+            return self._scope_by_tenant_field(qs, declaration, allowed_tenant_ids)
+        if declaration.strategy == TenantScopeDeclaration.LOOKUP:
+            return self._scope_by_lookup(qs, declaration, allowed_tenant_ids)
+        return qs
+
+    def _scope_tenant_group_rows(self, scope, get_descendant_group_ids):
+        """Rows of a model that IS the tenant-group tree.
+
+        A user sees the groups that contain a tenant they can access, plus
+        those groups' ancestors (the path to the root) for navigation.
+        Superusers and system/anonymous contexts see all. An explicit group
+        scope is a "show only this group" filter: the subtree plus ancestors,
+        for everyone. The parent walk uses ``_base_manager`` so it never
+        recurses through this (scoped) manager.
+        """
+        user = scope.user
+        model = self.model
+
+        def expand_to_ancestors(seed_ids):
+            visible_ids = set()
+            frontier = set(seed_ids)
+            while frontier:
+                visible_ids |= frontier
+                parent_ids = set(
+                    model._base_manager.filter(pk__in=frontier, deleted_at__isnull=True).values_list(
+                        "parent_id", flat=True
+                    )
+                )
+                parent_ids.discard(None)
+                frontier = parent_ids - visible_ids
+            return visible_ids
+
+        unrestricted = user is None or getattr(user, "is_superuser", False)
+        if scope.kind == Scope.GROUP:
+            scope_ids = expand_to_ancestors(get_descendant_group_ids(scope.group.pk))
+            if unrestricted:
+                return self.filter(pk__in=scope_ids)
+            # A member never sees a group none of their ACCESSIBLE tenants sit
+            # in: intersect the scope with the groups of every reachable tenant
+            # plus ancestors. The scoped group itself always survives.
+            return self.filter(pk__in=(scope_ids & expand_to_ancestors(self._member_visible_group_ids(user))))
+        if unrestricted:
+            return self
+        return self.filter(pk__in=expand_to_ancestors(self._member_visible_group_ids(user)))
+
+    def _scope_by_group_field(self, scope, declaration, allowed_tenant_ids, get_descendant_group_ids, Tenant):
+        """Narrow by the model's ``tenant_group`` field when it declares one."""
+        if not declaration.has_tenant_group:
+            return self
+        allowed_group_ids = []
+        if scope.kind == Scope.GROUP:
+            allowed_group_ids = get_descendant_group_ids(scope.group.pk)
+        elif scope.kind == Scope.TENANT and scope.tenant.group:
+            allowed_group_ids = get_descendant_group_ids(scope.tenant.group.pk)
+        elif scope.kind == Scope.ALL_ACCESSIBLE:
+            # Derived from the canonical accessible_tenant_ids, so no extra
+            # RBAC resolution; only runs for the (few) models that carry a
+            # tenant_group field.
+            allowed_group_ids = self._all_accessible_group_ids(scope.user, allowed_tenant_ids, Tenant)
+        return self.filter(models.Q(tenant_group_id__in=allowed_group_ids) | models.Q(tenant_group__isnull=True))
+
+    @staticmethod
+    def _scope_by_tenant_field(qs, declaration, allowed_tenant_ids):
+        """Narrow by a direct ``tenant`` field (plus ``filter_tenants`` M2M)."""
+        allow_global = declaration.allow_global
+        if declaration.has_filter_tenants:
+            cond = models.Q(tenant_id__in=allowed_tenant_ids) | models.Q(filter_tenants__id__in=allowed_tenant_ids)
+            if allow_global:
+                cond |= models.Q(tenant__isnull=True) & models.Q(filter_tenants__isnull=True)
+            return qs.filter(cond).distinct()
+        cond = models.Q(tenant_id__in=allowed_tenant_ids)
+        if allow_global:
+            cond |= models.Q(tenant__isnull=True)
+        return qs.filter(cond)
+
+    @staticmethod
+    def _scope_by_lookup(qs, declaration, allowed_tenant_ids):
+        """Narrow through ``tenant_lookup``, an ORM path to the owning tenant.
+
+        Children of a global (tenant=None) parent stay visible by default,
+        because a global catalogue parent is a normal pattern. Models that
+        must NEVER be cross-tenant visible (``deny_global_tenant``) opt out.
+        """
+        lookup = declaration.lookup
+        cond = models.Q(**{f"{lookup}_id__in": allowed_tenant_ids})
+        if not declaration.deny_global:
+            cond |= models.Q(**{f"{lookup}__isnull": True})
+        return qs.filter(cond)
 
 
 class TenantScopingManager(models.Manager.from_queryset(TenantScopingQuerySet)):

@@ -2556,14 +2556,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/managers.py",
-      "code": "C901",
-      "message": "'TenantScopingQuerySet.filter_by_tenant' is too complex (30)",
-      "source": "    def filter_by_tenant(self) -> QuerySet:",
-      "context": "Module:body/ClassDef:TenantScopingQuerySet:body/FunctionDef:filter_by_tenant:self",
-      "count": 1
-    },
-    {
       "path": "itambox/core/models.py",
       "code": "C901",
       "message": "'ChangeLoggingMixin._log_change' is too complex (11)",
