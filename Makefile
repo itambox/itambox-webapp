@@ -155,8 +155,8 @@ inline-style-check:
 	$(UV_DEV) python scripts/check_inline_styles.py
 
 # Idempotent: import sort runs before formatting, and re-running produces no
-# further diff. Ruff owns formatting/import order only -- see [tool.ruff] in
-# pyproject.toml; Flake8 (make lint) remains the separate semantic gate.
+# further diff. Ruff owns formatting, import order, and E501 at 132 characters;
+# Flake8 (make lint) retains every other rule until later migration phases.
 format:
 	$(UV_DEV) ruff check --select I --fix $(FORMAT_TARGETS)
 	$(UV_DEV) ruff format $(FORMAT_TARGETS)
@@ -168,7 +168,7 @@ format-styles:
 	cd itambox && npm run lint:styles:fix
 
 format-check:
-	$(UV_DEV) ruff check --select I $(FORMAT_TARGETS)
+	$(UV_DEV) ruff check --select I,E501 $(FORMAT_TARGETS)
 	$(UV_DEV) ruff format --check $(FORMAT_TARGETS)
 
 e2e:

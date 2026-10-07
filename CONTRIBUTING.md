@@ -149,11 +149,15 @@ uv run --locked --only-group dev python scripts/check_architecture.py
 make typecheck
 ```
 
-Ruff is the canonical formatter and import sorter (`make format` applies it
-idempotently; `make format-check` above is the non-mutating check CI runs).
-Ruff owns formatting and import order only -- Flake8 above remains the
-separate blocking semantic gate, and this split is deliberate: see
-[AGENTS.md](AGENTS.md#format-and-import-order-ruff) for the full policy.
+Ruff is the canonical formatter and import sorter and enforces E501 at 132
+characters (`make format` applies formatting/import sorting; `make format-check`
+and CI enforce the non-mutating line-length check). Flake8 above retains all
+other rules in its blocking baseline until later migration phases; B950 is
+replaced by Ruff E501 with exact file/line parity.
+
+The canonical rule selections are in `pyproject.toml` and `setup.cfg`; CI and
+pre-commit enforce them. The phased migration is tracked in
+[issue #622](https://github.com/itambox/itambox-webapp/issues/622).
 
 The fourth command is the import-placement gate. Imports belong at module top; a
 function-body import needs an explicit `# inline import: <category>: <reason>`

@@ -72,7 +72,8 @@ class CoreConfig(AppConfig):
                     except Exception:
                         pass
 
-            # Auto-apply TomSelect attribute to all select fields (excluding CheckboxSelectMultiple/RadioSelect/TableConfigForm/listboxes)
+            # Auto-apply TomSelect to select fields except checkbox/radio,
+            # TableConfigForm, and listbox controls.
             from django import forms
 
             class_name = self.__class__.__name__

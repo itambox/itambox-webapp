@@ -490,8 +490,9 @@ class UserBulkEditForm(BulkEditForm):
         for field_name in ["is_active", "is_staff", "is_superuser", "can_login"]:
             if field_name in selected_fields:
                 val = cleaned_data.get(field_name)
-                # If they are superuser, these fields aren't disabled and we validate they aren't None.
-                # If they aren't superuser, they were already validated/gated above, so we only need to validate fields that aren't disabled (i.e. is_active).
+                # Superusers can edit these fields, so validate that they are
+                # not None. Other users were gated above; only validate fields
+                # that remain enabled (i.e. is_active).
                 if val is None and (self.request_user and self.request_user.is_superuser or field_name == "is_active"):
                     self.add_error(field_name, _("Select Yes or No for this field."))
 

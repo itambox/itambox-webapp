@@ -86,7 +86,10 @@ class Command(BaseCommand):
 
         lines = [
             "digraph itambox_data_model {",
-            '  graph [bgcolor="#FFFFFF", compound=true, fontname="Arial", newrank=true, nodesep=0.4, pad=0.25, rankdir=LR, ranksep=1.2, splines=polyline];',
+            (
+                '  graph [bgcolor="#FFFFFF", compound=true, fontname="Arial", newrank=true, nodesep=0.4, '
+                "pad=0.25, rankdir=LR, ranksep=1.2, splines=polyline];"
+            ),
             '  node [color="#52606D", fontname="Arial", fontsize=11, margin="0.14,0.08", shape=box, style="rounded,filled"];',
             '  edge [color="#667085", fontcolor="#475467", fontname="Arial", fontsize=8, penwidth=1.0];',
             "",

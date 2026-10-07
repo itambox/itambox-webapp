@@ -45,7 +45,9 @@ def plugin_template_content(context, model, position, object=None):
                 rendered_contents.append(str(content))
         except Exception as e:
             # Catch exceptions raised by plugin templates safely as an HTML comment
-            comment_log = f"<!-- Error rendering plugin template content class '{content_class.__name__}' for position '{position}': {e} -->"
+            comment_log = "<!-- Error rendering plugin template content class '{}' for position '{}': {} -->".format(
+                content_class.__name__, position, e
+            )
             rendered_contents.append(comment_log)
 
     return mark_safe("\n".join(rendered_contents))

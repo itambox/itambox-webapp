@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "canonical_python": "3.12",
-  "policy_sha256": "29c7fe328fc4b6f4ab396a47ce10c128505647aae09ca5c6e646660b09b3bb7c",
+  "policy_sha256": "009b2c50b977bc7c23e38f442947ed0a03fce3204977363386d6bf4393d598d1",
   "findings": [
     {
       "path": "itambox/assets/api/serializers.py",
@@ -409,14 +409,6 @@
       "message": "'django.urls.reverse' imported but unused",
       "source": "from django.urls import reverse",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/models/catalog.py",
-      "code": "B950",
-      "message": "line too long (137 > 120 characters)",
-      "source": "            \"Assets with purchase cost at or below this amount are fully expensed in the month of acquisition (e.g. 800 for German GWG).\"",
-      "context": "Module:body/ClassDef:Depreciation:body",
       "count": 1
     },
     {
@@ -1893,14 +1885,6 @@
     },
     {
       "path": "itambox/core/apps.py",
-      "code": "B950",
-      "message": "line too long (138 > 120 characters)",
-      "source": "            # Auto-apply TomSelect attribute to all select fields (excluding CheckboxSelectMultiple/RadioSelect/TableConfigForm/listboxes)",
-      "context": "Module:body/ClassDef:CoreConfig:body/FunctionDef:ready:body/FunctionDef:scoped_baseform_init:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/apps.py",
       "code": "C901",
       "message": "'CoreConfig.ready' is too complex (16)",
       "source": "    def ready(self):",
@@ -2317,14 +2301,6 @@
     },
     {
       "path": "itambox/core/management/commands/_seed/organizations.py",
-      "code": "B950",
-      "message": "line too long (139 > 120 characters)",
-      "source": "                    \"Cross-border banking group: German retail bank (AG), UK capital-markets arm (plc) and a shared risk-services entity.\",",
-      "context": "Module:body/ClassDef:SeedOrganizationsMixin:body/FunctionDef:_org_spec:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/organizations.py",
       "code": "C901",
       "message": "'SeedOrganizationsMixin._seed_organizations' is too complex (20)",
       "source": "    def _seed_organizations(self):",
@@ -2409,14 +2385,6 @@
       "message": "'os' imported but unused",
       "source": "import os",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/export_datamodel.py",
-      "code": "B950",
-      "message": "line too long (156 > 120 characters)",
-      "source": "            '  graph [bgcolor=\"#FFFFFF\", compound=true, fontname=\"Arial\", newrank=true, nodesep=0.4, pad=0.25, rankdir=LR, ranksep=1.2, splines=polyline];',",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:handle:body",
       "count": 1
     },
     {
@@ -2662,14 +2630,6 @@
     {
       "path": "itambox/core/reports/charts.py",
       "code": "B907",
-      "message": "'145 + bar_width' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "svg_parts.append(\n            f'<text x=\"{145 + bar_width}\" y=\"{y_pos + 12}\" font-size=\"11\" font-weight=\"700\" fill=\"#0f172a\" text-anchor=\"start\">{escape(val_str)}</text>'\n        )",
-      "context": "Module:body/FunctionDef:generate_bar_chart:body/For:Tuple(elts=[Name(id='idx', ctx=Store()), Name(id='item', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='data', ctx=Load())], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/charts.py",
-      "code": "B907",
       "message": "'bar_width' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "svg_parts.append(f'<rect x=\"140\" y=\"{y_pos}\" width=\"{bar_width}\" height=\"16\" rx=\"4\" fill=\"{color}\" />')",
       "context": "Module:body/FunctionDef:generate_bar_chart:body/For:Tuple(elts=[Name(id='idx', ctx=Store()), Name(id='item', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='data', ctx=Load())], keywords=[]):body",
@@ -2742,22 +2702,6 @@
     {
       "path": "itambox/core/reports/charts.py",
       "code": "B907",
-      "message": "'y_pos + 12' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "svg_parts.append(\n            f'<text x=\"20\" y=\"{y_pos + 12}\" font-size=\"11\" font-weight=\"600\" fill=\"#475569\" text-anchor=\"start\">{escape(short_label)}</text>'\n        )",
-      "context": "Module:body/FunctionDef:generate_bar_chart:body/For:Tuple(elts=[Name(id='idx', ctx=Store()), Name(id='item', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='data', ctx=Load())], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/charts.py",
-      "code": "B907",
-      "message": "'y_pos + 12' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "svg_parts.append(\n            f'<text x=\"{145 + bar_width}\" y=\"{y_pos + 12}\" font-size=\"11\" font-weight=\"700\" fill=\"#0f172a\" text-anchor=\"start\">{escape(val_str)}</text>'\n        )",
-      "context": "Module:body/FunctionDef:generate_bar_chart:body/For:Tuple(elts=[Name(id='idx', ctx=Store()), Name(id='item', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='data', ctx=Load())], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/charts.py",
-      "code": "B907",
       "message": "'y_pos - 4' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "svg_parts.append(f'<circle cx=\"235\" cy=\"{y_pos - 4}\" r=\"5\" fill=\"{color}\" />')",
       "context": "Module:body/FunctionDef:generate_doughnut_chart:body/For:Tuple(elts=[Name(id='idx', ctx=Store()), Name(id='item', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='visible_items', ctx=Load())], keywords=[]):body",
@@ -2801,30 +2745,6 @@
       "message": "'y_pos' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "svg_parts.append(f'<rect x=\"140\" y=\"{y_pos}\" width=\"{max_bar_width}\" height=\"16\" rx=\"4\" fill=\"#f1f5f9\" />')",
       "context": "Module:body/FunctionDef:generate_bar_chart:body/For:Tuple(elts=[Name(id='idx', ctx=Store()), Name(id='item', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='data', ctx=Load())], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/charts.py",
-      "code": "B950",
-      "message": "line too long (141 > 120 characters)",
-      "source": "            f'<text x=\"20\" y=\"{y_pos + 12}\" font-size=\"11\" font-weight=\"600\" fill=\"#475569\" text-anchor=\"start\">{escape(short_label)}</text>'",
-      "context": "Module:body/FunctionDef:generate_bar_chart:body/For:Tuple(elts=[Name(id='idx', ctx=Store()), Name(id='item', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='data', ctx=Load())], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/charts.py",
-      "code": "B950",
-      "message": "line too long (152 > 120 characters)",
-      "source": "            f'<text x=\"{145 + bar_width}\" y=\"{y_pos + 12}\" font-size=\"11\" font-weight=\"700\" fill=\"#0f172a\" text-anchor=\"start\">{escape(val_str)}</text>'",
-      "context": "Module:body/FunctionDef:generate_bar_chart:body/For:Tuple(elts=[Name(id='idx', ctx=Store()), Name(id='item', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='data', ctx=Load())], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/reports/charts.py",
-      "code": "B950",
-      "message": "line too long (170 > 120 characters)",
-      "source": "        f'<text x=\"110\" y=\"132\" text-anchor=\"middle\" font-size=\"9\" font-weight=\"600\" fill=\"#64748b\" text-transform=\"uppercase\" letter-spacing=\"0.5px\">{_(\"Total\")}</text>'",
-      "context": "Module:body/FunctionDef:generate_doughnut_chart:body",
       "count": 1
     },
     {
@@ -3348,30 +3268,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/templatetags/plugins.py",
-      "code": "B907",
-      "message": "'content_class.__name__' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "comment_log = f\"<!-- Error rendering plugin template content class '{content_class.__name__}' for position '{position}': {e} -->\"",
-      "context": "Module:body/FunctionDef:plugin_template_content:body/For:Name(id='content_class', ctx=Store()):Name(id='content_classes', ctx=Load()):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/templatetags/plugins.py",
-      "code": "B907",
-      "message": "'position' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "comment_log = f\"<!-- Error rendering plugin template content class '{content_class.__name__}' for position '{position}': {e} -->\"",
-      "context": "Module:body/FunctionDef:plugin_template_content:body/For:Name(id='content_class', ctx=Store()):Name(id='content_classes', ctx=Load()):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/templatetags/plugins.py",
-      "code": "B950",
-      "message": "line too long (141 > 120 characters)",
-      "source": "            comment_log = f\"<!-- Error rendering plugin template content class '{content_class.__name__}' for position '{position}': {e} -->\"",
-      "context": "Module:body/FunctionDef:plugin_template_content:body/For:Name(id='content_class', ctx=Store()):Name(id='content_classes', ctx=Load()):body/Try:handlers/ExceptHandler:Name(id='Exception', ctx=Load()):e:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/templatetags/utility_tags.py",
       "code": "F401",
       "message": "'django.contrib.auth.get_user_model' imported but unused",
@@ -3409,14 +3305,6 @@
       "message": "'expected_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "assert f'href=\"{expected_url}\"' in html",
       "context": "Module:body/ClassDef:TestCountLinkColumnRender:body/FunctionDef:test_links_count_to_filtered_list:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_crypto.py",
-      "code": "B950",
-      "message": "line too long (142 > 120 characters)",
-      "source": "        \"\"\"Test that the rotate_encryption_keys management command successfully decrypts with old key and re-encrypts with new primary key.\"\"\"",
-      "context": "Module:body/ClassDef:CoreCryptoTestCase:body/FunctionDef:test_rotate_encryption_keys_command:body",
       "count": 1
     },
     {
@@ -3473,14 +3361,6 @@
       "message": "'unittest.mock.MagicMock' imported but unused",
       "source": "from unittest.mock import MagicMock, patch",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_plugins.py",
-      "code": "B950",
-      "message": "line too long (137 > 120 characters)",
-      "source": "            \"<!-- Error rendering plugin template content class 'BrokenContent' for position 'left_panel': Simulated template error -->\",",
-      "context": "Module:body/ClassDef:TemplateTagTestCase:body/FunctionDef:test_template_tag_rendering_and_error_handling:body",
       "count": 1
     },
     {
@@ -3877,14 +3757,6 @@
     },
     {
       "path": "itambox/extras/dashboard/utils.py",
-      "code": "B950",
-      "message": "line too long (327 > 120 characters)",
-      "source": "                \"content\": \"# Welcome to ITAMbox!\\n\\nThis is your premium ITAM dashboard. Click the gear icon on any widget to adjust parameters, or click **Unlock** at the top right to drag, resize, or reorder elements.\\n\\n- Star any object to see it under **My Bookmarks**\\n- Press **Ctrl+K** to jump to search from anywhere\"",
-      "context": "Module:body/FunctionDef:get_default_dashboard:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/dashboard/utils.py",
       "code": "F401",
       "message": "'extras.dashboard.widgets.get_registered_widgets' imported but unused",
       "source": "from extras.dashboard.widgets import get_registered_widgets",
@@ -3993,38 +3865,6 @@
       "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "self.helper.layout = Layout(\n            \"name\",\n            \"slug\",\n            \"color\",\n            \"description\",\n            HTML('<div class=\"mt-3\">'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n            HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">{_(\"Cancel\")}</a>'),\n            HTML(\"</div>\"),\n        )",
       "context": "Module:body/ClassDef:TagForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "B950",
-      "message": "line too long (163 > 120 characters)",
-      "source": "                    \"Select one or more specific tenants to filter this report's compiled data. If none are selected, aggregates data globally across all tenants.\"",
-      "context": "Module:body/ClassDef:ReportTemplateForm:body/FunctionDef:__init__:body/If:BoolOp(op=And(), values=[Name(id='user', ctx=Load()), UnaryOp(op=Not(), operand=BoolOp(op=Or(), values=[Attribute(value=Name(id='user', ctx=Load()), attr='is_superuser', ctx=Load()), BoolOp(op=And(), values=[Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='user', ctx=Load()), Constant(value='is_staff')], keywords=[]), Attribute(value=Name(id='user', ctx=Load()), attr='is_staff', ctx=Load())])]))]):orelse/If:Compare(left=Constant(value='filter_tenants'), ops=[In()], comparators=[Attribute(value=Name(id='self', ctx=Load()), attr='fields', ctx=Load())]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "B950",
-      "message": "line too long (173 > 120 characters)",
-      "source": "                    \"Select one or more specific tenants to filter this scheduled report's compiled data. If none are selected, aggregates data globally across all tenants.\"",
-      "context": "Module:body/ClassDef:ScheduledReportForm:body/FunctionDef:__init__:body/If:BoolOp(op=And(), values=[Name(id='user', ctx=Load()), UnaryOp(op=Not(), operand=BoolOp(op=Or(), values=[Attribute(value=Name(id='user', ctx=Load()), attr='is_superuser', ctx=Load()), BoolOp(op=And(), values=[Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='user', ctx=Load()), Constant(value='is_staff')], keywords=[]), Attribute(value=Name(id='user', ctx=Load()), attr='is_staff', ctx=Load())])]))]):orelse/If:Compare(left=Constant(value='filter_tenants'), ops=[In()], comparators=[Attribute(value=Name(id='self', ctx=Load()), attr='fields', ctx=Load())]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "B950",
-      "message": "line too long (187 > 120 characters)",
-      "source": "                    \"Select a specific tenant to restrict this report's compiled data strictly to that tenant. Choose 'All Tenants' (blank) to aggregate data globally across all tenants.\"",
-      "context": "Module:body/ClassDef:ReportTemplateForm:body/FunctionDef:__init__:body/If:BoolOp(op=And(), values=[Name(id='user', ctx=Load()), UnaryOp(op=Not(), operand=BoolOp(op=Or(), values=[Attribute(value=Name(id='user', ctx=Load()), attr='is_superuser', ctx=Load()), BoolOp(op=And(), values=[Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='user', ctx=Load()), Constant(value='is_staff')], keywords=[]), Attribute(value=Name(id='user', ctx=Load()), attr='is_staff', ctx=Load())])]))]):orelse/If:Compare(left=Constant(value='tenant'), ops=[In()], comparators=[Attribute(value=Name(id='self', ctx=Load()), attr='fields', ctx=Load())]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "B950",
-      "message": "line too long (197 > 120 characters)",
-      "source": "                    \"Select a specific tenant to restrict this scheduled report's compiled data strictly to that tenant. Choose 'All Tenants' (blank) to aggregate data globally across all tenants.\"",
-      "context": "Module:body/ClassDef:ScheduledReportForm:body/FunctionDef:__init__:body/If:BoolOp(op=And(), values=[Name(id='user', ctx=Load()), UnaryOp(op=Not(), operand=BoolOp(op=Or(), values=[Attribute(value=Name(id='user', ctx=Load()), attr='is_superuser', ctx=Load()), BoolOp(op=And(), values=[Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='user', ctx=Load()), Constant(value='is_staff')], keywords=[]), Attribute(value=Name(id='user', ctx=Load()), attr='is_staff', ctx=Load())])]))]):orelse/If:Compare(left=Constant(value='tenant'), ops=[In()], comparators=[Attribute(value=Name(id='self', ctx=Load()), attr='fields', ctx=Load())]):body",
       "count": 1
     },
     {
@@ -4649,14 +4489,6 @@
       "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "self.helper.layout = Layout(\n            \"name\",\n            \"description\",\n            \"tenant\",\n            \"tags\",\n            HTML('<div class=\"mt-3\">'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n            HTML(f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\">Cancel</a>'),\n            HTML(\"</div>\"),\n        )",
       "context": "Module:body/ClassDef:KitForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/forms/kit_forms.py",
-      "code": "B950",
-      "message": "line too long (134 > 120 characters)",
-      "source": "                    \"A kit item cannot select more than one target (must be either Asset Type OR Accessory OR License OR Consumable).\"",
-      "context": "Module:body/ClassDef:KitItemForm:body/FunctionDef:clean:body/If:Compare(left=Call(func=Name(id='len', ctx=Load()), args=[Name(id='filled', ctx=Load())], keywords=[]), ops=[Gt()], comparators=[Constant(value=1)]):body",
       "count": 1
     },
     {
@@ -5508,14 +5340,6 @@
       "count": 1
     },
     {
-      "path": "itambox/itambox/views/generic/import_.py",
-      "code": "B950",
-      "message": "line too long (149 > 120 characters)",
-      "source": "                        lambda job_pk=job.pk, r=rows, app=model._meta.app_label, name=model._meta.model_name, u_pk=request.user.pk, t_id=tenant_id: (",
-      "context": "Module:body/ClassDef:ObjectImportView:body/FunctionDef:post:body/If:Compare(left=Constant(value='_confirm'), ops=[In()], comparators=[Attribute(value=Name(id='request', ctx=Load()), attr='POST', ctx=Load())]):body/If:Name(id='rows', ctx=Load()):body/If:Call(func=Attribute(value=Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='settings', ctx=Load()), Constant(value='Q_CLUSTER'), Dict(keys=[], values=[])], keywords=[]), attr='get', ctx=Load()), args=[Constant(value='sync'), Constant(value=False)], keywords=[]):orelse",
-      "count": 1
-    },
-    {
       "path": "itambox/itambox/views/generic/mixins.py",
       "code": "F401",
       "message": "'django.shortcuts.get_object_or_404' imported but unused",
@@ -5529,14 +5353,6 @@
       "message": "'django.views.generic.View' imported but unused",
       "source": "from django.views.generic import View",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/views/htmx.py",
-      "code": "B950",
-      "message": "line too long (149 > 120 characters)",
-      "source": "                    f\"{self.__class__.__name__} or its superclasses must provide a render_to_response method or be mixed with TemplateResponseMixin.\"",
-      "context": "Module:body/ClassDef:BaseHTMXView:body/FunctionDef:render_to_response:body/If:Call(func=Name(id='hasattr', ctx=Load()), args=[Call(func=Name(id='super', ctx=Load()), args=[], keywords=[]), Constant(value='render_to_response')], keywords=[]):orelse/If:BoolOp(op=And(), values=[Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='self', ctx=Load()), Constant(value='response_class')], keywords=[]), Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='self', ctx=Load()), Constant(value='get_template_names')], keywords=[])]):orelse",
       "count": 1
     },
     {
@@ -7140,22 +6956,6 @@
       "count": 1
     },
     {
-      "path": "itambox/procurement/forms.py",
-      "code": "B950",
-      "message": "line too long (134 > 120 characters)",
-      "source": "                '<a href=\"{% url \\'procurement:contract_list\\' %}\" class=\"btn btn-outline-secondary ms-2\" data-no-dirty-track=\"true\">'",
-      "context": "Module:body/ClassDef:ContractForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/forms.py",
-      "code": "B950",
-      "message": "line too long (139 > 120 characters)",
-      "source": "                '<a href=\"{% url \\'procurement:purchaseorder_list\\' %}\" class=\"btn btn-outline-secondary ms-2\" data-no-dirty-track=\"true\">'",
-      "context": "Module:body/ClassDef:PurchaseOrderForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
       "path": "itambox/procurement/views.py",
       "code": "B905",
       "message": "`zip()` without an explicit `strict=` parameter.",
@@ -7297,14 +7097,6 @@
       "message": "'itambox.utils.get_paginate_count' imported but unused",
       "source": "        from itambox.utils import get_paginate_count",
       "context": "Module:body/ClassDef:SoftwareDetailView:body/FunctionDef:get_context_data:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/static/generate_icons.py",
-      "code": "B950",
-      "message": "line too long (151 > 120 characters)",
-      "source": "  <path d=\"M256 141 L384 205 L384 320 L256 384 L128 320 L128 205 Z\" stroke=\"#ffffff\" stroke-width=\"32\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
-      "context": "Module:body/FunctionDef:generate_svg:body",
       "count": 1
     },
     {
@@ -7457,14 +7249,6 @@
       "message": "'SCIMProviderBearerTokenAuthentication.authenticate' is too complex (20)",
       "source": "    def authenticate(self, request: Request) -> _SCIMAuthenticationResult:",
       "context": "Module:body/ClassDef:SCIMProviderBearerTokenAuthentication:body/FunctionDef:authenticate:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/forms.py",
-      "code": "B950",
-      "message": "line too long (158 > 120 characters)",
-      "source": "                # If they aren't superuser, they were already validated/gated above, so we only need to validate fields that aren't disabled (i.e. is_active).",
-      "context": "Module:body/ClassDef:UserBulkEditForm:body/FunctionDef:clean:body/For:Name(id='field_name', ctx=Store()):List(elts=[Constant(value='is_active'), Constant(value='is_staff'), Constant(value='is_superuser'), Constant(value='can_login')], ctx=Load()):body/If:Compare(left=Name(id='field_name', ctx=Load()), ops=[In()], comparators=[Name(id='selected_fields', ctx=Load())]):self",
       "count": 1
     },
     {
@@ -7686,14 +7470,6 @@
     {
       "path": "itambox/users/views.py",
       "code": "B907",
-      "message": "\"reverse('users:bookmark_toggle', kwargs={'content_type_id': content_type_id, 'object_id': object_id})\" is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "button_html = (\n                f'<button type=\"button\" class=\"btn btn-icon {btn_class}\"'\n                f' hx-post=\"{reverse(\"users:bookmark_toggle\", kwargs={\"content_type_id\": content_type_id, \"object_id\": object_id})}\"'\n                f' hx-headers=\\'{{\"X-CSRFToken\": \"{csrf_token}\"}}\\''\n                f' hx-target=\"this\" hx-swap=\"outerHTML\" title=\"{title}\">'\n                f'<i class=\"mdi {star_icon}\"></i></button>'\n            )",
-      "context": "Module:body/ClassDef:BookmarkToggleView:body/FunctionDef:post:body/If:Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='request', ctx=Load()), Constant(value='htmx'), Constant(value=False)], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "B907",
       "message": "\"reverse('users:watch_toggle', kwargs={'content_type_id': content_type_id, 'object_id': object_id})\" is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "button_html = (\n                f'<button type=\"button\" class=\"btn btn-icon {btn_class}\"'\n                f' hx-post=\"{reverse(\"users:watch_toggle\", kwargs={\"content_type_id\": content_type_id, \"object_id\": object_id})}\"'\n                f' hx-headers=\\'{{\"X-CSRFToken\": \"{csrf_token}\"}}\\''\n                f' hx-target=\"this\" hx-swap=\"outerHTML\" title=\"{title}\">'\n                f'<i class=\"mdi {bell_icon}\"></i></button>'\n            )",
       "context": "Module:body/ClassDef:WatchToggleView:body/FunctionDef:post:body/If:Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='request', ctx=Load()), Constant(value='htmx'), Constant(value=False)], keywords=[]):body",
@@ -7703,14 +7479,6 @@
       "path": "itambox/users/views.py",
       "code": "B907",
       "message": "'csrf_token' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "button_html = (\n                f'<button type=\"button\" class=\"btn btn-icon {btn_class}\"'\n                f' hx-post=\"{reverse(\"users:bookmark_toggle\", kwargs={\"content_type_id\": content_type_id, \"object_id\": object_id})}\"'\n                f' hx-headers=\\'{{\"X-CSRFToken\": \"{csrf_token}\"}}\\''\n                f' hx-target=\"this\" hx-swap=\"outerHTML\" title=\"{title}\">'\n                f'<i class=\"mdi {star_icon}\"></i></button>'\n            )",
-      "context": "Module:body/ClassDef:BookmarkToggleView:body/FunctionDef:post:body/If:Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='request', ctx=Load()), Constant(value='htmx'), Constant(value=False)], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "B907",
-      "message": "'csrf_token' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "button_html = (\n                f'<button type=\"button\" class=\"btn btn-icon {btn_class}\"'\n                f' hx-post=\"{reverse(\"users:watch_toggle\", kwargs={\"content_type_id\": content_type_id, \"object_id\": object_id})}\"'\n                f' hx-headers=\\'{{\"X-CSRFToken\": \"{csrf_token}\"}}\\''\n                f' hx-target=\"this\" hx-swap=\"outerHTML\" title=\"{title}\">'\n                f'<i class=\"mdi {bell_icon}\"></i></button>'\n            )",
       "context": "Module:body/ClassDef:WatchToggleView:body/FunctionDef:post:body/If:Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='request', ctx=Load()), Constant(value='htmx'), Constant(value=False)], keywords=[]):body",
       "count": 1
@@ -7719,32 +7487,8 @@
       "path": "itambox/users/views.py",
       "code": "B907",
       "message": "'title' is manually surrounded by quotes, consider using the `!r` conversion flag.",
-      "source": "button_html = (\n                f'<button type=\"button\" class=\"btn btn-icon {btn_class}\"'\n                f' hx-post=\"{reverse(\"users:bookmark_toggle\", kwargs={\"content_type_id\": content_type_id, \"object_id\": object_id})}\"'\n                f' hx-headers=\\'{{\"X-CSRFToken\": \"{csrf_token}\"}}\\''\n                f' hx-target=\"this\" hx-swap=\"outerHTML\" title=\"{title}\">'\n                f'<i class=\"mdi {star_icon}\"></i></button>'\n            )",
-      "context": "Module:body/ClassDef:BookmarkToggleView:body/FunctionDef:post:body/If:Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='request', ctx=Load()), Constant(value='htmx'), Constant(value=False)], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "B907",
-      "message": "'title' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "button_html = (\n                f'<button type=\"button\" class=\"btn btn-icon {btn_class}\"'\n                f' hx-post=\"{reverse(\"users:watch_toggle\", kwargs={\"content_type_id\": content_type_id, \"object_id\": object_id})}\"'\n                f' hx-headers=\\'{{\"X-CSRFToken\": \"{csrf_token}\"}}\\''\n                f' hx-target=\"this\" hx-swap=\"outerHTML\" title=\"{title}\">'\n                f'<i class=\"mdi {bell_icon}\"></i></button>'\n            )",
       "context": "Module:body/ClassDef:WatchToggleView:body/FunctionDef:post:body/If:Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='request', ctx=Load()), Constant(value='htmx'), Constant(value=False)], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "B950",
-      "message": "line too long (133 > 120 characters)",
-      "source": "                f' hx-post=\"{reverse(\"users:bookmark_toggle\", kwargs={\"content_type_id\": content_type_id, \"object_id\": object_id})}\"'",
-      "context": "Module:body/ClassDef:BookmarkToggleView:body/FunctionDef:post:body/If:Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='request', ctx=Load()), Constant(value='htmx'), Constant(value=False)], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "B950",
-      "message": "line too long (172 > 120 characters)",
-      "source": "                    \"API Token generated successfully! Make sure to copy your new personal access token now, as you won't be able to see it again: <code>{token_key}</code>\"",
-      "context": "Module:body/ClassDef:UserApiTokensView:body/FunctionDef:post:body/If:Call(func=Attribute(value=Name(id='form', ctx=Load()), attr='is_valid', ctx=Load()), args=[], keywords=[]):body",
       "count": 1
     },
     {

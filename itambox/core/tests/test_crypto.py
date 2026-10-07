@@ -102,7 +102,7 @@ class CoreCryptoTestCase(TestCase):
                 del os.environ["ITAMBOX_FIELD_ENCRYPTION_KEYS"]
 
     def test_rotate_encryption_keys_command(self):
-        """Test that the rotate_encryption_keys management command successfully decrypts with old key and re-encrypts with new primary key."""
+        """Test key rotation: decrypt with the old key and re-encrypt with the new primary key."""
         mfr = Manufacturer.objects.create(name="Microsoft", slug="microsoft")
         software = Software.objects.create(name="Office 365", version="v2026", manufacturer=mfr)
 
