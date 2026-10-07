@@ -15,14 +15,10 @@ class AssetsConfig(AppConfig):
         import assets.search
         import assets.signals
 
-        # inline imports: app-registry: register custom-field validation after all models are loaded.
-        from assets.customfields import validate_asset_custom_field_data, validate_asset_type_custom_field_data
+        # inline import: app-registry: attach dynamic Asset/AssetType definitions to the shared value validator.
+        from assets.customfields import asset_custom_field_definitions, asset_type_custom_field_definitions
 
-        registry.register_custom_field_data_validator(
-            self.get_model("AssetType"),
-            validate_asset_type_custom_field_data,
+        registry.register_custom_field_data_definition_provider(
+            self.get_model("AssetType"), asset_type_custom_field_definitions
         )
-        registry.register_custom_field_data_validator(
-            self.get_model("Asset"),
-            validate_asset_custom_field_data,
-        )
+        registry.register_custom_field_data_definition_provider(self.get_model("Asset"), asset_custom_field_definitions)

@@ -35,6 +35,14 @@ def test_non_ui_writers_use_the_audited_writer_seam():
     licenses = (root / "core" / "importers" / "snipeit" / "stages" / "licenses.py").read_text()
     inventory = (root / "core" / "importers" / "snipeit" / "stages" / "inventory.py").read_text()
     catalog = (root / "core" / "importers" / "snipeit" / "stages" / "catalog.py").read_text()
+    generic_form = (root / "extras" / "customfields.py").read_text()
+    asset_api = (root / "assets" / "api" / "serializers.py").read_text()
+    command_support = (root / "assets" / "services" / "specifications" / "_command_support.py").read_text()
+    specification_commands = (root / "assets" / "services" / "specifications" / "commands.py").read_text()
+    composition_commands = (root / "assets" / "services" / "specifications" / "_composition_commands.py").read_text()
+    history_commands = (root / "assets" / "services" / "specifications" / "_history_commands.py").read_text()
+    shared_writer = (root / "extras" / "services" / "custom_field_data.py").read_text()
+    seed_catalog = (root / "core" / "management" / "commands" / "_seed" / "catalog.py").read_text()
     generic_stages = [
         (root / "core" / "importers" / "snipeit" / "stages" / "organization.py").read_text(),
         licenses,
@@ -55,11 +63,20 @@ def test_non_ui_writers_use_the_audited_writer_seam():
     assert "asset.custom_field_data = data" not in intune
     assert "_lock_and_authorize_generic_owner" in writer
     assert "authorize_tenant_operation" in writer
+    assert "write_custom_field_data" in writer
     assert "assets.specification_adapters" not in writer
     assert "load_effective_definition" in writer
     assert "resolve_access_scope" in writer
     assert "assets.specification_adapters" not in asset_models
     assert "load_prospective_definition" in asset_models
+    assert "write_custom_field_data" in generic_form
+    assert "update_asset_specifications(" in asset_api
+    assert "write_custom_field_data" in command_support
+    assert "custom_field_data=custom_field_data" in specification_commands
+    assert "custom_field_data=proposed_values" in composition_commands
+    assert "custom_field_data=proposed_values" in history_commands
+    assert "write_custom_field_data" in seed_catalog
+    assert "def write_custom_field_data(" in shared_writer
     assert "def _software_for(self, sid: int, sw_name: str, mfr, Software, tenant)" in licenses
     assert "authorize_generic_owner_scope" in inventory
     assert "authorize_generic_owner_scope" in catalog

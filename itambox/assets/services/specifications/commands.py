@@ -7,6 +7,7 @@ codec/resolver; no alternate raw-JSON writer is provided here.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from django.core.exceptions import ValidationError
@@ -128,6 +129,7 @@ def _save_owner_or_rejection(
     owner_ref: OwnerRefDTO,
     *,
     update_fields: list[str] | tuple[str, ...],
+    custom_field_data: Mapping[str, object] | None = None,
 ) -> CommandRejectedDTO | None:
     try:
         save_owner_in_savepoint(
@@ -135,6 +137,7 @@ def _save_owner_or_rejection(
             actor,
             using=_DEFAULT_DB,
             update_fields=update_fields,
+            custom_field_data=custom_field_data,
         )
     except ValidationError as error:
         return map_reference_error(owner_ref, error)
@@ -183,7 +186,7 @@ def _update_asset_type_locked(
     )
     if isinstance(normalized, tuple):
         return rejected(owner_ref, *normalized)
-    proposed_values = dict(normalized.stored_values)
+    proposed_values = {str(key): value for key, value in normalized.stored_values.items()}
     if json_values_equal(owner.custom_field_data, proposed_values):
         return OwnerNoOpDTO(
             outcome="no_op",
@@ -192,12 +195,12 @@ def _update_asset_type_locked(
             definition_revision=actual_definition_revision,
         )
 
-    owner.custom_field_data = proposed_values
     rejection = _save_owner_or_rejection(
         owner,
         actor_model,
         owner_ref,
         update_fields=("custom_field_data", "updated_at"),
+        custom_field_data=proposed_values,
     )
     if rejection is not None:
         return rejection
@@ -375,7 +378,7 @@ def _update_asset_locked(
     )
     if isinstance(normalized, tuple):
         return rejected(owner_ref, *normalized)
-    proposed_values = dict(normalized.stored_values)
+    proposed_values = {str(key): value for key, value in normalized.stored_values.items()}
     type_changed = destination_type_id != owner.asset_type_id
     values_changed = not json_values_equal(owner.custom_field_data, proposed_values)
     if not type_changed and not values_changed:
@@ -386,7 +389,6 @@ def _update_asset_locked(
             definition_revision=actual_definition_revision,
         )
 
-    owner.custom_field_data = proposed_values
     update_fields = ["custom_field_data", "updated_at"]
     if type_changed:
         owner.asset_type_id = destination_type_id
@@ -396,6 +398,7 @@ def _update_asset_locked(
         actor_result,
         owner_ref,
         update_fields=update_fields,
+        custom_field_data=proposed_values,
     )
     if rejection is not None:
         return rejection

@@ -12,11 +12,9 @@ import hashlib
 import json
 import uuid
 from collections.abc import Mapping, Sequence
-from contextlib import contextmanager
 from datetime import date, datetime
 from decimal import Decimal
 from types import MappingProxyType
-from typing import Iterator
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -42,8 +40,8 @@ from assets.services.specifications.loader import (
     load_specification_graph,
     relevant_library_ids,
 )
-from core.context import _current_user, _request_id
 from extras.models import SpecificationLibrary
+from extras.services.custom_field_data import actor_change_context, write_custom_field_data
 from extras.services.specifications.codecs import (
     NormalizedSpecificationPatch,
     SpecificationCodecError,
@@ -366,32 +364,23 @@ def normalize_patch(
         return codec_issues(error)
 
 
-@contextmanager
-def actor_change_context(actor: object) -> Iterator[None]:
-    """Attribute one command save through the existing change-log context."""
-    user_token = _current_user.set(actor)
-    request_token = None
-    if not _request_id.get():
-        request_token = _request_id.set(uuid.uuid4())
-    try:
-        yield
-    finally:
-        if request_token is not None:
-            _request_id.reset(request_token)
-        _current_user.reset(user_token)
-
-
 def save_owner_in_savepoint(
     owner: Asset | AssetType | Category,
     actor: object,
     *,
     update_fields: Sequence[str],
+    custom_field_data: Mapping[str, object] | None = None,
     using: str = DEFAULT_DB_ALIAS,
 ) -> None:
     """Rollback model-hook side effects when the existing save rejects the command."""
+    fields = tuple(update_fields)
+    if "custom_field_data" in fields:
+        values = custom_field_data if custom_field_data is not None else owner.custom_field_data or {}
+        write_custom_field_data(owner, values, actor=actor, update_fields=fields, using=using)
+        return
     with transaction.atomic(using=using):
         with actor_change_context(actor):
-            owner.save(using=using, update_fields=list(update_fields))
+            owner.save(using=using, update_fields=list(fields))
 
 
 def reload_actor(actor: ActorContextDTO):
