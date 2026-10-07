@@ -179,7 +179,7 @@ class EnhancedPage(Page):
         pages_wanted = [1, n - 2, n - 1, n, n + 1, n + 2, self.paginator.num_pages]
         page_list = sorted(set(self.paginator.page_range).intersection(pages_wanted))
 
-        skip_pages = [x[1] for x in zip(page_list[:-1], page_list[1:]) if (x[1] - x[0] != 1)]
+        skip_pages = [x[1] for x in zip(page_list[:-1], page_list[1:], strict=False) if (x[1] - x[0] != 1)]
         for i in skip_pages:
             page_list.insert(page_list.index(i), False)
 

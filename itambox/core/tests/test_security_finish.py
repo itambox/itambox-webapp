@@ -212,7 +212,7 @@ class SearchTenantScopingTests(TestCase):
         # The query term appears in the page title/form, so we can't assertNotContains on it.
         # Instead verify the search returned zero results (not the asset from tenant B).
         results = resp.context.get("results", {})
-        for model, data in results.items():
+        for _model, data in results.items():
             for obj in data.get("queryset", []):
                 self.assertNotEqual(
                     getattr(obj, "asset_tag", None),

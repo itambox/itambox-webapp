@@ -72,7 +72,7 @@ class ResolveScannedCodeTests(TenantTestMixin, TestCase):
 
     def test_url_with_tag_segment(self):
         # URL whose last segment is an asset tag (not a numeric pk)
-        url = f"http://localhost:8000/assets/ITM-00001/"
+        url = "http://localhost:8000/assets/ITM-00001/"
         result = resolve_scanned_code(url)
         self.assertEqual(result, self.asset)
 
@@ -432,7 +432,7 @@ class ScanResolveViewTests(TenantTestMixin, TestCase):
 
     def test_found_by_itambox_scheme(self):
         self._login()
-        resp = self.client.get(self.url, {"code": f"itambox:SCAN-001"})
+        resp = self.client.get(self.url, {"code": "itambox:SCAN-001"})
         self.assertEqual(resp.status_code, 200)
         data = json.loads(resp.content)
         self.assertTrue(data["found"])

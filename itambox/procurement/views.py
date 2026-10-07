@@ -364,7 +364,7 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
         formset = ReceiveLineFormSet(initial=initial_data)
 
         context["formset"] = formset
-        context["lines_and_forms"] = list(zip(outstanding_lines, formset))
+        context["lines_and_forms"] = list(zip(outstanding_lines, formset, strict=False))
         context["step"] = "1"
         return context
 
@@ -424,7 +424,7 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
 
                 context = self.get_context_data(object=po)
                 context["formset"] = formset
-                context["lines_info"] = list(zip(lines_info, formset))
+                context["lines_info"] = list(zip(lines_info, formset, strict=False))
                 context["step"] = "2"
                 # Keep this operation's submitted snapshot: a corrected submission stays bound
                 # to the state it was prepared against and is refused if that state moved on.
@@ -480,7 +480,7 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
 
                     context = self.get_context_data(object=po)
                     context["formset"] = step2_formset
-                    context["lines_info"] = list(zip(lines_info, step2_formset))
+                    context["lines_info"] = list(zip(lines_info, step2_formset, strict=False))
                     context["step"] = "2"
                     # Carry this operation's snapshot into the step-2 form so its own submission
                     # stays bound to the same prepared state.
@@ -510,7 +510,7 @@ class PurchaseOrderReceiveFormView(ObjectDetailView):
 
                 context = self.get_context_data(object=po)
                 context["formset"] = formset
-                context["lines_and_forms"] = list(zip(outstanding_lines, formset))
+                context["lines_and_forms"] = list(zip(outstanding_lines, formset, strict=False))
                 context["step"] = "1"
                 return render(request, "procurement/purchaseorder_receive.html", context)
 

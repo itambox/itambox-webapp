@@ -100,7 +100,9 @@ class SeedComplianceMixin:
                 # assets physically sitting there so the session isn't empty.
                 session_location = None
                 if locs and random.random() < 0.4:
-                    loc_candidates = [l for l in locs if any(a.location_id == l.pk for a in tenant_assets)]
+                    loc_candidates = [
+                        location for location in locs if any(a.location_id == location.pk for a in tenant_assets)
+                    ]
                     session_location = random.choice(loc_candidates or locs)
 
                 if session_location:
@@ -192,7 +194,7 @@ class SeedComplianceMixin:
         self._custody_receipts = []
         new_receipts = 0
 
-        for slug, tenant in self._tenants.items():
+        for slug, _tenant in self._tenants.items():
             tenant_assets = self._assets_by_tenant.get(slug, [])
             if not tenant_assets:
                 continue

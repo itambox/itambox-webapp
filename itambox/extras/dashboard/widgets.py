@@ -1446,7 +1446,7 @@ class TenantSpendWidget(DashboardWidget):
             entry["max_total"] = max(entry["max_total"], entry["buckets"][code])
 
         tenant_spend = []
-        for t_id, entry in tenants.items():
+        for _t_id, entry in tenants.items():
             currency_spend = []
             for code, total in sorted(entry["buckets"].items(), key=lambda kv: kv[1], reverse=True):
                 currency_spend.append(

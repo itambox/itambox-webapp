@@ -257,7 +257,7 @@ class CoreTablesTestCase(TestCase):
         table.configure(request)
 
         # Ensure assigning mechanism and cache builder are run
-        for row in table.data:
+        for _row in table.data:
             pass
 
         # ObjectChangeTable render coverage

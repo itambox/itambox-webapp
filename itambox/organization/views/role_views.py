@@ -111,7 +111,7 @@ class RoleDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         role = self.object
         groups = {}
-        for key, info in MATRIX_MODELS.items():
+        for _key, info in MATRIX_MODELS.items():
             app, model = info["app"], info["model_name"]
             groups.setdefault(info.get("group", "Other"), []).append(
                 {
