@@ -4,22 +4,22 @@
   "coverage_series": "7.15",
   "policy_sha256": "d361fd8b3ad72413b002fabc4612c7646ef74b2bc39a07ef07c4884f47551845",
   "totals": {
-    "num_statements": 65471,
-    "covered_lines": 58165,
-    "line_rate": 88.84,
-    "num_branches": 18696,
-    "covered_branches": 14420,
-    "branch_rate": 77.13,
+    "num_statements": 65528,
+    "covered_lines": 58246,
+    "line_rate": 88.89,
+    "num_branches": 18756,
+    "covered_branches": 14486,
+    "branch_rate": 77.23,
     "excluded_lines": 50,
-    "measured_files": 639
+    "measured_files": 636
   },
   "decline_justification": {
-    "reason": "Issue #613 Graphene-to-Strawberry port: assets/schema.py keeps the assets<->software node reference lazy with a documented 'if TYPE_CHECKING:' import, which coverage counts as two excluded lines (the clause and its body) where the port replaced the previous module-level wiring. Only the excluded-line count changed; the recorded rates come from the same canonical CI run.",
-    "previous_line_rate": 88.73,
-    "previous_branch_rate": 76.89,
-    "previous_excluded_lines": 48,
-    "previous_measured_files": 634,
-    "previous_num_statements": 65032,
-    "previous_num_branches": 18588
+    "reason": "Merging main (#658, retirement of the repair-episode modules) into the Strawberry GraphQL port removes source files, so the measured file count falls from 639 to 636; that deletion is deliberate and was reviewed on main. The merged tree was measured in the same canonical CI run and no rate declined.",
+    "previous_line_rate": 88.84,
+    "previous_branch_rate": 77.13,
+    "previous_excluded_lines": 50,
+    "previous_measured_files": 639,
+    "previous_num_statements": 65471,
+    "previous_num_branches": 18696
   }
 }
