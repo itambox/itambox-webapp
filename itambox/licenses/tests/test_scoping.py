@@ -184,10 +184,10 @@ class ScopedCallSiteCoverageTests(TestCase):
         request.active_tenant = self.tenant
         queries = (
             "{ softwareList { id } }",
-            f'{{ software(id: "{self.software.pk}") {{ id }} }}',
+            '{ software(id: "' + str(self.software.pk) + '") { id } }',
             "{ licenses { id } }",
-            f'{{ license(id: "{self.lic.pk}") {{ id }} }}',
-            f'{{ subscription(id: "{self.sub.pk}") {{ id }} }}',
+            '{ license(id: "' + str(self.lic.pk) + '") { id } }',
+            '{ subscription(id: "' + str(self.sub.pk) + '") { id } }',
         )
         for query in queries:
             result = schema.execute_sync(query, context_value=request)
