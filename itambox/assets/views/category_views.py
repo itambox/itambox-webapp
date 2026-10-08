@@ -48,7 +48,9 @@ class CategoryDetailView(ObjectDetailView):
         )
         context["asset_types_table"] = asset_types_table
 
-        cat_accessories = Accessory.objects.filter(category=category).select_related("manufacturer")
+        cat_accessories = (
+            Accessory.objects.for_scope(Scope.current()).filter(category=category).select_related("manufacturer")
+        )
         accessories_table = tables.AccessoryTable(cat_accessories, request=self.request)
         RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(
             accessories_table
@@ -60,7 +62,8 @@ class CategoryDetailView(ObjectDetailView):
         from inventory.tables import ComponentTable
 
         cat_components = (
-            Component.objects.filter(category=category)
+            Component.objects.for_scope(Scope.current())
+            .filter(category=category)
             .select_related("manufacturer", "category", "tenant")
             .prefetch_related("tags")
         )
@@ -73,7 +76,8 @@ class CategoryDetailView(ObjectDetailView):
         from inventory.tables import ConsumableTable
 
         cat_consumables = (
-            Consumable.objects.filter(category=category)
+            Consumable.objects.for_scope(Scope.current())
+            .filter(category=category)
             .select_related("manufacturer", "category", "tenant")
             .prefetch_related("tags")
         )

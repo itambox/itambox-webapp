@@ -82,7 +82,11 @@ class ManufacturerDetailView(ObjectDetailView):
         from inventory.models import Component
         from inventory.tables import ComponentTable
 
-        comp_qs = Component.objects.filter(manufacturer=manufacturer).select_related("category", "tenant")
+        comp_qs = (
+            Component.objects.for_scope(Scope.current())
+            .filter(manufacturer=manufacturer)
+            .select_related("category", "tenant")
+        )
         components_table = ComponentTable(comp_qs, request=self.request)
         RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(components_table)
         context["components_table"] = components_table
@@ -91,7 +95,11 @@ class ManufacturerDetailView(ObjectDetailView):
         from inventory.models import Accessory
         from inventory.tables import AccessoryTable
 
-        acc_qs = Accessory.objects.filter(manufacturer=manufacturer).select_related("category", "tenant")
+        acc_qs = (
+            Accessory.objects.for_scope(Scope.current())
+            .filter(manufacturer=manufacturer)
+            .select_related("category", "tenant")
+        )
         accessories_table = AccessoryTable(acc_qs, request=self.request)
         RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(
             accessories_table
@@ -102,7 +110,11 @@ class ManufacturerDetailView(ObjectDetailView):
         from inventory.models import Consumable
         from inventory.tables import ConsumableTable
 
-        con_qs = Consumable.objects.filter(manufacturer=manufacturer).select_related("category", "tenant")
+        con_qs = (
+            Consumable.objects.for_scope(Scope.current())
+            .filter(manufacturer=manufacturer)
+            .select_related("category", "tenant")
+        )
         consumables_table = ConsumableTable(con_qs, request=self.request)
         RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(
             consumables_table

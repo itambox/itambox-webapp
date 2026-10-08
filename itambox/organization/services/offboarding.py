@@ -160,7 +160,9 @@ def _accessory_items(holder: AssetHolder) -> list[ObligationItem]:
             object_pk=item.pk,
             model_label="inventory.AccessoryAssignment",
         )
-        for item in AccessoryAssignment.objects.filter(assigned_holder=holder).select_related("accessory")
+        for item in AccessoryAssignment.objects.for_scope(Scope.current())
+        .filter(assigned_holder=holder)
+        .select_related("accessory")
     ]
 
 
@@ -175,7 +177,9 @@ def _component_items(holder: AssetHolder) -> list[ObligationItem]:
             object_pk=item.pk,
             model_label="inventory.ComponentAllocation",
         )
-        for item in ComponentAllocation.objects.filter(assigned_holder=holder).select_related("component")
+        for item in ComponentAllocation.objects.for_scope(Scope.current())
+        .filter(assigned_holder=holder)
+        .select_related("component")
     ]
 
 
@@ -190,7 +194,9 @@ def _consumable_items(holder: AssetHolder) -> list[ObligationItem]:
             object_pk=item.pk,
             model_label="inventory.ConsumableAssignment",
         )
-        for item in ConsumableAssignment.objects.filter(assigned_holder=holder).select_related("consumable")
+        for item in ConsumableAssignment.objects.for_scope(Scope.current())
+        .filter(assigned_holder=holder)
+        .select_related("consumable")
     ]
 
 

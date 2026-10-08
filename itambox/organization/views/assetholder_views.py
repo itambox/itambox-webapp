@@ -1,3 +1,4 @@
+from core.managers import Scope
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.contenttypes.models import ContentType
@@ -67,7 +68,7 @@ class AssetHolderDetailView(ObjectDetailView):
         from inventory.models import AccessoryAssignment
         from inventory.tables import AccessoryAssignmentTable
 
-        acc_assign_qs = AccessoryAssignment.objects.filter(assigned_holder=assetholder)
+        acc_assign_qs = AccessoryAssignment.objects.for_scope(Scope.current()).filter(assigned_holder=assetholder)
         accessory_assignments_table = AccessoryAssignmentTable(acc_assign_qs, request=self.request)
         accessory_assignments_table.configure(self.request)
         context["accessory_assignments_table"] = accessory_assignments_table
@@ -76,7 +77,7 @@ class AssetHolderDetailView(ObjectDetailView):
         from inventory.models import ConsumableAssignment
         from inventory.tables import ConsumableAssignmentTable
 
-        con_assign_qs = ConsumableAssignment.objects.filter(assigned_holder=assetholder)
+        con_assign_qs = ConsumableAssignment.objects.for_scope(Scope.current()).filter(assigned_holder=assetholder)
         consumable_dispatches_table = ConsumableAssignmentTable(con_assign_qs, request=self.request)
         consumable_dispatches_table.configure(self.request)
         context["consumable_dispatches_table"] = consumable_dispatches_table

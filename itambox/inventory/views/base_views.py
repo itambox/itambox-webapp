@@ -11,6 +11,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
 from django.views.generic import View
 
+from core.managers import Scope
 from inventory.services import checkout_inventory_item
 from itambox.views.generic.utils import safe_return_url
 
@@ -135,7 +136,7 @@ def bulk_checkout_inventory(request):
 
             for pk in object_pks:
                 try:
-                    item = item_model.objects.get(pk=pk)
+                    item = item_model.objects.for_scope(Scope.current()).get(pk=pk)
                     checkout_inventory_item(
                         item=item,
                         qty=qty,
@@ -164,7 +165,7 @@ def bulk_checkout_inventory(request):
             # Stocks page checkouts: from_location determined per stock record
             for pk in object_pks:
                 try:
-                    stock = stock_model.objects.get(pk=pk)
+                    stock = stock_model.objects.for_scope(Scope.current()).get(pk=pk)
                     item = getattr(stock, item_model.__name__.lower())
                     checkout_inventory_item(
                         item=item,

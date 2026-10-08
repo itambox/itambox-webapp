@@ -84,7 +84,12 @@ class AssetTypeDetailView(ObjectDetailView):
         from inventory.models import Kit
         from inventory.tables import KitTable
 
-        kits_qs = Kit.objects.filter(items__asset_type=assettype).distinct().select_related("tenant")
+        kits_qs = (
+            Kit.objects.for_scope(Scope.current())
+            .filter(items__asset_type=assettype)
+            .distinct()
+            .select_related("tenant")
+        )
         kits_table = KitTable(kits_qs, request=self.request)
         RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(kits_table)
         context["kits_table"] = kits_table

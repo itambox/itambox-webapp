@@ -31,7 +31,10 @@ from .stock_actions import StockAdjustView, StockCreateModalView
 
 class AccessoryListView(ObjectListView):
     queryset = (
-        Accessory.objects.with_counts().select_related("tenant", "manufacturer", "category").prefetch_related("tags")
+        Accessory.objects.for_scope(Scope.current())
+        .with_counts()
+        .select_related("tenant", "manufacturer", "category")
+        .prefetch_related("tags")
     )
     filterset = filters.AccessoryFilterSet
     filterset_form = forms.AccessoryFilterForm
@@ -80,7 +83,7 @@ class AccessoryDetailView(ObjectDetailView):
         context["stocks_table"] = stocks_table
 
         # Kits
-        kits_qs = Kit.objects.filter(items__accessory=accessory).distinct()
+        kits_qs = Kit.objects.for_scope(Scope.current()).filter(items__accessory=accessory).distinct()
         kits_table = tables.KitTable(kits_qs, request=self.request)
         kits_table.configure(self.request)
         context["kits_table"] = kits_table
