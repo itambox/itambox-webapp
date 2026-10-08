@@ -11,7 +11,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from assets.customfields import resolve_effective_custom_fields
-from core.forms import SlugModelForm
+from core.forms import SlugModelForm, TenantScopedFormMixin
 from extras.customfields import (
     CustomFieldModelFormMixin,
     build_custom_field_form_field,
@@ -219,7 +219,7 @@ def _history_entries(stored_values, current_definitions):
     return entries
 
 
-class AssetTypeForm(CustomFieldModelFormMixin, SlugModelForm):
+class AssetTypeForm(TenantScopedFormMixin, CustomFieldModelFormMixin, SlugModelForm):
     manufacturer = forms.ModelChoiceField(
         queryset=Manufacturer.objects.all(),
         widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
