@@ -6,6 +6,7 @@
 # moved to extras/forms.py.  This module no longer imports extras at all,
 # breaking the eager extras dependency.
 
+from .base import TenantScopedFormMixin, apply_tom_select, tenant_rows_exist
 from .mixins import (
     BULK_EDIT_FIELD_BLACKLIST,
     BULK_EDIT_FIELD_TYPE_MAP,
@@ -18,6 +19,13 @@ from .mixins import (
     JournalEntryForm,
     SearchForm,
     SlugModelForm,
+)
+from .scoping import (
+    TenantScopedAdminFormMixin,
+    TenantScopedFilterSetMixin,
+    TenantScopedModelChoiceField,
+    TenantScopedModelMultipleChoiceField,
+    apply_tenant_scoped_choices,
 )
 from .tenant import scope_tenant_field, scope_tenant_group_field
 
@@ -36,4 +44,12 @@ __all__ = [
     "ColorFieldFormMixin",
     "scope_tenant_field",
     "scope_tenant_group_field",
+    "TenantScopedFormMixin",
+    "TenantScopedAdminFormMixin",
+    "TenantScopedFilterSetMixin",
+    "TenantScopedModelChoiceField",
+    "TenantScopedModelMultipleChoiceField",
+    "apply_tenant_scoped_choices",
+    "apply_tom_select",
+    "tenant_rows_exist",
 ]
