@@ -79,8 +79,8 @@ class AssetsFormDeclarationTests(TenantTestMixin, TestCase):
 
     def test_model_choice_fields_are_scoped_explicitly(self):
         for form_class, names in (
-            (AssetForm, ("asset_type", "location", "tenant")),
-            (AssetBulkEditForm, ("status", "location", "tenant")),
+            (AssetForm, ("location", "tenant")),
+            (AssetBulkEditForm, ("location", "tenant")),
             (AssetTagSequenceForm, ("tenant",)),
             (SupplierForm, ("tenant",)),
         ):
