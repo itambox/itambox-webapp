@@ -6,7 +6,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Manufacturer  # Import Manufacturer
-from core.forms import CrispyFormMixin, FilterForm, scope_tenant_field
+from core.forms import CrispyFormMixin, FilterForm, TenantScopedFormMixin
 
 # =============================================================================
 # Software
@@ -18,8 +18,12 @@ from .filters import SoftwareFilterSet
 from .models import InstalledSoftware, Software
 
 
-class SoftwareForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
+class SoftwareForm(TenantScopedFormMixin, CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
     """Form for creating and updating Software instances."""
+
+    # Software is a shared catalogue (a null tenant is a global entry), so the
+    # tenant stays optional; only the single-accessible-tenant preset applies.
+    tenant_autoset_when_single = True
 
     manufacturer = forms.ModelChoiceField(
         queryset=Manufacturer.objects.all(),
@@ -61,7 +65,6 @@ class SoftwareForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        scope_tenant_field(self)
         self.fields["tenant"].required = False
 
         if self.instance and self.instance.pk:
@@ -105,7 +108,7 @@ class SoftwareForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
         self.append_custom_fields_to_layout()
 
 
-class InstalledSoftwareForm(forms.ModelForm):
+class InstalledSoftwareForm(TenantScopedFormMixin, forms.ModelForm):
     """Record a software installation on an asset (asset-scoped quick-add)."""
 
     install_date = forms.DateField(
