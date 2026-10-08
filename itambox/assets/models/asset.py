@@ -1,5 +1,3 @@
-from assets.models.tagsequence import AssetTagSequence
-
 """Asset state machine and the core Asset model."""
 
 import datetime
@@ -18,6 +16,7 @@ from django.utils.translation import ngettext
 
 from assets.choices import StatusTypeChoices
 from assets.model_book_value import compute_book_value
+from assets.models.tagsequence import AssetTagSequence
 from core.currency import CurrencyField
 from core.managers import ExplicitScopeAllObjectsManager, ExplicitScopeSoftDeleteManager
 from core.mixins import BookmarkableMixin, CustomFieldDataMixin, SubscribableMixin

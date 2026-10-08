@@ -1,4 +1,5 @@
 import re
+from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -12,7 +13,7 @@ from model_bakery import baker
 from assets.models import Asset, StatusLabel, Supplier
 from extras.models import JournalEntry
 from licenses.models import License
-from organization.models import Location, Site, Tenant, TenantGroup
+from organization.models import AssetHolder, Location, Site, Tenant, TenantGroup
 from software.models import Software
 from subscriptions.models import (
     BillingCycleChoices,
@@ -341,11 +342,6 @@ class SubscriptionAssignmentViewTests(TestCase):
         resp = self.client.post(url)
         self.assertEqual(resp.status_code, 302)
         self.assertFalse(SubscriptionAssignment.objects.filter(pk=assignment.pk).exists())
-
-
-from datetime import date
-
-from organization.models import AssetHolder
 
 
 class SubscriptionLifecycleViewTests(TestCase):

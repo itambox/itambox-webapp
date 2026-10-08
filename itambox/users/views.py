@@ -4,10 +4,12 @@ import json
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.views import PasswordChangeView as DjangoPasswordChangeView
 from django.core.exceptions import ValidationError
-from django.http import HttpResponse
+from django.db import transaction
+from django.db.models import Count, Prefetch
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext as _
@@ -22,14 +24,34 @@ from core.context import get_current_all_accessible, get_current_tenant, get_cur
 from core.models import ObjectChange
 from core.tables import ObjectChangeTable
 from itambox.utils import get_paginate_count
-from itambox.views.generic import BaseHTMXView
+from itambox.views.generic import (
+    BaseHTMXView,
+    ObjectBulkDeleteView,
+    ObjectBulkEditView,
+    ObjectDeleteView,
+    ObjectDetailView,
+    ObjectEditView,
+    ObjectListView,
+    safe_return_url,
+)
 from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids
 from organization.models import RoleGrant, Tenant
 from organization.services.role_grant_validation import validate_group_membership_grant
 
-from .forms import UserPreferencesForm, UserProfileForm
-from .models import UserPreference
+from .filters import UserFilterSet, UserGroupFilterSet
+from .forms import (
+    UserBulkEditForm,
+    UserFilterForm,
+    UserForm,
+    UserGroupAssignUsersForm,
+    UserGroupFilterForm,
+    UserGroupForm,
+    UserPreferencesForm,
+    UserProfileForm,
+)
+from .models import GroupMembership, UserGroup, UserPreference
 from .services import clear_workspace_session
+from .tables import UserGroupTable, UserTable
 
 User = get_user_model()
 
@@ -499,20 +521,6 @@ class WatchToggleView(LoginRequiredMixin, View):
 
 
 # User Management Views (Frontend Admin)
-from django.http import HttpResponseRedirect
-
-from itambox.views.generic import (
-    ObjectBulkEditView,
-    ObjectDeleteView,
-    ObjectDetailView,
-    ObjectEditView,
-    ObjectListView,
-    safe_return_url,
-)
-
-from .filters import UserFilterSet
-from .forms import UserBulkEditForm, UserFilterForm, UserForm
-from .tables import UserTable
 
 
 def _user_scope_tenant_ids(user):
@@ -686,16 +694,6 @@ class UserDeleteView(ObjectDeleteView):
 
 # --------------------------------------------------------------------------- UserGroup
 # Relocated from organization/ — UserGroup is an identity-layer construct.
-from django.contrib.auth.mixins import UserPassesTestMixin
-from django.db import transaction
-from django.db.models import Count, Prefetch
-
-from itambox.views.generic import ObjectBulkDeleteView
-
-from .filters import UserGroupFilterSet
-from .forms import UserGroupAssignUsersForm, UserGroupFilterForm, UserGroupForm
-from .models import GroupMembership, UserGroup
-from .tables import UserGroupTable
 
 
 def _group_admin_tenant_ids(user, perms):

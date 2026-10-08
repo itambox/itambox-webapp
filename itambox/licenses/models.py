@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from assets.models import Asset
 from core.crypto import decrypt_string, encrypt_string
 from core.currency import CurrencyField
+from core.managers import AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingSoftDeleteQuerySet
 from core.mixins import BookmarkableMixin, CustomFieldDataMixin, SoftDeleteMixin
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel
 from extras.models import Tag
@@ -18,9 +19,6 @@ class LicenseTypeChoices(models.TextChoices):
     PERPETUAL_SEAT = "perpetual_seat", _("Perpetual Seat")
     SUBSCRIPTION_SEAT = "subscription_seat", _("Subscription Seat")
     # Add others like 'Device', 'User CAL', 'Processor', 'Core' if needed later
-
-
-from core.managers import AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingSoftDeleteQuerySet
 
 
 class LicenseQuerySet(TenantScopingSoftDeleteQuerySet):

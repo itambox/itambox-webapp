@@ -13,6 +13,7 @@ from core.config_contract import (
     validate_db_password,
     validate_secret_key,
 )
+from core.crypto import is_using_derived_encryption_key
 
 from .base import *
 
@@ -213,7 +214,6 @@ if CACHE_BACKEND == "locmem":
 # stable ITAMBOX_FIELD_ENCRYPTION_KEYS is set. In that mode, rotating SECRET_KEY
 # silently makes every encrypted field (License.product_key, EmailSettings
 # smtp_password, WebhookEndpoint.secret) permanently unrecoverable. Warn loudly.
-from core.crypto import is_using_derived_encryption_key
 
 if is_using_derived_encryption_key():
     import logging

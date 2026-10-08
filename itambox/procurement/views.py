@@ -2,12 +2,14 @@ import json
 from decimal import Decimal
 
 from django.contrib import messages
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
+from django.views import View
 
 from core.managers import Scope
 from itambox.views.generic import ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
@@ -142,10 +144,6 @@ class PurchaseOrderDeleteView(ObjectDeleteView):
     queryset = PurchaseOrder.objects.all()
     permission_required = "procurement.delete_purchaseorder"
     default_return_url = reverse_lazy("procurement:purchaseorder_list")
-
-
-from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.views import View
 
 
 class PurchaseOrderLineAddView(PermissionRequiredMixin, View):

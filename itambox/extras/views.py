@@ -1,5 +1,6 @@
 import datetime
 import json
+import logging
 
 from croniter import croniter
 from django.apps import apps
@@ -13,6 +14,8 @@ from django.db.models import Count
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django.utils.html import escape
 from django.utils.http import urlencode
 from django.utils.translation import gettext, ngettext
@@ -43,22 +46,62 @@ from itambox.views.generic import (
     ObjectListView,
 )
 from itambox.views.generic.mixins import CapabilityRequiredMixin, is_managed_definition
+from itambox.views.generic.service_views import SimplePostView
 from itambox.views.generic.utils import safe_return_url
 from users.models import UserPreference  # Import UserPreference
 
-from .filters import CustomFieldFilterSet, CustomFieldsetFilterSet, SavedFilterFilterSet, TagFilter
+from .filters import (
+    AlertLogFilterSet,
+    AlertRuleFilterSet,
+    CustomFieldFilterSet,
+    CustomFieldsetFilterSet,
+    NotificationChannelFilterSet,
+    ReportTemplateFilterSet,
+    SavedFilterFilterSet,
+    ScheduledReportFilterSet,
+    TagFilter,
+)
 from .forms import (
+    AlertLogFilterForm,
+    AlertRuleFilterForm,
+    AlertRuleForm,
     CustomFieldFilterForm,
     CustomFieldForm,
     CustomFieldsetFilterForm,
     CustomFieldsetForm,
+    NotificationChannelFilterForm,
+    NotificationChannelForm,
+    ReportTemplateFilterForm,
+    ReportTemplateForm,
     SavedFilterFilterForm,
     SavedFilterForm,
+    ScheduledReportFilterForm,
+    ScheduledReportForm,
     TagFilterForm,
     TagForm,
 )
-from .models import CustomField, CustomFieldset, SavedFilter, Tag
-from .tables import CustomFieldsetTable, CustomFieldTable, SavedFilterTable, TagTable
+from .models import (
+    AlertLog,
+    AlertRule,
+    CustomField,
+    CustomFieldset,
+    NotificationChannel,
+    ReportTemplate,
+    SavedFilter,
+    ScheduledReport,
+    Tag,
+)
+from .tables import (
+    AlertLogTable,
+    AlertRuleTable,
+    CustomFieldsetTable,
+    CustomFieldTable,
+    NotificationChannelTable,
+    ReportTemplateTable,
+    SavedFilterTable,
+    ScheduledReportTable,
+    TagTable,
+)
 
 
 class TagDetailView(ObjectDetailView):
@@ -355,39 +398,7 @@ class SavedFilterSaveView(LoginRequiredMixin, PermissionRequiredMixin, View):
 # =============================================================================
 # Alerting Views
 # =============================================================================
-import logging
 
-from django.utils import timezone
-from django.utils.decorators import method_decorator
-
-from itambox.views.generic.service_views import SimplePostView
-
-from .filters import (
-    AlertLogFilterSet,
-    AlertRuleFilterSet,
-    NotificationChannelFilterSet,
-    ReportTemplateFilterSet,
-    ScheduledReportFilterSet,
-)
-from .forms import (
-    AlertLogFilterForm,
-    AlertRuleFilterForm,
-    AlertRuleForm,
-    NotificationChannelFilterForm,
-    NotificationChannelForm,
-    ReportTemplateFilterForm,
-    ReportTemplateForm,
-    ScheduledReportFilterForm,
-    ScheduledReportForm,
-)
-from .models import AlertLog, AlertRule, NotificationChannel, ReportTemplate, ScheduledReport
-from .tables import (
-    AlertLogTable,
-    AlertRuleTable,
-    NotificationChannelTable,
-    ReportTemplateTable,
-    ScheduledReportTable,
-)
 
 logger = logging.getLogger(__name__)
 
