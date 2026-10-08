@@ -29,6 +29,7 @@ from assets.services.request_fulfillment import (
     manually_complete_request,
     request_fulfillment_labels,
 )
+from core.managers import Scope
 from inventory.services import checkout_inventory_item
 from itambox.panels import Panel
 from itambox.views.generic import (
@@ -72,7 +73,7 @@ def _request_action_tenant_ids(user):
 
 @transaction.atomic
 def approve_asset_request(request_instance, user, request=None, **kwargs):
-    request_instance = AssetRequest.objects.select_for_update().get(pk=request_instance.pk)
+    request_instance = AssetRequest.objects.for_scope(Scope.current()).select_for_update().get(pk=request_instance.pk)
     if request_instance.status != RequestStatusChoices.PENDING:
         raise ValidationError(_("Only pending requests can be approved."))
 
@@ -120,7 +121,7 @@ def approve_asset_request(request_instance, user, request=None, **kwargs):
 
 @transaction.atomic
 def deny_asset_request(request_instance, user, request=None, **kwargs):
-    request_instance = AssetRequest.objects.select_for_update().get(pk=request_instance.pk)
+    request_instance = AssetRequest.objects.for_scope(Scope.current()).select_for_update().get(pk=request_instance.pk)
     if request_instance.status != RequestStatusChoices.PENDING:
         raise ValidationError(_("Only pending requests can be denied."))
 
@@ -201,7 +202,7 @@ class RequestListView(ObjectListView):
         group_ids = [req.pk for req in candidates if req.is_group]
         group_units = {}
         if group_ids:
-            units = AssetRequest.objects.filter(
+            units = AssetRequest.objects.for_scope(Scope.current()).filter(
                 parent_id__in=group_ids,
                 status=RequestStatusChoices.APPROVED,
                 is_group=False,
@@ -382,7 +383,7 @@ class RequestCancelView(SimplePostView):
                 )
             lock_unit_fulfillment_links(candidate_unit_ids)
 
-            obj = AssetRequest.objects.select_for_update().get(pk=obj.pk)
+            obj = AssetRequest.objects.for_scope(Scope.current()).select_for_update().get(pk=obj.pk)
             if obj.status not in [
                 RequestStatusChoices.PENDING,
                 RequestStatusChoices.APPROVED,
@@ -428,7 +429,8 @@ class RequestClaimView(SimplePostView):
     def _claim_units(self, obj):
         if obj.is_group:
             all_children = list(
-                AssetRequest.objects.select_for_update()
+                AssetRequest.objects.for_scope(Scope.current())
+                .select_for_update()
                 .filter(
                     parent_id=obj.pk,
                     tenant_id=obj.tenant_id,
@@ -502,10 +504,12 @@ class RequestClaimView(SimplePostView):
 
     def _checkout_asset_unit(self, req, request, holder, location, asset_target):
         existing_assignment_ids = set(
-            AssetAssignment.objects.filter(
+            AssetAssignment.objects.for_scope(Scope.current())
+            .filter(
                 asset_id=req.asset_id,
                 is_active=True,
-            ).values_list("pk", flat=True)
+            )
+            .values_list("pk", flat=True)
         )
         checkout_result = checkout_asset(
             asset=req.asset,
@@ -518,11 +522,15 @@ class RequestClaimView(SimplePostView):
         )
         if checkout_result is None:
             raise ValidationError(_("Checkout did not return a recorded handover."))
-        assignments = AssetAssignment.objects.filter(
-            asset_id=req.asset_id,
-            is_active=True,
-            checked_out_by_id=request.user.pk,
-        ).exclude(pk__in=existing_assignment_ids)
+        assignments = (
+            AssetAssignment.objects.for_scope(Scope.current())
+            .filter(
+                asset_id=req.asset_id,
+                is_active=True,
+                checked_out_by_id=request.user.pk,
+            )
+            .exclude(pk__in=existing_assignment_ids)
+        )
         if holder is not None:
             assignments = assignments.filter(assigned_user_id=holder.pk)
         if location is not None:
@@ -540,10 +548,14 @@ class RequestClaimView(SimplePostView):
             raise PermissionDenied(_("You do not have permission to claim this asset."))
 
         with transaction.atomic():
-            obj = AssetRequest.objects.select_for_update().get(
-                pk=obj.pk,
-                tenant_id=obj.tenant_id,
-                deleted_at__isnull=True,
+            obj = (
+                AssetRequest.objects.for_scope(Scope.current())
+                .select_for_update()
+                .get(
+                    pk=obj.pk,
+                    tenant_id=obj.tenant_id,
+                    deleted_at__isnull=True,
+                )
             )
 
             if obj.status != RequestStatusChoices.APPROVED:
@@ -696,7 +708,9 @@ class RequestBulkReceiveView(LoginRequiredMixin, View):
         selected_ids = {req.pk for req in selected_requests}
         group_ids = [req.pk for req in approved_requests if req.is_group]
         child_requests = list(
-            AssetRequest.objects.filter(parent_id__in=group_ids, deleted_at__isnull=True).select_related(
+            AssetRequest.objects.for_scope(Scope.current())
+            .filter(parent_id__in=group_ids, deleted_at__isnull=True)
+            .select_related(
                 "asset_type",
                 "requester",
                 "asset",
@@ -724,7 +738,11 @@ class RequestBulkReceiveView(LoginRequiredMixin, View):
         for form in formset:
             try:
                 request_id = int(form["request_id"].value())
-                req = AssetRequest.objects.filter(pk=request_id, deleted_at__isnull=True).first()
+                req = (
+                    AssetRequest.objects.for_scope(Scope.current())
+                    .filter(pk=request_id, deleted_at__isnull=True)
+                    .first()
+                )
             except (TypeError, ValueError):
                 req = None
             requests_data.append((req, form))

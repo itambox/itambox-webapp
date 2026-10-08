@@ -6,6 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.models import Supplier
 from core.forms import FilterForm, scope_tenant_field
+from core.managers import Scope
 
 from .filters import ContractFilterSet, PurchaseOrderFilterSet
 from .models import Contract, PurchaseOrder, PurchaseOrderLine
@@ -53,7 +54,7 @@ class PurchaseOrderForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["supplier"].queryset = Supplier.objects.filter(is_active=True)
+        self.fields["supplier"].queryset = Supplier.objects.for_scope(Scope.current()).filter(is_active=True)
         scope_tenant_field(self)
         self.helper = FormHelper()
         self.helper.layout = Layout(
@@ -242,7 +243,7 @@ class ContractForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["supplier"].queryset = Supplier.objects.filter(is_active=True)
+        self.fields["supplier"].queryset = Supplier.objects.for_scope(Scope.current()).filter(is_active=True)
         scope_tenant_field(self)
         self.fields["cost_center"].label_from_instance = lambda cost_center: (
             f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
@@ -374,7 +375,7 @@ class BaseAssetProvisionFormSet(forms.BaseFormSet):
                     form.add_error("asset_tag", _("Duplicate asset tag in this batch."))
                 tags.add(tag)
                 # Check DB for duplicate tag
-                if Asset.objects.filter(asset_tag=tag).exists():
+                if Asset.objects.for_scope(Scope.current()).filter(asset_tag=tag).exists():
                     form.add_error("asset_tag", _("An asset with tag '%(tag)s' already exists.") % {"tag": tag})
 
             if serial:
@@ -383,7 +384,7 @@ class BaseAssetProvisionFormSet(forms.BaseFormSet):
                     form.add_error("serial_number", _("Duplicate serial number in this batch."))
                 serials.add(serial)
                 # Check DB for duplicate serial
-                if Asset.objects.filter(serial_number=serial).exists():
+                if Asset.objects.for_scope(Scope.current()).filter(serial_number=serial).exists():
                     form.add_error(
                         "serial_number",
                         _("An asset with serial number '%(serial)s' already exists.") % {"serial": serial},

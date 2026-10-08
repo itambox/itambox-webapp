@@ -41,6 +41,7 @@ from assets.models import (
 )
 from assets.models.choices import ReservationStatusChoices
 from compliance.models import CustodyReceipt
+from core.managers import Scope
 from inventory.models import (
     AccessoryAssignment,
     ComponentAllocation,
@@ -128,8 +129,12 @@ def _holder_user(holder: AssetHolder):
 def _asset_assignment_items(holder: AssetHolder) -> list[ObligationItem]:
     """Active asset assignments handed to this holder."""
     items: list[ObligationItem] = []
-    for assignment in AssetAssignment.objects.filter(assigned_user=holder, is_active=True).select_related(
-        "asset",
+    for assignment in (
+        AssetAssignment.objects.for_scope(Scope.current())
+        .filter(assigned_user=holder, is_active=True)
+        .select_related(
+            "asset",
+        )
     ):
         items.append(
             ObligationItem(
@@ -233,7 +238,7 @@ def _custody_items(holder: AssetHolder) -> list[ObligationItem]:
 def _request_items(holder: AssetHolder) -> list[ObligationItem]:
     """Open asset requests where this person is the requester *or* the assignee."""
     user = _holder_user(holder)
-    qs = AssetRequest.objects.filter(status__in=_OPEN_REQUEST_STATUSES)
+    qs = AssetRequest.objects.for_scope(Scope.current()).filter(status__in=_OPEN_REQUEST_STATUSES)
     if user is not None:
         qs = qs.filter(Q(requester=user) | Q(assigned_user=holder))
     else:
@@ -257,11 +262,15 @@ def _request_items(holder: AssetHolder) -> list[ObligationItem]:
 def _reservation_items(holder: AssetHolder) -> list[ObligationItem]:
     """Reservations of an asset that are still inside their window."""
     today = date.today()
-    qs = AssetReservation.objects.filter(
-        reserved_for=holder,
-        status__in=_OPEN_RESERVATION_STATUSES,
-        end_date__gte=today,
-    ).select_related("asset")
+    qs = (
+        AssetReservation.objects.for_scope(Scope.current())
+        .filter(
+            reserved_for=holder,
+            status__in=_OPEN_RESERVATION_STATUSES,
+            end_date__gte=today,
+        )
+        .select_related("asset")
+    )
     return [
         ObligationItem(
             kind="asset_reservation",

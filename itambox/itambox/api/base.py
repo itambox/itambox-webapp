@@ -9,6 +9,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.utils.serializer_helpers import BindingDict
 
+from core.managers import Scope
 from itambox.api.exceptions import SerializerNotFound
 from itambox.api.related import get_related_object_by_attrs
 
@@ -75,7 +76,19 @@ class BaseModelSerializer(serializers.ModelSerializer[Any]):
         for field_name in set(self._omit_fields):
             fields.pop(field_name, None)
 
+        self._scope_related_querysets(fields)
         return fields
+
+    @staticmethod
+    # typing: third-party-untyped: DRF related fields carry heterogeneous querysets
+    def _scope_related_querysets(fields: BindingDict) -> None:
+        """Scope writable related-field querysets to the request's explicit ``Scope``."""
+        scope = Scope.current()
+        for field in fields.values():
+            related = getattr(field, "child_relation", field)
+            queryset = getattr(related, "queryset", None)
+            if queryset is not None and hasattr(queryset, "for_scope"):
+                related.queryset = queryset.all().for_scope(scope)
 
     @extend_schema_field(OpenApiTypes.STR)
     # typing: third-party-untyped: DRF model serializer hooks accept each concrete child model

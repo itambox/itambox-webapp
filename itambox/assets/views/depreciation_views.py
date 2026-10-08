@@ -1,6 +1,7 @@
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
+from core.managers import Scope
 from itambox.panels import Panel
 from itambox.views.generic import (
     ObjectCloneView,
@@ -47,7 +48,8 @@ class DepreciationDetailView(ObjectDetailView):
 
         # Active Assets Amortization Schedule (using this depreciation rule)
         asset_qs = (
-            Asset.objects.filter(asset_type__depreciation=depreciation)
+            Asset.objects.for_scope(Scope.current())
+            .filter(asset_type__depreciation=depreciation)
             .select_related(
                 "asset_role",
                 "asset_type",

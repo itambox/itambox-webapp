@@ -69,6 +69,7 @@ from assets.services.specifications.contracts import (
 )
 from assets.services.specifications.locking import catalogue_transaction_lock
 from assets.specification_adapters import actor_context_for_user
+from core.managers import Scope
 from itambox.api.permissions import StrictTenantPermission, TokenPermissions
 from itambox.api.viewsets import ITAMBoxModelViewSet
 
@@ -774,7 +775,8 @@ class CategoryViewSet(SpecificationContractMixin, ITAMBoxModelViewSet):
 
 class AssetRequestViewSet(ITAMBoxModelViewSet):
     queryset = (
-        AssetRequest.objects.select_related("requester", "asset", "asset_type__manufacturer", "responded_by")
+        AssetRequest.objects.for_scope(Scope.current())
+        .select_related("requester", "asset", "asset_type__manufacturer", "responded_by")
         .prefetch_related("tags")
         .all()
     )

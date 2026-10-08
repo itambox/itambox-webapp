@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, Supplier
 from core.forms import CrispyFormMixin, FilterForm, scope_tenant_field
+from core.managers import Scope
 from extras.customfields import CustomFieldModelFormMixin
 from extras.models import Tag
 from organization.models import AssetHolder
@@ -86,7 +87,7 @@ class LicenseForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         scope_tenant_field(self)
-        self.fields["supplier"].queryset = Supplier.objects.filter(is_active=True)
+        self.fields["supplier"].queryset = Supplier.objects.for_scope(Scope.current()).filter(is_active=True)
         # Rescope the tenant-owned `cost_center`/`subscription` FK pickers per
         # request (import-frozen unscoped). `software` is validated same-tenant in
         # License.clean(); `supplier` is a global catalogue model.

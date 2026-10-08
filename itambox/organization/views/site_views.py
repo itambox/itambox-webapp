@@ -7,6 +7,7 @@ from django_tables2 import RequestConfig
 
 from assets.models import Asset
 from assets.tables import AssetTable
+from core.managers import Scope
 from itambox.panels import Panel
 from itambox.utils import get_paginate_count
 from itambox.views.generic import (
@@ -56,7 +57,7 @@ class SiteDetailView(ObjectDetailView):
         locations_table = LocationTable(site.locations.all(), request=self.request)
         locations_table.configure(self.request)
 
-        site_assets = Asset.objects.filter(location__site=site)
+        site_assets = Asset.objects.for_scope(Scope.current()).filter(location__site=site)
         assets_table = AssetTable(site_assets, request=self.request)
         assets_table.configure(self.request)
 
@@ -105,7 +106,7 @@ class SiteDeleteView(ObjectDeleteView):
     def post(self, request, *args, **kwargs):
         site = self.get_object()
         location_count = site.locations.count()
-        asset_count = Asset.objects.filter(location__site=site).count()
+        asset_count = Asset.objects.for_scope(Scope.current()).filter(location__site=site).count()
 
         if location_count > 0 or asset_count > 0:
             related_object_details = []

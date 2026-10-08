@@ -19,7 +19,7 @@ from assets.models.choices import (
     WarrantyTypeChoices,
 )
 from core.currency import CurrencyField
-from core.managers import TenantScopingAllObjectsManager, TenantScopingSoftDeleteManager
+from core.managers import ExplicitScopeAllObjectsManager, ExplicitScopeSoftDeleteManager, Scope
 from core.mixins import FileAttachmentMixin, JournalingMixin, SoftDeleteMixin
 from core.models import BaseModel, ChangeLoggingMixin
 
@@ -63,8 +63,8 @@ class AssetDisposal(FileAttachmentMixin, JournalingMixin, SoftDeleteMixin, Chang
     """
 
     tenant_lookup = "asset__tenant"
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     @property
     def tenant(self):
@@ -260,8 +260,8 @@ class Warranty(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     """
 
     tenant_lookup = "asset__tenant"
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     @property
     def tenant(self):
@@ -336,8 +336,8 @@ class AssetReservation(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, Bas
     """Reservation of an asset for a specific holder within a date window."""
 
     tenant_lookup = "asset__tenant"
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     @property
     def tenant(self):
@@ -434,7 +434,7 @@ class AssetReservation(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, Bas
         reservation never raises a false overlap — matching the DB
         ExclusionConstraint, whose condition already excludes deleted rows.
         """
-        qs = AssetReservation.objects.filter(
+        qs = AssetReservation.objects.for_scope(Scope.current()).filter(
             asset=self.asset,
             status__in=[ReservationStatusChoices.ACTIVE, ReservationStatusChoices.PENDING],
             start_date__lte=self.end_date,

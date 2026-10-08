@@ -24,6 +24,7 @@ from assets.tasks.labels import _default_label_card, generate_base64_barcode, re
 from compliance.audit_services import audit_asset_from_form
 from compliance.models import CustodyReceipt
 from compliance.services import scope_custody_receipts
+from core.managers import Scope
 from inventory.models import AccessoryAssignment, ConsumableAssignment
 from inventory.tables import AccessoryAssignmentTable, ConsumableAssignmentTable
 from itambox.panels import Panel
@@ -171,7 +172,11 @@ class AssetDetailView(ObjectDetailView):
         # Requests
         from ..models import AssetRequest
 
-        req_qs = AssetRequest.objects.filter(asset=asset).select_related("requester", "asset", "asset_type")
+        req_qs = (
+            AssetRequest.objects.for_scope(Scope.current())
+            .filter(asset=asset)
+            .select_related("requester", "asset", "asset_type")
+        )
         requests_table = tables.AssetRequestTable(req_qs, request=self.request)
         RequestConfig(self.request, paginate={"per_page": 10}).configure(requests_table)
         context["requests_table"] = requests_table
@@ -261,7 +266,9 @@ class AssetDetailView(ObjectDetailView):
         if self.request.user.is_authenticated:
             from assets.models import AssetRequest
 
-            approved_request_qs = AssetRequest.objects.filter(asset=asset, status=RequestStatusChoices.APPROVED)
+            approved_request_qs = AssetRequest.objects.for_scope(Scope.current()).filter(
+                asset=asset, status=RequestStatusChoices.APPROVED
+            )
             for req in approved_request_qs:
                 if can_asset_request_action(self.request.user, req, "claim"):
                     approved_request = req
@@ -385,7 +392,7 @@ class AssetCheckoutView(GenericTransactionView):
             from ..models import AssetRequest
 
             try:
-                asset_request = AssetRequest.objects.get(pk=request_id)
+                asset_request = AssetRequest.objects.for_scope(Scope.current()).get(pk=request_id)
                 if "initial" not in kwargs:
                     kwargs["initial"] = {}
                 initial = kwargs["initial"]
@@ -420,7 +427,8 @@ class AssetCheckoutView(GenericTransactionView):
         if obj.asset_type_id:
             request_filter |= Q(asset__isnull=True, asset_type_id=obj.asset_type_id)
         asset_request = (
-            AssetRequest.objects.filter(
+            AssetRequest.objects.for_scope(Scope.current())
+            .filter(
                 pk=request_id,
                 status__in=(RequestStatusChoices.PENDING, RequestStatusChoices.APPROVED),
             )
@@ -574,7 +582,7 @@ def _resolve_label_batch_assets(request, raw_pks):
     # Resolve through the active tenant/group/aggregate queryset first. The
     # per-object view check is still required because queryset visibility and
     # the asset's actual label-disclosure permission are separate boundaries.
-    assets = list(Asset.objects.filter(pk__in=normalized_pks))
+    assets = list(Asset.objects.for_scope(Scope.current()).filter(pk__in=normalized_pks))
     assets_by_pk = {asset.pk: asset for asset in assets}
     if len(assets) != len(normalized_pks) or not all(
         request.user.has_perm("assets.view_asset", obj=asset) for asset in assets

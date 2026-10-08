@@ -4,7 +4,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset
-from core.managers import get_current_tenant
+from core.managers import Scope, get_current_tenant
 from organization.access import resolved_shared_stock_ids
 from organization.models import AssetHolder, Location, TenantResourceGrant
 
@@ -55,7 +55,9 @@ class BaseCheckoutForm(forms.Form):
             self.fields["assigned_location"].queryset = (
                 Location.objects.filter(tenant=scope_tenant).select_related("site").order_by("site__name", "name")
             )
-            self.fields["assigned_asset"].queryset = Asset.objects.filter(tenant=scope_tenant).order_by("asset_tag")
+            self.fields["assigned_asset"].queryset = (
+                Asset.objects.for_scope(Scope.current()).filter(tenant=scope_tenant).order_by("asset_tag")
+            )
             source_q = Q(tenant=scope_tenant)
             shared_location_ids = self._shared_pool_location_ids(item, stock_model, user)
             if shared_location_ids:

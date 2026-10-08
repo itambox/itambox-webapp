@@ -88,7 +88,7 @@ class LocationDetailView(ObjectDetailView):
         from assets.models import AssetAssignment
         from organization.tables import AssetAssignmentTable
 
-        asset_assignments_qs = AssetAssignment.objects.filter(assigned_location=location)
+        asset_assignments_qs = AssetAssignment.objects.for_scope(Scope.current()).filter(assigned_location=location)
         asset_assignments_table = AssetAssignmentTable(asset_assignments_qs, request=self.request)
         asset_assignments_table.configure(self.request)
         context["asset_assignments_table"] = asset_assignments_table

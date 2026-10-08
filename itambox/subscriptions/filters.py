@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.models import Supplier
 from core.filters import BaseFilterSet
+from core.managers import Scope
 from organization.models import CostCenter, Tenant
 
 from .models import Subscription, SubscriptionAssignment, SubscriptionStatusChoices, SubscriptionTypeChoices
@@ -69,7 +70,7 @@ class SubscriptionFilterSet(BaseFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.filters["supplier"].queryset = Supplier.objects.filter(is_active=True)
+        self.filters["supplier"].queryset = Supplier.objects.for_scope(Scope.current()).filter(is_active=True)
         self.filters["cost_center"].field.label_from_instance = lambda cost_center: (
             f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
         )

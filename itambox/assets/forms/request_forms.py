@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, AssetRequest, AssetType
+from core.managers import Scope
 
 
 class AssetRequestForm(forms.ModelForm):
@@ -105,13 +106,15 @@ class AssetRequestForm(forms.ModelForm):
             self.fields["assigned_location"].queryset = (
                 Location.objects.filter(tenant=tenant).select_related("site").order_by("site__name", "name")
             )
-            self.fields["assigned_asset"].queryset = Asset.objects.filter(tenant=tenant).order_by("name")
+            self.fields["assigned_asset"].queryset = (
+                Asset.objects.for_scope(Scope.current()).filter(tenant=tenant).order_by("name")
+            )
         else:
             self.fields["assigned_user"].queryset = AssetHolder.objects.all().order_by("last_name", "first_name")
             self.fields["assigned_location"].queryset = (
                 Location.objects.all().select_related("site").order_by("site__name", "name")
             )
-            self.fields["assigned_asset"].queryset = Asset.objects.all().order_by("name")
+            self.fields["assigned_asset"].queryset = Asset.objects.for_scope(Scope.current()).all().order_by("name")
 
         # Set initial value for request_category and target_type if instance exists
         if self.instance and self.instance.pk:
@@ -413,7 +416,9 @@ class AssetReceiveForm(forms.Form):
         self.fields["location"].queryset = loc_qs.select_related("site").order_by("site__name", "name")
 
         # Populate Suppliers
-        self.fields["supplier"].queryset = Supplier.objects.filter(is_active=True).order_by("name")
+        self.fields["supplier"].queryset = (
+            Supplier.objects.for_scope(Scope.current()).filter(is_active=True).order_by("name")
+        )
 
     def clean_asset_tag(self):
         asset_tag = self.cleaned_data.get("asset_tag", "").strip()
@@ -421,7 +426,7 @@ class AssetReceiveForm(forms.Form):
             raise ValidationError(_("Asset tag is required."))
         from assets.models import Asset
 
-        if Asset.objects.filter(asset_tag=asset_tag).exists():
+        if Asset.objects.for_scope(Scope.current()).filter(asset_tag=asset_tag).exists():
             raise ValidationError(_("Asset with this tag already exists."))
         return asset_tag
 
@@ -431,7 +436,7 @@ class AssetReceiveForm(forms.Form):
             raise ValidationError(_("Serial number is required."))
         from assets.models import Asset
 
-        if Asset.objects.filter(serial_number=serial_number).exists():
+        if Asset.objects.for_scope(Scope.current()).filter(serial_number=serial_number).exists():
             raise ValidationError(_("Asset with this serial number already exists."))
         return serial_number
 
