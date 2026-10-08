@@ -55,6 +55,7 @@
     "itambox/core/tests/test_security_headers_and_pagination.py",
     "itambox/core/tests/test_tables.py",
     "itambox/core/tests/test_tenant_scope_declarations.py",
+    "itambox/core/tests/test_tenant_security.py",
     "itambox/extras/tests/test_bookmarks_watch.py",
     "itambox/extras/tests/test_customfields_value_validators.py",
     "itambox/extras/tests/test_definition_boundary_regressions.py",
