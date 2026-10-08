@@ -150,11 +150,13 @@ make typecheck
 ```
 
 Ruff is the canonical formatter and import sorter and enforces E501 at 132
-characters plus the migrated B007, B009, B010, B028, B905, and F541 rules
+characters plus the migrated B007, B009, B010, B028, B905, E741, and F541 rules
 (`make format` applies formatting/import sorting; `make format-check` and CI
 enforce the non-mutating checks). Flake8 above retains the not-yet-migrated
 rules in its blocking baseline; B950 is replaced by Ruff E501 with exact
-file/line parity, while B907/B908 remain Flake8-only because Ruff 0.15.20 has no
+file/line parity. Phase 3 moved E741 after a same-tree comparison showed Ruff
+was stricter (8 findings versus Flake8's 7); all eight were fixed. B907/B908
+remain Flake8-only because Ruff 0.15.20 has no
 equivalent selectors.
 
 The canonical rule selections are in `pyproject.toml` and `setup.cfg`; CI and

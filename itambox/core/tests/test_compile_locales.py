@@ -107,6 +107,40 @@ msgstr "Echt"
         self.assertNotIn(b"Unscharf", mo_bytes)
         self.assertNotIn(b"Empty entry", mo_bytes)
 
+    def test_contextual_plural_entries_compile(self):
+        po = (
+            HEADER
+            + """msgctxt "context"
+msgid "Item"
+msgid_plural "Items"
+msgstr[0] "Eintrag"
+msgstr[1] "Einträge"
+"""
+        )
+        base = locale_fixture(self, de=True, js=False)
+        po_file = write_catalog(base / "locale" / "de", "django", po)
+        mo_file = po_file.with_suffix(".mo")
+
+        _compile_po(str(po_file), str(mo_file))
+
+        import gettext
+
+        with open(mo_file, "rb") as fp:
+            translations = gettext.GNUTranslations(fp)
+        self.assertEqual(translations.npgettext("context", "Item", "Items", 1), "Eintrag")
+        self.assertEqual(translations.npgettext("context", "Item", "Items", 2), "Einträge")
+
+    def test_unexpected_literal_without_section_fails_clearly(self):
+        base = locale_fixture(self, de=True, js=False)
+        po_file = write_catalog(base / "locale" / "de", "django", '"orphan"\n')
+        mo_file = po_file.with_suffix(".mo")
+
+        with self.assertRaises(CommandError) as context:
+            _compile_po(str(po_file), str(mo_file))
+
+        self.assertIn("Syntax error", str(context.exception))
+        self.assertIn(f"{po_file}:1", str(context.exception))
+
     def test_malformed_input_fails_clearly(self):
         base = locale_fixture(self, de=True, js=False)
         write_catalog(base / "locale" / "de", "django", HEADER + 'msgid "unterminated\n')
