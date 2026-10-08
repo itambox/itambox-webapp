@@ -5143,7 +5143,7 @@
       "path": "itambox/licenses/models.py",
       "code": "E402",
       "message": "module level import not at top of file",
-      "source": "from core.managers import AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingSoftDeleteQuerySet",
+      "source": "from core.managers import (",
       "context": "Module:body",
       "count": 1
     },
@@ -6720,22 +6720,6 @@
       "code": "F401",
       "message": "'extras.filters.TagFilter' imported but unused",
       "source": "from extras.filters import TagFilter  # Assuming TagFilter exists for M2M",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/models.py",
-      "code": "F401",
-      "message": "'core.managers.AllObjectsManager' imported but unused",
-      "source": "from core.managers import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/models.py",
-      "code": "F401",
-      "message": "'core.managers.SoftDeleteManager' imported but unused",
-      "source": "from core.managers import (",
       "context": "Module:body",
       "count": 1
     },
