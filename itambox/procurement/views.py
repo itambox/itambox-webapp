@@ -87,7 +87,7 @@ class PurchaseOrderEditView(ObjectEditView):
             from assets.models import AssetRequest
 
             try:
-                asset_request = AssetRequest.objects.get(pk=from_request_id)
+                asset_request = AssetRequest.objects.for_scope(Scope.current()).get(pk=from_request_id)
                 if not self.request.user.has_perm("assets.fulfill_assetrequest", asset_request):
                     raise PermissionDenied(_("You do not have permission to fulfill this Asset Request."))
                 loc = asset_request.assigned_location or asset_request.source_location

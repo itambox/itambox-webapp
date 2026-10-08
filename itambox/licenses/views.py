@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
 
 from assets.forms.import_forms import LicenseBulkImportForm
+from core.managers import Scope
 from itambox.panels import Panel
 from itambox.quick_add import QuickAddMixin
 from itambox.utils import get_paginate_count
@@ -62,7 +63,9 @@ class LicenseDetailView(ObjectDetailView):
 
         from assets.models import AssetAssignment
 
-        active_asset_assignments = AssetAssignment.objects.filter(is_active=True).select_related("assigned_user")
+        active_asset_assignments = (
+            AssetAssignment.objects.for_scope(Scope.current()).filter(is_active=True).select_related("assigned_user")
+        )
         assignments_qs = license_obj.assignments.select_related("asset", "assigned_holder", "license").prefetch_related(
             Prefetch("asset__assignments", queryset=active_asset_assignments, to_attr="prefetched_active_assignments")
         )

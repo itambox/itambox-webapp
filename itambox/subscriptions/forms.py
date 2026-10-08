@@ -11,6 +11,7 @@ from django.utils.translation import gettext_lazy as _
 from assets.models import Asset, Supplier
 from core.forms import BulkEditForm, CrispyFormMixin, FilterForm, scope_tenant_field
 from core.importers.bulk_forms import BulkImportForm, register_import_form
+from core.managers import Scope
 from extras.customfields import CustomFieldModelFormMixin
 from organization.models import AssetHolder, CostCenter, Location, Tenant
 
@@ -164,7 +165,7 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
         contract_model = self.fields["linked_contract"].queryset.model
         self.fields["linked_contract"].queryset = contract_model.objects.all()
         # Keep active suppliers from the current tenant or group and globals selectable.
-        self.fields["supplier"].queryset = Supplier.objects.filter(is_active=True)
+        self.fields["supplier"].queryset = Supplier.objects.for_scope(Scope.current()).filter(is_active=True)
 
         cancel_url = (
             self.instance.get_absolute_url() if self.instance.pk else reverse("subscriptions:subscription_list")

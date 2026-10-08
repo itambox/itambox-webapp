@@ -905,7 +905,7 @@ def custody_template_preview(request, pk):
     from assets.models import Asset
     from organization.models import AssetHolder
 
-    asset = Asset.objects.first()
+    asset = Asset.objects.for_scope(Scope.current()).first()
     if not asset:
         asset = Asset(
             name="[Preview] Professional Corporate Laptop (M3 Max)",

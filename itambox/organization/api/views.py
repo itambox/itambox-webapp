@@ -3,6 +3,7 @@ from django.core.exceptions import FieldDoesNotExist
 from django.db.models import Count, Q
 from django_filters.rest_framework import DjangoFilterBackend
 
+from core.managers import Scope
 from itambox.api.permissions import (
     IsSuperuserOrReadOnly,
     StrictTenantPermission,
@@ -226,7 +227,7 @@ class ContactAssignmentViewSet(ITAMBoxModelViewSet):
                 # Letting it do the work avoids over-restricting global
                 # catalogue targets to the active tenant (L1) and applies
                 # soft-delete filtering for free. Don't add `.filter(tenant=...)`.
-                visible_ids = list(manager.values_list("pk", flat=True))
+                visible_ids = list(manager.get_queryset().for_scope(Scope.current()).values_list("pk", flat=True))
             elif tenant_lookup:
                 # Tenant-aware via a relational lookup but the default manager is
                 # NOT tenant-scoping: scope explicitly through the lookup path,

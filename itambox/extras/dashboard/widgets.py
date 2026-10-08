@@ -20,6 +20,7 @@ from django.utils.translation import gettext_lazy as _lazy
 
 from assets.models import Asset, AssetMaintenance, StatusLabel
 from core.context import override_current_tenant_scope
+from core.managers import Scope
 from core.tenant_access import accessible_tenant_ids, active_membership
 from inventory.models import (
     Accessory,
@@ -160,6 +161,14 @@ def _dashboard_render_scope(request, target):
                     delattr(request, name)
 
 
+def _scoped_all(model_class):
+    """Return ``objects.all()``, bound to the explicit ``Scope`` for explicit-scope managers."""
+    qs = model_class.objects.all()
+    if hasattr(qs, "for_scope"):
+        return qs.for_scope(Scope.current())
+    return qs
+
+
 def get_scoped_queryset(model_class, request, config=None):
     """Return rows under the request scope and an authorized explicit target."""
     user = getattr(request, "user", None)
@@ -168,17 +177,17 @@ def get_scoped_queryset(model_class, request, config=None):
 
     requested, target = _request_target_scope(request, config)
     if not requested:
-        return model_class.objects.all()
+        return _scoped_all(model_class)
     if target is None:
         return model_class.objects.none()
 
     marker = getattr(request, _TARGET_SCOPE_ATTR, _MISSING)
     if marker is not _MISSING and marker[0] is target:
-        qs = model_class.objects.all()
+        qs = _scoped_all(model_class)
         return _narrow_queryset_to_tenant(qs, model_class, target.pk)
 
     with override_current_tenant_scope(target, active_membership(user, target.pk)):
-        qs = model_class.objects.all()
+        qs = _scoped_all(model_class)
         return _narrow_queryset_to_tenant(qs, model_class, target.pk)
 
 

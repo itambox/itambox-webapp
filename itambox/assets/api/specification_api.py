@@ -41,6 +41,7 @@ from assets.services.specifications.contracts import (
 from assets.services.specifications.loader import load_specification_graph
 from assets.services.specifications.messages import specification_message
 from assets.specification_adapters import patch_from_mapping
+from core.managers import Scope
 from extras.services.specifications.composition import resolve_specification_definition
 from extras.services.specifications.contracts import (
     ChoiceSetDTO,
@@ -596,7 +597,7 @@ def composition_preview_payload(
         "issues": _issues_payload(issues),
         "can_apply": not issues,
         "impact": {
-            "asset_count": Asset.objects.filter(asset_type_id=owner.pk).count(),
+            "asset_count": Asset.objects.for_scope(Scope.current()).filter(asset_type_id=owner.pk).count(),
         },
     }
 

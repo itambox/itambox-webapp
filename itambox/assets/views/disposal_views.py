@@ -17,6 +17,7 @@ from assets.services import (
     update_asset_disposal,
 )
 from assets.tables import AssetDisposalTable
+from core.managers import Scope
 from itambox.panels import Panel
 from itambox.quick_add import QuickAddMixin
 from itambox.views.generic import (
@@ -87,7 +88,7 @@ class AssetDisposalEditView(QuickAddMixin, ObjectEditView):
                 # B1: re-fetch through the tenant-scoped manager. The form's
                 # asset queryset is import-frozen and unscoped, so a crafted POST
                 # could otherwise dispose another tenant's asset by pk.
-                asset = get_object_or_404(Asset.objects, pk=data["asset"].pk)
+                asset = get_object_or_404(Asset.objects.for_scope(Scope.current()), pk=data["asset"].pk)
                 self.object = dispose_asset(asset=asset, user=self.request.user, **disposal_service_payload(data))
             else:
                 self.object = update_asset_disposal(
@@ -200,7 +201,7 @@ class AssetDisposeActionView(ObjectEditView):
         # B1: re-fetch the asset through the tenant-scoped manager before
         # disposing. The URL pk is authoritative (the form field is disabled), so
         # a crafted POST cannot dispose a different asset.
-        asset = get_object_or_404(Asset.objects, pk=self.kwargs["pk"])
+        asset = get_object_or_404(Asset.objects.for_scope(Scope.current()), pk=self.kwargs["pk"])
         try:
             disposal = dispose_asset(asset=asset, user=self.request.user, **disposal_service_payload(data))
         except DjangoValidationError as exc:

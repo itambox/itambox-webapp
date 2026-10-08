@@ -16,6 +16,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core.choices import ObjectChangeActionChoices
 from core.context import get_current_request_id
+from core.managers import Scope
 from core.models import ObjectChange, write_object_change
 from inventory.models import AccessoryAssignment, ComponentAllocation, ConsumableAssignment
 
@@ -215,7 +216,7 @@ def _lock_request(request_instance: AssetRequest) -> AssetRequest:
         "tenant_id": request_instance.tenant_id,
         "deleted_at__isnull": True,
     }
-    return AssetRequest.objects.select_for_update().get(**filters)
+    return AssetRequest.objects.for_scope(Scope.current()).select_for_update().get(**filters)
 
 
 def _completion_conflicts(

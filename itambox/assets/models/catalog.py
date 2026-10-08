@@ -12,9 +12,9 @@ from django.utils.translation import gettext_lazy as _
 from assets.choices import StatusTypeChoices
 from core.managers import (
     AllObjectsManager,
+    ExplicitScopeAllObjectsManager,
+    ExplicitScopeSoftDeleteManager,
     SoftDeleteManager,
-    TenantScopingAllObjectsManager,
-    TenantScopingSoftDeleteManager,
 )
 from core.mixins import AutoSlugMixin, CustomFieldDataMixin, SoftDeleteMixin
 from core.models import BaseModel, StandardModel
@@ -444,8 +444,8 @@ class Supplier(CustomFieldDataMixin, AutoSlugMixin, StandardModel, SoftDeleteMix
     # Tenant rows log to their tenant; group-scoped rows fan out to the group's
     # tenants; only global suppliers log system-wide changes.
     changelog_global = True
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     allow_global_tenant = True
     name = models.CharField(max_length=255, verbose_name=_("Name"))
     slug = models.SlugField(max_length=255, verbose_name=_("Slug"))

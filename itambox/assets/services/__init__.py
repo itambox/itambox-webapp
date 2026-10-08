@@ -7,6 +7,8 @@ from contextlib import contextmanager
 from functools import partial
 from typing import TYPE_CHECKING
 
+from core.managers import Scope
+
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractBaseUser
     from django.http import HttpRequest
@@ -81,7 +83,7 @@ def checkout_asset(
 
     with transaction.atomic():
         # Lock the asset row to prevent concurrent overallocation or state issues
-        asset = Asset.objects.select_for_update().get(pk=asset.pk)
+        asset = Asset.objects.for_scope(Scope.current()).select_for_update().get(pk=asset.pk)
 
         if not asset.is_issuable:
             # Disposal owns the lifecycle independently of the visible status,
@@ -419,7 +421,8 @@ def repair_holder(asset: Asset):
 def active_repair_loan(maintenance: "AssetMaintenance") -> "AssetAssignment | None":
     """The open loaner of a repair maintenance, or ``None`` when none was issued (#644)."""
     return (
-        AssetAssignment.objects.filter(maintenance=maintenance, is_loan=True, is_active=True)
+        AssetAssignment.objects.for_scope(Scope.current())
+        .filter(maintenance=maintenance, is_loan=True, is_active=True)
         .select_related("asset", "assigned_user")
         .first()
     )
@@ -944,7 +947,7 @@ def _lock_kit_hardware(kit_items, selections, target_tenant_id):
     locked = {}
     for asset_pk in sorted(set(selections.values())):
         try:
-            locked[asset_pk] = Asset.objects.select_for_update().get(pk=asset_pk)
+            locked[asset_pk] = Asset.objects.for_scope(Scope.current()).select_for_update().get(pk=asset_pk)
         except Asset.DoesNotExist:
             raise ValidationError(_("The selected asset is no longer available.")) from None
 

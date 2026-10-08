@@ -5,6 +5,7 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Supplier, Warranty
+from core.managers import Scope
 
 
 class WarrantyForm(forms.ModelForm):
@@ -44,7 +45,7 @@ class WarrantyForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["supplier"].queryset = Supplier.objects.filter(is_active=True)
+        self.fields["supplier"].queryset = Supplier.objects.for_scope(Scope.current()).filter(is_active=True)
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
         self.helper.form_tag = True

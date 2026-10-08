@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.models.choices import MaintenanceStatusChoices
 from core.currency import CurrencyField
-from core.managers import TenantScopingAllObjectsManager, TenantScopingSoftDeleteManager
+from core.managers import ExplicitScopeAllObjectsManager, ExplicitScopeSoftDeleteManager
 from core.mixins import (
     CloneableMixin,
     ExportableMixin,
@@ -31,8 +31,8 @@ class AssetMaintenance(
     BaseModel,
 ):
     tenant_lookup = "asset__tenant"
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     MAINTENANCE_TYPE_UPGRADE = "upgrade"
     MAINTENANCE_TYPE_REPAIR = "repair"

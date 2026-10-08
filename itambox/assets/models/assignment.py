@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from assets.choices import StatusTypeChoices
-from core.managers import TenantScopingAllObjectsManager, TenantScopingSoftDeleteManager
+from core.managers import ExplicitScopeAllObjectsManager, ExplicitScopeSoftDeleteManager
 from core.mixins import JournalingMixin, SoftDeleteMixin, TaggableMixin
 from core.models import BaseModel, ChangeLoggingMixin
 
@@ -19,8 +19,8 @@ class AssetAssignment(SoftDeleteMixin, JournalingMixin, TaggableMixin, ChangeLog
     # Tenant is derived from the parent asset; scope through it so assignments
     # cannot be listed or mutated across tenant boundaries.
     tenant_lookup = "asset__tenant"
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     @property
     def tenant(self):
