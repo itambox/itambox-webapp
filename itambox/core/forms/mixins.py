@@ -378,7 +378,7 @@ class FilterForm(forms.Form):
         applied = {}
         ignored_params = ["page", "per_page", "q"]
 
-        for name, filter_field in self.filterset.filters.items():
+        for name, _filter_field in self.filterset.filters.items():
             if name in ignored_params:
                 continue
 

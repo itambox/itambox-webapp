@@ -691,7 +691,7 @@ class SeedAssetsMixin:
         # Custody receipts for regulated-industry laptops/mobiles (accepted, no
         # signature image).
         receipts = 0
-        for slug, tenant in self._tenants.items():
+        for slug, _tenant in self._tenants.items():
             # Sign receipts for regulated industries plus any tenant that has its own
             # tenant-scoped custody template (e.g. Brightwell Legal).
             has_scoped = any(k.startswith(f"{slug}:") for k in self._custody_templates)

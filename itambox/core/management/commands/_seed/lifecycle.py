@@ -185,7 +185,7 @@ class SeedLifecycleMixin:
         # claim-blocker invariant is the fail-closed net behind this exclusion.
         request_allocated = getattr(self, "_request_allocated_asset_ids", set())
 
-        for slug, tenant in (getattr(self, "_tenants", None) or {}).items():
+        for slug, _tenant in (getattr(self, "_tenants", None) or {}).items():
             holders = tenant_holders.get(slug, [])
             tenant_assets = assets_by_tenant.get(slug, [])
 
@@ -210,7 +210,7 @@ class SeedLifecycleMixin:
 
             used_assets = set()
 
-            for i in range(n_res):
+            for _i in range(n_res):
                 # Pick an asset not yet reserved in this batch.
                 avail = [a for a in reservable if a.pk not in used_assets]
                 if not avail:
