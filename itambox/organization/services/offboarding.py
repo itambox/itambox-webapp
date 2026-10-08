@@ -211,7 +211,9 @@ def _license_items(holder: AssetHolder) -> list[ObligationItem]:
             object_pk=item.pk,
             model_label="licenses.LicenseSeatAssignment",
         )
-        for item in LicenseSeatAssignment.objects.filter(assigned_holder=holder).select_related("license")
+        for item in LicenseSeatAssignment.objects.for_scope(Scope.current())
+        .filter(assigned_holder=holder)
+        .select_related("license")
     ]
 
 
@@ -302,10 +304,12 @@ def _subscription_items(holder: AssetHolder) -> list[ObligationItem]:
             object_pk=assignment.pk,
             model_label="subscriptions.SubscriptionAssignment",
         )
-        for assignment in SubscriptionAssignment.objects.filter(
+        for assignment in SubscriptionAssignment.objects.for_scope(Scope.current())
+        .filter(
             content_type=holder_ct,
             object_id=holder.pk,
-        ).select_related("subscription")
+        )
+        .select_related("subscription")
     ]
 
 

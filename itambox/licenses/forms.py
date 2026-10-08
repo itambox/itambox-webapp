@@ -223,7 +223,7 @@ class LicenseSeatAssignmentForm(forms.ModelForm):
         asset = cleaned.get("asset")
         if lic and asset and not self.instance.pk:
             # Friendly pre-checks; the model's DB constraints enforce these too.
-            if LicenseSeatAssignment.objects.filter(license=lic, asset=asset).exists():
+            if LicenseSeatAssignment.objects.for_scope(Scope.current()).filter(license=lic, asset=asset).exists():
                 raise forms.ValidationError(_("This asset already holds a seat on this license."))
             if lic.available_seats <= 0:
                 raise forms.ValidationError(_("No seats available on this license."))

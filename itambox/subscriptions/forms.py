@@ -258,9 +258,11 @@ class SubscriptionAssignmentForm(forms.ModelForm):
         cleaned_data = super().clean()
         subscription = cleaned_data.get("subscription")
         if subscription and self.content_type and self.object_id:
-            if SubscriptionAssignment.objects.filter(
-                subscription=subscription, content_type=self.content_type, object_id=self.object_id
-            ).exists():
+            if (
+                SubscriptionAssignment.objects.for_scope(Scope.current())
+                .filter(subscription=subscription, content_type=self.content_type, object_id=self.object_id)
+                .exists()
+            ):
                 raise forms.ValidationError(_("This subscription is already assigned to this object."))
         return cleaned_data
 
@@ -276,7 +278,7 @@ class SubscriptionAssignmentForm(forms.ModelForm):
                 target_obj = content_type.model_class().objects.get(id=object_id)
                 if hasattr(target_obj, "tenant") and target_obj.tenant:
                     # Filter subscriptions to active ones that belong to the same tenant or are global
-                    self.fields["subscription"].queryset = Subscription.objects.filter(
+                    self.fields["subscription"].queryset = Subscription.objects.for_scope(Scope.current()).filter(
                         db_models.Q(tenant=target_obj.tenant) | db_models.Q(tenant__isnull=True), status="active"
                     )
             except Exception:
@@ -438,9 +440,11 @@ class SubscriptionCheckoutForm(forms.Form):
             from django.contrib.contenttypes.models import ContentType
 
             content_type = ContentType.objects.get_for_model(target_obj)
-            if SubscriptionAssignment.objects.filter(
-                subscription=self.subscription, content_type=content_type, object_id=target_obj.pk
-            ).exists():
+            if (
+                SubscriptionAssignment.objects.for_scope(Scope.current())
+                .filter(subscription=self.subscription, content_type=content_type, object_id=target_obj.pk)
+                .exists()
+            ):
                 raise forms.ValidationError(
                     _("This subscription is already assigned to %(target)s.") % {"target": target_obj}
                 )

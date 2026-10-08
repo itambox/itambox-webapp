@@ -2,6 +2,7 @@
 
 from django_tables2 import RequestConfig
 
+from core.managers import Scope
 from itambox.registry import (
     DetailContextInput,
     ListContextInput,
@@ -24,10 +25,14 @@ class _SubscriptionsGenericPresentationProvider:
         return {}
 
     def build_detail_context(self, input: DetailContextInput) -> dict[str, object]:
-        assignments = SubscriptionAssignment.objects.filter(
-            content_type=input.content_type,
-            object_id=input.obj.pk,
-        ).select_related("subscription", "subscription__supplier", "assigned_by")
+        assignments = (
+            SubscriptionAssignment.objects.for_scope(Scope.current())
+            .filter(
+                content_type=input.content_type,
+                object_id=input.obj.pk,
+            )
+            .select_related("subscription", "subscription__supplier", "assigned_by")
+        )
         table = SubscriptionAssignmentTable(assignments, request=input.request)
         table.exclude = ("content_type", "object_id", "assigned_object")
         RequestConfig(input.request, paginate=False).configure(table)

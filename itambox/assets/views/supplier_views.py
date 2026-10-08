@@ -36,7 +36,8 @@ class SupplierListView(ObjectListView):
         from subscriptions.models import Subscription
 
         live_subscriptions = (
-            Subscription.objects.filter(supplier=OuterRef("pk"))
+            Subscription.objects.for_scope(Scope.current())
+            .filter(supplier=OuterRef("pk"))
             .order_by()
             .values("supplier")
             .annotate(total=Count("pk"))
@@ -103,7 +104,10 @@ class SupplierDetailView(ObjectDetailView):
         from licenses.tables import LicenseTable
 
         license_qs = (
-            License.objects.filter(supplier=supplier).select_related("software", "tenant").prefetch_related("tags")
+            License.objects.for_scope(Scope.current())
+            .filter(supplier=supplier)
+            .select_related("software", "tenant")
+            .prefetch_related("tags")
         )
         licenses_table = LicenseTable(license_qs, request=self.request)
         RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(licenses_table)
@@ -113,7 +117,7 @@ class SupplierDetailView(ObjectDetailView):
         from subscriptions.models import Subscription
         from subscriptions.tables import SupplierSubscriptionTable
 
-        subscription_qs = Subscription.objects.filter(supplier=supplier)
+        subscription_qs = Subscription.objects.for_scope(Scope.current()).filter(supplier=supplier)
         subscriptions_table = SupplierSubscriptionTable(subscription_qs, request=self.request)
         RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(
             subscriptions_table

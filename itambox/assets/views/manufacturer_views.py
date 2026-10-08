@@ -126,7 +126,10 @@ class ManufacturerDetailView(ObjectDetailView):
         from software.tables import SoftwareTable
 
         sw_qs = (
-            Software.objects.filter(manufacturer=manufacturer).select_related("manufacturer").prefetch_related("tags")
+            Software.objects.for_scope(Scope.current())
+            .filter(manufacturer=manufacturer)
+            .select_related("manufacturer")
+            .prefetch_related("tags")
         )
         software_table = SoftwareTable(sw_qs, request=self.request)
         RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(software_table)

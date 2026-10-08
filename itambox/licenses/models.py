@@ -20,7 +20,11 @@ class LicenseTypeChoices(models.TextChoices):
     # Add others like 'Device', 'User CAL', 'Processor', 'Core' if needed later
 
 
-from core.managers import AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingSoftDeleteQuerySet
+from core.managers import (
+    AllObjectsManager,
+    ExplicitScopeSoftDeleteManager,
+    TenantScopingSoftDeleteQuerySet,
+)
 
 
 class LicenseQuerySet(TenantScopingSoftDeleteQuerySet):
@@ -38,7 +42,7 @@ class LicenseQuerySet(TenantScopingSoftDeleteQuerySet):
         )
 
 
-class SoftDeleteLicenseManager(TenantScopingSoftDeleteManager.from_queryset(LicenseQuerySet)):
+class SoftDeleteLicenseManager(ExplicitScopeSoftDeleteManager.from_queryset(LicenseQuerySet)):
     pass
 
 
@@ -241,7 +245,7 @@ class LicenseSeatAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     # Opt out of the default "global-parent children stay visible" behaviour.
     deny_global_tenant = True
 
-    objects = TenantScopingSoftDeleteManager()
+    objects = ExplicitScopeSoftDeleteManager()
     all_objects = AllObjectsManager()
 
     @property

@@ -2,6 +2,7 @@
 
 from django.utils.translation import gettext as _
 
+from core.managers import Scope
 from core.reports.charts import generate_bar_chart
 from core.reports.contracts import ReportDefinition, ReportRequest, ReportResult, record_window_state
 from core.reports.formatting import _format_per_currency, _money, _record_currency
@@ -108,8 +109,10 @@ class SubscriptionRenewalsReportProvider(ReportDefinition):
     def get_queryset(self, request: ReportRequest):
         # 'tenant' is select_related because the currency of a blank-currency
         # subscription is resolved from its own tenant — without it that is N+1.
-        queryset = Subscription.objects.filter(deleted_at__isnull=True, status="active").select_related(
-            "supplier", "tenant"
+        queryset = (
+            Subscription.objects.for_scope(Scope.current())
+            .filter(deleted_at__isnull=True, status="active")
+            .select_related("supplier", "tenant")
         )
         return self.scope_to_tenants(queryset, request)
 

@@ -62,6 +62,8 @@ from typing import TYPE_CHECKING
 from django.apps import apps
 from django.db.models import Count, Q, Sum
 
+from core.managers import Scope
+
 if TYPE_CHECKING:  # pragma: no cover - typing only, no runtime import edge
     from software.models import Software
 
@@ -140,20 +142,28 @@ def reconcile_software(software: "Software") -> dict:
 
     # Installs for this software visible to the current tenant (scoped via
     # tenant_lookup='asset__tenant' on InstalledSoftware.objects).
-    installed_count = InstalledSoftware.objects.filter(software=software).count()
+    installed_count = InstalledSoftware.objects.for_scope(Scope.current()).filter(software=software).count()
 
     # Active (non-soft-deleted) licenses for this software owned by the current
     # tenant.  License.objects is already tenant-scoped + soft-delete-filtered.
-    entitled_seats = License.objects.filter(software=software).aggregate(total=Sum("seats", default=0))["total"]
+    entitled_seats = (
+        License.objects.for_scope(Scope.current())
+        .filter(software=software)
+        .aggregate(total=Sum("seats", default=0))["total"]
+    )
 
     # Count asset-assigned seats that carry an explicit install link for this
     # software.  LicenseSeatAssignment has no direct tenant field, so we scope
     # via the license FK (which is already tenant-scoped through License.objects).
-    linked_seats = LicenseSeatAssignment.objects.filter(
-        license__software=software,
-        installed_software__isnull=False,
-        deleted_at__isnull=True,
-    ).count()
+    linked_seats = (
+        LicenseSeatAssignment.objects.for_scope(Scope.current())
+        .filter(
+            license__software=software,
+            installed_software__isnull=False,
+            deleted_at__isnull=True,
+        )
+        .count()
+    )
 
     return _build_result(software, installed_count, entitled_seats, linked_seats)
 
@@ -178,13 +188,17 @@ def reconcile_tenant_licensing() -> list:
     # ── bulk install counts (scoped to active tenant via manager) ────────────
     install_counts: dict[int, int] = {
         row["software_id"]: row["count"]
-        for row in InstalledSoftware.objects.values("software_id").annotate(count=Count("id"))
+        for row in InstalledSoftware.objects.for_scope(Scope.current())
+        .values("software_id")
+        .annotate(count=Count("id"))
     }
 
     # ── bulk seat sums (scoped to active tenant via manager) ─────────────────
     seat_sums: dict[int, int] = {
         row["software_id"]: row["total"]
-        for row in License.objects.values("software_id").annotate(total=Sum("seats", default=0))
+        for row in License.objects.for_scope(Scope.current())
+        .values("software_id")
+        .annotate(total=Sum("seats", default=0))
     }
 
     # ── bulk linked-seat counts ───────────────────────────────────────────────
@@ -192,7 +206,8 @@ def reconcile_tenant_licensing() -> list:
     # the software they cover (resolved through the license FK).
     linked_seat_counts: dict[int, int] = {
         row["license__software_id"]: row["count"]
-        for row in LicenseSeatAssignment.objects.filter(
+        for row in LicenseSeatAssignment.objects.for_scope(Scope.current())
+        .filter(
             installed_software__isnull=False,
             deleted_at__isnull=True,
         )
@@ -208,7 +223,7 @@ def reconcile_tenant_licensing() -> list:
 
     # Fetch Software rows (manager applies tenant + soft-delete scoping).
     # We intersect with relevant_pks so we only pull rows that actually matter.
-    software_qs = Software.objects.filter(pk__in=relevant_pks).select_related("manufacturer")
+    software_qs = Software.objects.for_scope(Scope.current()).filter(pk__in=relevant_pks).select_related("manufacturer")
 
     results = []
     for sw in software_qs:

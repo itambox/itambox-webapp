@@ -98,11 +98,10 @@ def check_subscription_expiries_and_reminders():
     That ensures every save and Notification is recorded as an ObjectChange and
     attributed to the correct tenant rather than the global (None) context.
 
-    Both enumerations deliberately bootstrap through ``Subscription.unscoped``
-    (see the manager's declaration): the tenant-scoping default manager cannot
-    discover the first row here, because the per-tenant scope is only entered
-    afterwards. ``unscoped`` widens the tenant boundary and nothing else —
-    soft-deleted subscriptions remain excluded — and every row found is still
+    Both enumerations deliberately read ``Subscription.objects`` WITHOUT
+    ``for_scope``: the default manager only filters soft-deleted rows, so every
+    tenant's subscriptions are found before the per-tenant scope is entered.
+    Soft-deleted subscriptions remain excluded, and every row found is still
     processed inside its own tenant's TaskContext below.
     """
     # Renewal dates are calendar dates in the configured application timezone,
@@ -112,11 +111,11 @@ def check_subscription_expiries_and_reminders():
 
     # 1. Handle auto-expiries
     expired_count = 0
-    expired_subs = Subscription.unscoped.filter(status=SubscriptionStatusChoices.ACTIVE, renewal_date__lt=today)
+    expired_subs = Subscription.objects.filter(status=SubscriptionStatusChoices.ACTIVE, renewal_date__lt=today)
     for candidate in expired_subs:
         with transaction.atomic():
             sub = (
-                Subscription.unscoped.select_for_update()
+                Subscription.objects.select_for_update()
                 .filter(
                     pk=candidate.pk,
                     status=SubscriptionStatusChoices.ACTIVE,
@@ -138,11 +137,11 @@ def check_subscription_expiries_and_reminders():
     reminder_days = [30, 14, 7]
     for days in reminder_days:
         target_date = today + timezone.timedelta(days=days)
-        subs_to_remind = Subscription.unscoped.filter(status=SubscriptionStatusChoices.ACTIVE, renewal_date=target_date)
+        subs_to_remind = Subscription.objects.filter(status=SubscriptionStatusChoices.ACTIVE, renewal_date=target_date)
         for candidate in subs_to_remind:
             with transaction.atomic():
                 sub = (
-                    Subscription.unscoped.select_for_update()
+                    Subscription.objects.select_for_update()
                     .filter(
                         pk=candidate.pk,
                         status=SubscriptionStatusChoices.ACTIVE,

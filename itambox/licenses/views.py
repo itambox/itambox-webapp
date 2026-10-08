@@ -32,7 +32,8 @@ from .services import checkin_license_seat, checkout_license
 
 class LicenseListView(ObjectListView):
     queryset = (
-        License.objects.with_counts()
+        License.objects.for_scope(Scope.current())
+        .with_counts()
         .select_related("software", "software__manufacturer", "tenant", "supplier")
         .prefetch_related("tags")
     )

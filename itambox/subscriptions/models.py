@@ -11,10 +11,9 @@ from django.utils.translation import gettext_lazy as _
 
 from core.currency import CurrencyField
 from core.managers import (
-    SoftDeleteManager,
-    TenantScopingAllObjectsManager,
-    TenantScopingManager,
-    TenantScopingSoftDeleteManager,
+    ExplicitScopeAllObjectsManager,
+    ExplicitScopeManager,
+    ExplicitScopeSoftDeleteManager,
 )
 from core.mixins import (
     AutoSlugMixin,
@@ -56,21 +55,8 @@ class BillingCycleChoices(models.TextChoices):
 
 class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, DeletableVaultModel):
     export_aliases = {"auto_renewal": "vendor_contract_auto_renews"}
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
-    # Deliberately cross-tenant / unscoped bootstrap manager for the daily
-    # expiry+reminder system task (subscriptions.tasks) ONLY. That task has to
-    # enumerate every tenant's subscriptions BEFORE it can enter each row's
-    # per-tenant TaskContext, and the tenant-scoping default manager cannot do
-    # that: with a bound non-superuser principal and no active tenant it fails
-    # closed to an empty queryset, and under an inherited request scope
-    # (Q_CLUSTER sync) it narrows to a single tenant — either way past-due
-    # subscriptions stay active and no reminder is ever sent.
-    # SoftDeleteManager, not AllObjectsManager: this widens the TENANT boundary
-    # only, so soft-deleted rows stay excluded. NOT named ``all_objects`` — that
-    # name carries a tenant-scoped contract here (the Recycle Bin relies on it).
-    # This manager must never back a tenant-facing view, API, or GraphQL field.
-    unscoped = SoftDeleteManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     """Represents a recurring service agreement (SaaS, Support, etc.)."""
     name = models.CharField(
@@ -449,7 +435,7 @@ class SubscriptionAssignment(ChangeLoggingMixin, BaseModel):
     # Subscriptions are always tenant-owned; a global (tenant=None) parent would
     # be an anomaly, so never expose its assignments cross-tenant.
     deny_global_tenant = True
-    objects = TenantScopingManager()
+    objects = ExplicitScopeManager()
 
     """Flexibly links a Subscription to the entity (or entities) it covers."""
     subscription = models.ForeignKey(
