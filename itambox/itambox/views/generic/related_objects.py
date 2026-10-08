@@ -11,7 +11,16 @@ from django.db.models import Count, OuterRef, Subquery
 from django.db.models.functions import Coalesce
 from django.urls import NoReverseMatch, reverse
 
+from core.managers import Scope
 from itambox.utils import get_model_viewname
+
+
+def _scoped_default(model):
+    """The model's default manager queryset, scoped explicitly to the current scope."""
+    queryset = model._default_manager.get_queryset()
+    if hasattr(queryset, "for_scope"):
+        queryset = queryset.for_scope(Scope.current())
+    return queryset
 
 
 class RelatedObjectProvider:
@@ -96,7 +105,8 @@ class RelatedObjectProvider:
                         fk_name = relation.field.name
                         target = getattr(relation, "field_name", None) or "pk"
                         subquery = Subquery(
-                            related_model._default_manager.filter(**{fk_name: OuterRef(target)})
+                            _scoped_default(related_model)
+                            .filter(**{fk_name: OuterRef(target)})
                             .order_by()
                             .values(fk_name)
                             .annotate(c=Count("pk"))

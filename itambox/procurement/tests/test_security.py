@@ -10,6 +10,7 @@ from rest_framework.test import APITestCase
 
 from assets.choices import RequestStatusChoices
 from assets.models import AssetRequest, AssetType, Manufacturer, Supplier
+from core.managers import Scope
 from core.tests.mixins import grant
 from itambox.api.mixins import ETagMixin
 from organization.models import Location, Role, Site, Tenant
@@ -842,3 +843,26 @@ class AssetRequestCrossTenantLifecycleUITests(TestCase):
         self.approved_request_a.refresh_from_db()
         self.assertEqual(self.pending_request_a.status, RequestStatusChoices.PENDING)
         self.assertEqual(self.approved_request_a.status, RequestStatusChoices.APPROVED)
+
+
+class ProcurementExplicitScopeTests(ContractTenantIsolationSetupMixin, TestCase):
+    """The procurement default managers are plain; scoping is an explicit call."""
+
+    def test_default_manager_does_not_apply_ambient_scope(self):
+        # System context (no request): both tenants' rows are visible to the plain manager.
+        self.assertEqual(
+            set(Contract.objects.filter(pk__in=[self.contract_a.pk, self.contract_b.pk])),
+            {self.contract_a, self.contract_b},
+        )
+
+    def test_for_scope_restricts_to_the_explicit_tenant(self):
+        scope = Scope(Scope.TENANT, tenant=self.tenant_a)
+        rows = set(Contract.objects.for_scope(scope).filter(pk__in=[self.contract_a.pk, self.contract_b.pk]))
+        self.assertEqual(rows, {self.contract_a})
+
+    def test_denied_scope_resolves_to_nothing(self):
+        self.assertFalse(Contract.objects.for_scope(Scope(Scope.DENIED)).exists())
+
+    def test_soft_deleted_rows_stay_hidden_from_the_plain_manager(self):
+        self.contract_a.delete()
+        self.assertFalse(Contract.objects.filter(pk=self.contract_a.pk).exists())
