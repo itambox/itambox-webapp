@@ -7,7 +7,8 @@
     "itambox/core/tests/test_tenant_scope_resolution.py",
     "itambox/organization/tests/test_cost_centers.py",
     "itambox/organization/tests/test_scoping.py",
-    "itambox/software/tests/test_form_scoping.py"
+    "itambox/software/tests/test_form_scoping.py",
+    "itambox/subscriptions/tests/test_form_scoping.py"
   ],
   "baseline_tests": [
     "itambox/assets/api/tests/test_error_boundary_disclosure.py",
@@ -785,6 +786,7 @@
     "itambox/subscriptions/tests/test_filters.py",
     "itambox/subscriptions/tests/test_fixes.py",
     "itambox/subscriptions/tests/test_form_fk_scoping.py",
+    "itambox/subscriptions/tests/test_form_scoping.py",
     "itambox/subscriptions/tests/test_graphql.py",
     "itambox/subscriptions/tests/test_models.py",
     "itambox/subscriptions/tests/test_subscription_tenant_isolation.py",
