@@ -13,6 +13,7 @@ from django.utils.translation import ngettext
 from assets.models import Asset, Category, Warranty
 from core import context
 from core.events import DeliveryDisposition, delivery_log_context, delivery_log_message, send_notification_to_channel
+from core.managers import Scope
 from core.tasks.context import TaskContext
 from extras.models import AlertLog, AlertRule
 from inventory.models import (
@@ -745,7 +746,7 @@ def _match_upcoming_eol(rule, today):
 
 def _match_license_expiry(rule, today):
     deadline = today + timezone.timedelta(days=rule.threshold_value)
-    qs = License.objects.filter(
+    qs = License.objects.for_scope(Scope.current()).filter(
         deleted_at__isnull=True,
         expiration_date__lte=deadline,
         expiration_date__gte=today,
@@ -774,7 +775,7 @@ def _match_license_expiry(rule, today):
 
 def _match_renewal_due(rule, today):
     deadline = today + timezone.timedelta(days=rule.threshold_value)
-    qs = Subscription.objects.filter(
+    qs = Subscription.objects.for_scope(Scope.current()).filter(
         deleted_at__isnull=True,
         status="active",
         renewal_date__lte=deadline,

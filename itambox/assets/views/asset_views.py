@@ -136,7 +136,11 @@ class AssetDetailView(ObjectDetailView):
         )
         context["asset_specification_fields"] = resolve_asset_custom_fields(asset.asset_type, asset.custom_field_data)
 
-        sw_qs = InstalledSoftware.objects.filter(asset=asset).select_related("software", "software__manufacturer")
+        sw_qs = (
+            InstalledSoftware.objects.for_scope(Scope.current())
+            .filter(asset=asset)
+            .select_related("software", "software__manufacturer")
+        )
         sw_table = InstalledSoftwareTable(sw_qs)
         RequestConfig(self.request, paginate={"per_page": 10}).configure(sw_table)
         context["software_table"] = sw_table
@@ -215,8 +219,10 @@ class AssetDetailView(ObjectDetailView):
         from licenses.models import LicenseSeatAssignment
         from licenses.tables import LicenseSeatAssignmentTable
 
-        license_qs = LicenseSeatAssignment.objects.filter(asset=asset).select_related(
-            "license", "asset", "assigned_holder"
+        license_qs = (
+            LicenseSeatAssignment.objects.for_scope(Scope.current())
+            .filter(asset=asset)
+            .select_related("license", "asset", "assigned_holder")
         )
         license_seats_table = LicenseSeatAssignmentTable(license_qs, request=self.request)
         RequestConfig(self.request, paginate={"per_page": 10}).configure(license_seats_table)

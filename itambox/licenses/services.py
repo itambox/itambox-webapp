@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset
+from core.managers import Scope
 from organization.models import AssetHolder
 
 from .models import License, LicenseSeatAssignment
@@ -25,7 +26,7 @@ def checkout_license(
 
     with transaction.atomic():
         # Lock the license row to prevent TOCTOU race conditions under concurrent load
-        lic = License.objects.select_for_update().get(pk=license_obj.pk)
+        lic = License.objects.for_scope(Scope.current()).select_for_update().get(pk=license_obj.pk)
 
         if lic.available_seats < 1:
             raise ValidationError(_("No available seats left for this software license."))
@@ -33,7 +34,7 @@ def checkout_license(
         # Reject a second active seat for the same target. The DB enforces this with
         # a partial UniqueConstraint, but checking here turns a duplicate request into
         # a clean ValidationError (HTTP 400) instead of an IntegrityError (HTTP 500).
-        duplicate = LicenseSeatAssignment.objects.filter(license=lic)
+        duplicate = LicenseSeatAssignment.objects.for_scope(Scope.current()).filter(license=lic)
         duplicate = (
             duplicate.filter(asset=asset) if asset is not None else duplicate.filter(assigned_holder=assigned_holder)
         )
@@ -77,13 +78,15 @@ def transfer_license_seat(
     with transaction.atomic():
         # Lock the destination license row to prevent TOCTOU race conditions under
         # concurrent load, same as checkout_license().
-        lic = License.objects.select_for_update().get(pk=new_license.pk)
+        lic = License.objects.for_scope(Scope.current()).select_for_update().get(pk=new_license.pk)
 
         if lic.available_seats < 1:
             raise ValidationError(_("No available seats left for this software license."))
 
         target = assignment.asset or assignment.assigned_holder
-        duplicate = LicenseSeatAssignment.objects.filter(license=lic).exclude(pk=assignment.pk)
+        duplicate = (
+            LicenseSeatAssignment.objects.for_scope(Scope.current()).filter(license=lic).exclude(pk=assignment.pk)
+        )
         duplicate = (
             duplicate.filter(asset=assignment.asset)
             if assignment.asset_id is not None
@@ -115,7 +118,7 @@ def transfer_license_seat(
 def checkin_license_seat(assignment: LicenseSeatAssignment, user=None, request=None, **kwargs) -> dict:
     with transaction.atomic():
         # Lock the assignment row to prevent concurrent checkin race conditions
-        asgn = LicenseSeatAssignment.objects.select_for_update().get(pk=assignment.pk)
+        asgn = LicenseSeatAssignment.objects.for_scope(Scope.current()).select_for_update().get(pk=assignment.pk)
         lic = asgn.license
 
         target = asgn.asset or asgn.assigned_holder

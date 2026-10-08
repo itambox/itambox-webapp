@@ -3,6 +3,7 @@
 from django.db.models import Count, Q
 from django.utils.translation import gettext as _
 
+from core.managers import Scope
 from core.reports.charts import generate_doughnut_chart
 from core.reports.contracts import ReportDefinition, ReportRequest
 from core.reports.registry import register_report_provider
@@ -58,7 +59,9 @@ class SoftwareInventoryReportProvider(ReportDefinition):
     sample_group_keys = {"category": "Productivity", "manufacturer": "Microsoft"}
 
     def _scoped_queryset(self, request: ReportRequest):
-        return self.scope_to_tenants(Software.objects.all().select_related("manufacturer"), request)
+        return self.scope_to_tenants(
+            Software.objects.for_scope(Scope.current()).all().select_related("manufacturer"), request
+        )
 
     def get_queryset(self, request: ReportRequest):
         queryset = self._scoped_queryset(request)

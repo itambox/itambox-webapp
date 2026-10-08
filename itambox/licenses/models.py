@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from assets.models import Asset
 from core.crypto import decrypt_string, encrypt_string
 from core.currency import CurrencyField
-from core.managers import AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingSoftDeleteQuerySet
+from core.managers import AllObjectsManager, ExplicitScopeSoftDeleteManager, TenantScopingSoftDeleteQuerySet
 from core.mixins import BookmarkableMixin, CustomFieldDataMixin, SoftDeleteMixin
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel
 from extras.models import Tag
@@ -36,7 +36,7 @@ class LicenseQuerySet(TenantScopingSoftDeleteQuerySet):
         )
 
 
-class SoftDeleteLicenseManager(TenantScopingSoftDeleteManager.from_queryset(LicenseQuerySet)):
+class SoftDeleteLicenseManager(ExplicitScopeSoftDeleteManager.from_queryset(LicenseQuerySet)):
     pass
 
 
@@ -239,7 +239,7 @@ class LicenseSeatAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     # Opt out of the default "global-parent children stay visible" behaviour.
     deny_global_tenant = True
 
-    objects = TenantScopingSoftDeleteManager()
+    objects = ExplicitScopeSoftDeleteManager()
     all_objects = AllObjectsManager()
 
     @property

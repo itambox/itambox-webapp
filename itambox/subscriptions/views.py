@@ -11,6 +11,7 @@ from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
 from django_tables2 import RequestConfig
 
+from core.managers import Scope
 from extras.models import JournalEntry
 from itambox.panels import Panel
 from itambox.utils import get_paginate_count
@@ -131,7 +132,7 @@ class SubscriptionRenewView(SecuredObjectActionMixin, LoginRequiredMixin, Permis
     template_name = "subscriptions/includes/subscription_renew_modal.html"
 
     def get(self, request, pk, *args, **kwargs):
-        subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
+        subscription = get_object_or_404(Subscription.objects.for_scope(Scope.current()).all(), pk=pk)
         form = forms.SubscriptionRenewForm(subscription=subscription)
         return render(
             request,
@@ -143,7 +144,7 @@ class SubscriptionRenewView(SecuredObjectActionMixin, LoginRequiredMixin, Permis
         )
 
     def post(self, request, pk, *args, **kwargs):
-        subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
+        subscription = get_object_or_404(Subscription.objects.for_scope(Scope.current()).all(), pk=pk)
         form = forms.SubscriptionRenewForm(request.POST, subscription=subscription)
         if form.is_valid():
             renewal_date = form.cleaned_data["renewal_date"]
@@ -208,7 +209,7 @@ class SubscriptionCancelView(SecuredObjectActionMixin, LoginRequiredMixin, Permi
     template_name = "subscriptions/includes/subscription_cancel_modal.html"
 
     def get(self, request, pk, *args, **kwargs):
-        subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
+        subscription = get_object_or_404(Subscription.objects.for_scope(Scope.current()).all(), pk=pk)
         form = forms.SubscriptionCancelForm()
         return render(
             request,
@@ -220,7 +221,7 @@ class SubscriptionCancelView(SecuredObjectActionMixin, LoginRequiredMixin, Permi
         )
 
     def post(self, request, pk, *args, **kwargs):
-        subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
+        subscription = get_object_or_404(Subscription.objects.for_scope(Scope.current()).all(), pk=pk)
         form = forms.SubscriptionCancelForm(request.POST)
         if form.is_valid():
             cancellation_date = form.cleaned_data["cancellation_date"]
@@ -278,7 +279,7 @@ class SubscriptionSuspendView(SecuredObjectActionMixin, LoginRequiredMixin, Perm
     queryset = Subscription.objects.all()
 
     def post(self, request, pk, *args, **kwargs):
-        subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
+        subscription = get_object_or_404(Subscription.objects.for_scope(Scope.current()).all(), pk=pk)
         try:
             changed = subscription.suspend()
         except ValidationError as error:
@@ -313,7 +314,7 @@ class SubscriptionResumeView(SecuredObjectActionMixin, LoginRequiredMixin, Permi
     queryset = Subscription.objects.all()
 
     def post(self, request, pk, *args, **kwargs):
-        subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
+        subscription = get_object_or_404(Subscription.objects.for_scope(Scope.current()).all(), pk=pk)
         try:
             changed = subscription.resume()
         except ValidationError as error:
@@ -344,7 +345,7 @@ class SubscriptionCheckoutView(LoginRequiredMixin, PermissionRequiredMixin, View
     template_name = "subscriptions/includes/subscription_checkout_modal.html"
 
     def get(self, request, pk, *args, **kwargs):
-        subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
+        subscription = get_object_or_404(Subscription.objects.for_scope(Scope.current()).all(), pk=pk)
         form = forms.SubscriptionCheckoutForm(subscription=subscription)
         return render(
             request,
@@ -356,7 +357,7 @@ class SubscriptionCheckoutView(LoginRequiredMixin, PermissionRequiredMixin, View
         )
 
     def post(self, request, pk, *args, **kwargs):
-        subscription = get_object_or_404(Subscription.objects.all(), pk=pk)
+        subscription = get_object_or_404(Subscription.objects.for_scope(Scope.current()).all(), pk=pk)
         form = forms.SubscriptionCheckoutForm(request.POST, subscription=subscription)
         if form.is_valid():
             target_type = form.cleaned_data["target_type"]

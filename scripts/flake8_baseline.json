@@ -6254,22 +6254,6 @@
     {
       "path": "itambox/software/models.py",
       "code": "F401",
-      "message": "'core.managers.AllObjectsManager' imported but unused",
-      "source": "from core.managers import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/models.py",
-      "code": "F401",
-      "message": "'core.managers.SoftDeleteManager' imported but unused",
-      "source": "from core.managers import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/models.py",
-      "code": "F401",
       "message": "'core.models.VaultModel' imported but unused",
       "source": "from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, VaultModel",
       "context": "Module:body",

@@ -86,7 +86,7 @@ class AssetHolderDetailView(ObjectDetailView):
         from licenses.models import LicenseSeatAssignment
         from licenses.tables import LicenseSeatAssignmentTable
 
-        lic_assign_qs = LicenseSeatAssignment.objects.filter(assigned_holder=assetholder)
+        lic_assign_qs = LicenseSeatAssignment.objects.for_scope(Scope.current()).filter(assigned_holder=assetholder)
         license_assignments_table = LicenseSeatAssignmentTable(lic_assign_qs, request=self.request)
         license_assignments_table.configure(self.request)
         context["license_assignments_table"] = license_assignments_table

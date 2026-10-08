@@ -8,6 +8,7 @@ from assets.schema import SupplierNode, TenantNode
 from core.graphql_choice_enums import choice_enum
 from core.graphql_scalars import BigInt
 from core.graphql_utils import active_tenant_from_info, check_permission, paginate_queryset
+from core.managers import Scope
 
 from .models import Subscription, SubscriptionAssignment
 
@@ -107,7 +108,11 @@ class Query:
     ) -> list[SubscriptionNode | None] | None:
         check_permission(info, "subscriptions.view_subscription")
         # TenantScopingSoftDeleteManager handles tenant scoping and active filtering.
-        qs = Subscription.objects.select_related("supplier", "linked_contract", "tenant", "owner").all()
+        qs = (
+            Subscription.objects.for_scope(Scope.current())
+            .select_related("supplier", "linked_contract", "tenant", "owner")
+            .all()
+        )
         for key, val in (("name", name), ("status", status), ("type", type)):
             if val is not None:
                 qs = qs.filter(**{key: val})
@@ -119,7 +124,11 @@ class Query:
     def subscription(self, info: strawberry.Info, id: strawberry.ID) -> SubscriptionNode | None:
         check_permission(info, "subscriptions.view_subscription")
         try:
-            return Subscription.objects.select_related("supplier", "linked_contract", "tenant", "owner").get(pk=id)
+            return (
+                Subscription.objects.for_scope(Scope.current())
+                .select_related("supplier", "linked_contract", "tenant", "owner")
+                .get(pk=id)
+            )
         except Subscription.DoesNotExist:
             return None
 
@@ -133,8 +142,10 @@ class Query:
     ) -> list[SubscriptionAssignmentNode | None] | None:
         check_permission(info, "subscriptions.view_subscriptionassignment")
         # SubscriptionAssignment has no direct tenant field, scope via its subscription
-        qs = SubscriptionAssignment.objects.select_related(*_ASSIGNMENT_RELATED).filter(
-            subscription__tenant=active_tenant_from_info(info)
+        qs = (
+            SubscriptionAssignment.objects.for_scope(Scope.current())
+            .select_related(*_ASSIGNMENT_RELATED)
+            .filter(subscription__tenant=active_tenant_from_info(info))
         )
         if subscription_id is not None:
             qs = qs.filter(subscription_id=subscription_id)
@@ -145,7 +156,8 @@ class Query:
         check_permission(info, "subscriptions.view_subscriptionassignment")
         try:
             return (
-                SubscriptionAssignment.objects.select_related(*_ASSIGNMENT_RELATED)
+                SubscriptionAssignment.objects.for_scope(Scope.current())
+                .select_related(*_ASSIGNMENT_RELATED)
                 .filter(subscription__tenant=active_tenant_from_info(info))
                 .get(pk=id)
             )

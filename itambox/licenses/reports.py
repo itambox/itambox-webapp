@@ -3,6 +3,7 @@
 from django.db.models import Count, Q
 from django.utils.translation import gettext as _
 
+from core.managers import Scope
 from core.reports.charts import generate_doughnut_chart
 from core.reports.contracts import ReportDefinition, ReportRequest
 from core.reports.registry import register_report_provider
@@ -60,7 +61,8 @@ class LicenseUtilizationReportProvider(ReportDefinition):
         # tallies soft-deleted (checked-in) seats, overstating utilization and
         # the downstream SAM/financial figures.
         queryset = (
-            License.objects.filter(deleted_at__isnull=True)
+            License.objects.for_scope(Scope.current())
+            .filter(deleted_at__isnull=True)
             .select_related("software")
             .annotate(assigned_seats_count=Count("assignments", filter=Q(assignments__deleted_at__isnull=True)))
         )

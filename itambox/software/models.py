@@ -4,11 +4,10 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from core.managers import (
-    AllObjectsManager,
-    SoftDeleteManager,
-    TenantScopingAllObjectsManager,
-    TenantScopingManager,
-    TenantScopingSoftDeleteManager,
+    ExplicitScopeAllObjectsManager,
+    ExplicitScopeManager,
+    ExplicitScopeSoftDeleteManager,
+    Scope,
 )
 from core.mixins import CustomFieldDataMixin
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, VaultModel
@@ -37,8 +36,8 @@ class Software(CustomFieldDataMixin, DeletableVaultModel):
     # is visible to every tenant (allow_global_tenant); a tenant-set entry is
     # private to that tenant. This closes the cross-tenant software exposure
     # (the software report compiler previously returned all tenants' rows).
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     allow_global_tenant = True
 
     """
@@ -118,7 +117,7 @@ class Software(CustomFieldDataMixin, DeletableVaultModel):
     def installed_count(self):
         if hasattr(self, "_installed_count"):
             return self._installed_count
-        return InstalledSoftware.objects.filter(software=self).count()
+        return InstalledSoftware.objects.for_scope(Scope.current()).filter(software=self).count()
 
     @property
     def license_count(self):
@@ -129,7 +128,7 @@ class Software(CustomFieldDataMixin, DeletableVaultModel):
         # close a cycle. The registry returns the same class and therefore the
         # same tenant-scoped manager.
         License = apps.get_model("licenses", "License")
-        return License.objects.filter(software=self, deleted_at__isnull=True).count()
+        return License.objects.for_scope(Scope.current()).filter(software=self, deleted_at__isnull=True).count()
 
 
 class InstalledSoftware(ChangeLoggingMixin, BaseModel):
@@ -145,7 +144,7 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
     # only scopes the manager) — set both so audit rows are attributed to the
     # asset's tenant instead of the ambient request tenant.
     changelog_tenant_lookup = "asset__tenant"
-    objects = TenantScopingManager()
+    objects = ExplicitScopeManager()
 
     asset = models.ForeignKey(
         to="assets.Asset",

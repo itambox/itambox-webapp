@@ -3,6 +3,7 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
+from core.managers import Scope
 from itambox.panels import Panel
 from itambox.quick_add import QuickAddMixin
 from itambox.views.generic import (
@@ -24,7 +25,8 @@ from .tables import InstalledSoftwareTable
 
 class SoftwareListView(ObjectListView):
     queryset = (
-        Software.objects.select_related("manufacturer")
+        Software.objects.for_scope(Scope.current())
+        .select_related("manufacturer")
         .prefetch_related("tags")
         .annotate(
             _installed_count=Count("installed_instances", distinct=True),
@@ -52,7 +54,7 @@ class SoftwareDetailView(ObjectDetailView):
 
         from itambox.utils import get_paginate_count
 
-        instances_qs = InstalledSoftware.objects.filter(software=software)
+        instances_qs = InstalledSoftware.objects.for_scope(Scope.current()).filter(software=software)
         instances_table = InstalledSoftwareTable(instances_qs)
         instances_table.configure(self.request)
         context["instances_table"] = instances_table
@@ -61,7 +63,7 @@ class SoftwareDetailView(ObjectDetailView):
         from licenses.models import License
         from licenses.tables import LicenseTable
 
-        license_qs = License.objects.filter(software=software)
+        license_qs = License.objects.for_scope(Scope.current()).filter(software=software)
         licenses_table = LicenseTable(license_qs, request=self.request)
         licenses_table.configure(self.request)
         context["licenses_table"] = licenses_table
