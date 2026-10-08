@@ -14,10 +14,10 @@ from django.utils.translation import gettext_lazy as _
 from compliance.choices import AuditSessionStatusChoices, AuditVerificationMethodChoices
 from core.managers import (
     AllObjectsManager,
+    ExplicitScopeAllObjectsManager,
+    ExplicitScopeManager,
+    ExplicitScopeSoftDeleteManager,
     SoftDeleteManager,
-    TenantScopingAllObjectsManager,
-    TenantScopingManager,
-    TenantScopingSoftDeleteManager,
 )
 from core.mixins import (
     CloneableMixin,
@@ -45,8 +45,8 @@ def custody_signing_session_expiry():
 
 
 class CustodyTemplate(TaggableMixin, CloneableMixin, ExportableMixin, ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     allow_global_tenant = True
 
     tenant = models.ForeignKey(
@@ -245,7 +245,7 @@ class CustodyReceipt(ChangeLoggingMixin, BaseModel):
 class CustodySigningSession(BaseModel):
     """Short-lived, operator-prepared handoff for recipient custody consent."""
 
-    objects = TenantScopingManager()
+    objects = ExplicitScopeManager()
     tenant_lookup = "receipt__asset__tenant"
     deny_global_tenant = True
 
@@ -317,7 +317,7 @@ class CustodySigningSession(BaseModel):
 class CustodyHandoffDelivery(BaseModel):
     """Durable, token-free audit record for a handoff e-mail attempt."""
 
-    objects = TenantScopingManager()
+    objects = ExplicitScopeManager()
     tenant_lookup = "signing_session__receipt__asset__tenant"
     deny_global_tenant = True
 
@@ -370,8 +370,8 @@ User = get_user_model()
 
 
 class AuditSession(StandardModel, SoftDeleteMixin):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     allow_global_tenant = True
     # reconciliation_report is a large frozen JSON snapshot; keep it out of the
     # changelog so each session UPDATE doesn't store the whole blob twice.

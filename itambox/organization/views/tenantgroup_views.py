@@ -5,6 +5,7 @@ from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
 
+from core.managers import Scope
 from itambox.panels import Panel
 from itambox.utils import get_paginate_count
 from itambox.views.generic import (
@@ -48,7 +49,7 @@ class TenantGroupDetailView(ObjectDetailView):
         from compliance.models import CustodyTemplate
         from compliance.tables import CustodyTemplateTable
 
-        custody_templates_qs = CustodyTemplate.objects.filter(tenant_group=tenantgroup)
+        custody_templates_qs = CustodyTemplate.objects.for_scope(Scope.current()).filter(tenant_group=tenantgroup)
         custody_templates_table = CustodyTemplateTable(custody_templates_qs, request=self.request)
         custody_templates_table.configure(self.request)
         context["custody_templates_table"] = custody_templates_table
