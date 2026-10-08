@@ -13,7 +13,7 @@ from assets.services import (
     complete_repair,
     issue_repair_loaner,
 )
-from core.forms import FilterForm, scope_tenant_field, scope_tenant_group_field
+from core.forms import FilterForm, TenantScopedFormMixin, scope_tenant_field, scope_tenant_group_field
 from core.managers import Scope
 
 
@@ -23,7 +23,7 @@ class AssetMaintenanceFilterForm(FilterForm):
     filterset_class = AssetMaintenanceFilterSet
 
 
-class AssetMaintenanceForm(forms.ModelForm):
+class AssetMaintenanceForm(TenantScopedFormMixin, forms.ModelForm):
     """Record a maintenance and, for a repair, its loaner story in one step (#644).
 
     A repair maintenance is the anchor: the optional **Issue loaner** section
@@ -267,7 +267,12 @@ from organization.models import Tenant, TenantGroup
 from .models import CustodyTemplate
 
 
-class CustodyTemplateForm(forms.ModelForm):
+class CustodyTemplateForm(TenantScopedFormMixin, forms.ModelForm):
+    # A template scopes to a tenant OR a tenant group (or is global): ``tenant``
+    # stays optional and visible, so no requiredness and no single-tenant autoset.
+    tenant_required = False
+    tenant_autoset_when_single = False
+
     tenant = forms.ModelChoiceField(
         queryset=Tenant.objects.all(),
         required=False,
