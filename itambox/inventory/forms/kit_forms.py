@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.choices import StatusTypeChoices
 from assets.models import Asset, StatusLabel
-from core.forms import FilterForm, scope_tenant_field
+from core.forms import FilterForm, TenantScopedFormMixin
 from core.managers import get_current_tenant
 from core.tenant_scope import accessible_tenant_ids, get_descendant_tenant_group_ids
 from extras.models import Tag
@@ -18,7 +18,10 @@ from ..models import Kit, KitItem
 from .base_forms import BaseCheckoutForm
 
 
-class KitForm(forms.ModelForm):
+class KitForm(TenantScopedFormMixin, forms.ModelForm):
+    tenant_required = True
+    tenant_autoset_when_single = True
+
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
@@ -35,7 +38,6 @@ class KitForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        scope_tenant_field(self)
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
         self.helper.form_tag = True
@@ -55,7 +57,7 @@ class KitForm(forms.ModelForm):
         )
 
 
-class KitItemForm(forms.ModelForm):
+class KitItemForm(TenantScopedFormMixin, forms.ModelForm):
     class Meta:
         model = KitItem
         fields = ["kit", "asset_type", "accessory", "license", "consumable", "qty"]
@@ -70,13 +72,9 @@ class KitItemForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Rescope the tenant-owned FK querysets per request (import-frozen
-        # unscoped) so a kit item can't reference another tenant's kit/accessory/
-        # license/consumable. asset_type is a global catalogue model — left as-is.
-        for fk_name in ("kit", "accessory", "license", "consumable"):
-            field = self.fields.get(fk_name)
-            if field is not None and getattr(field, "queryset", None) is not None:
-                field.queryset = field.queryset.model._default_manager.all()
+        # kit / accessory / license / consumable are scoped by TenantScopedFormMixin
+        # so a kit item can't reference another tenant's rows. asset_type is a
+        # global catalogue model (its queryset has no tenant scoping).
 
         self.helper = FormHelper(self)
         self.helper.form_method = "post"

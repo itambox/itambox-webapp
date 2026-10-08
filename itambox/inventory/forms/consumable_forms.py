@@ -7,7 +7,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Category, Manufacturer, Supplier
-from core.forms import FilterForm, SlugModelForm, scope_tenant_field
+from core.forms import FilterForm, SlugModelForm, TenantScopedFormMixin
 from core.managers import Scope
 from extras.customfields import CustomFieldModelFormMixin
 from extras.models import Tag
@@ -18,7 +18,10 @@ from ..models import Consumable, ConsumableStock
 from .base_forms import BaseCheckoutForm
 
 
-class ConsumableForm(CustomFieldModelFormMixin, SlugModelForm):
+class ConsumableForm(TenantScopedFormMixin, CustomFieldModelFormMixin, SlugModelForm):
+    tenant_required = True
+    tenant_autoset_when_single = True
+
     manufacturer = forms.ModelChoiceField(
         queryset=Manufacturer.objects.all(), widget=forms.Select(attrs={"class": "form-select"})
     )
@@ -72,7 +75,6 @@ class ConsumableForm(CustomFieldModelFormMixin, SlugModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        scope_tenant_field(self)
         self.fields["supplier"].queryset = Supplier.objects.for_scope(Scope.current()).filter(is_active=True)
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
@@ -102,7 +104,7 @@ class ConsumableForm(CustomFieldModelFormMixin, SlugModelForm):
         self.append_custom_fields_to_layout()
 
 
-class ConsumableStockForm(forms.ModelForm):
+class ConsumableStockForm(TenantScopedFormMixin, forms.ModelForm):
     class Meta:
         model = ConsumableStock
         fields = ["consumable", "location", "qty"]
@@ -114,8 +116,8 @@ class ConsumableStockForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Rescope tenant-owned FK querysets per request (import-frozen unscoped).
-        self.fields["consumable"].queryset = Consumable.objects.all()
+        # Tenant-owned FK choices are scoped by TenantScopedFormMixin; only the
+        # select_related optimisation stays here.
         self.fields["location"].queryset = Location.objects.all().select_related("site")
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
@@ -193,7 +195,7 @@ class ConsumableAssignmentFilterForm(FilterForm):
     filterset_class = ConsumableAssignmentFilterSet
 
 
-class ConsumableStockModalForm(forms.ModelForm):
+class ConsumableStockModalForm(TenantScopedFormMixin, forms.ModelForm):
     qty = forms.IntegerField(
         min_value=1,
         widget=forms.NumberInput(attrs={"class": "form-control", "min": 1}),
@@ -208,7 +210,6 @@ class ConsumableStockModalForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Rescope the tenant-owned `location` FK per request (import-frozen unscoped).
         self.fields["location"].queryset = Location.objects.all().select_related("site")
         self.helper = FormHelper()
         self.helper.form_tag = False
