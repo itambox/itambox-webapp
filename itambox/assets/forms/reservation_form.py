@@ -5,9 +5,10 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import AssetReservation
+from core.forms import TenantScopedFormMixin
 
 
-class AssetReservationForm(forms.ModelForm):
+class AssetReservationForm(TenantScopedFormMixin, forms.ModelForm):
     start_date = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
         required=True,

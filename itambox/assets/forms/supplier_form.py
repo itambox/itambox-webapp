@@ -3,14 +3,19 @@ from django import forms
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
-from core.forms import SlugModelForm, scope_tenant_field, scope_tenant_group_field
+from core.forms import SlugModelForm, TenantScopedFormMixin, scope_tenant_group_field
 from extras.customfields import CustomFieldModelFormMixin
 from organization.models import Tenant, TenantGroup
 
 from ..models import Supplier
 
 
-class SupplierForm(CustomFieldModelFormMixin, SlugModelForm):
+class SupplierForm(TenantScopedFormMixin, CustomFieldModelFormMixin, SlugModelForm):
+    # A supplier scopes to a tenant OR a tenant group (or is global): ``tenant``
+    # stays optional and visible, so no requiredness and no single-tenant autoset.
+    tenant_required = False
+    tenant_autoset_when_single = False
+
     tenant = forms.ModelChoiceField(
         queryset=Tenant.objects.all(),
         required=False,
@@ -59,7 +64,6 @@ class SupplierForm(CustomFieldModelFormMixin, SlugModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        scope_tenant_field(self, autoset_when_single=False)
         scope_tenant_group_field(self)
         self.fields["tenant"].required = False
         cancel_url = reverse("assets:supplier_list")

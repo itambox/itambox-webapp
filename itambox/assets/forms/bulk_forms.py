@@ -1,15 +1,15 @@
 from django import forms
 
-from core.forms import BulkEditForm, scope_tenant_field
+from core.forms import BulkEditForm, TenantScopedFormMixin
 from organization.models import Location, Tenant
 
 from ..models import AssetRole, StatusLabel
 
 
-class AssetBulkEditForm(BulkEditForm):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        scope_tenant_field(self, autoset_when_single=False)
+class AssetBulkEditForm(TenantScopedFormMixin, BulkEditForm):
+    # Bulk edit never requires a target tenant and always shows the picker.
+    tenant_required = False
+    tenant_autoset_when_single = False
 
     status = forms.ModelChoiceField(
         queryset=StatusLabel.objects.all(),
