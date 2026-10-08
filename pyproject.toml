@@ -187,9 +187,9 @@ exclude_also = [
 show_contexts = false
 
 [tool.ruff]
-# Canonical formatter, import sorter, and E501 gate (see issue #87 / #622).
-# Ruff owns formatting/import order plus 132-character E501; Flake8 retains all
-# other rules until their later migration phases.
+# Canonical formatter, import sorter, and lint gate (see issue #87 / #622).
+# Ruff owns formatting/import order, 132-character E501, and migrated semantic
+# rules. Flake8 retains the not-yet-migrated rules as a blocking bridge.
 line-length = 120
 target-version = "py312"
 # Two independent import roots: itambox/ (Django project root -- apps import
@@ -210,9 +210,9 @@ extend-exclude = [
 line-ending = "lf"
 
 [tool.ruff.lint]
-# Ruff owns import ordering, E501, and the phase-2 B007/B009/B010/B028/B905/F541
-# group. The Flake8 bridge retains the rules not yet migrated in setup.cfg.
-select = ["B007", "B009", "B010", "B028", "B905", "E501", "F541", "I"]
+# Ruff owns import ordering, E501, phase-2 B007/B009/B010/B028/B905/F541, and
+# phase-3 E741. The Flake8 bridge retains the rules not yet migrated in setup.cfg.
+select = ["B007", "B009", "B010", "B028", "B905", "E501", "E741", "F541", "I"]
 
 [tool.ruff.lint.pycodestyle]
 # B950's 10% grace over Flake8 max-line-length=120 was exactly 132 characters.
