@@ -1,8 +1,9 @@
 import datetime
 
 from django.test import TestCase
+from model_bakery import baker
 
-from assets.models import Asset, AssetType, Manufacturer, Supplier
+from assets.models import Asset, Manufacturer, StatusLabel, Supplier
 from core.managers import Scope, set_current_tenant
 from licenses.models import License, LicenseSeatAssignment
 from organization.models import Tenant
@@ -52,9 +53,9 @@ class SoftwareLicenseSubscriptionScopingTests(TestCase):
         self.assertEqual(list(Subscription.objects.for_scope(scope)), [self.sub_a])
 
     def test_installs_and_seats_scope_through_parent(self):
-        asset_type = AssetType.objects.create(name="Laptop", slug="laptop-t", manufacturer=self.manufacturer)
-        asset_a = Asset.objects.create(asset_tag="A1", asset_type=asset_type, tenant=self.tenant_a)
-        asset_b = Asset.objects.create(asset_tag="B1", asset_type=asset_type, tenant=self.tenant_b)
+        status = baker.make(StatusLabel, type=StatusLabel.TYPE_DEPLOYABLE)
+        asset_a = baker.make(Asset, asset_tag="A1", status=status, tenant=self.tenant_a)
+        asset_b = baker.make(Asset, asset_tag="B1", status=status, tenant=self.tenant_b)
         inst_a = InstalledSoftware.objects.create(asset=asset_a, software=self.sw_a)
         inst_b = InstalledSoftware.objects.create(asset=asset_b, software=self.sw_b)
         seat_a = LicenseSeatAssignment.objects.create(license=self.lic_a, asset=asset_a)
