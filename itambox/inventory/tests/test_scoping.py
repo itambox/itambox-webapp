@@ -3,6 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from assets.models import Category, Manufacturer
+from core.managers import Scope
 from inventory.models import (
     Accessory,
     AccessoryAssignment,
@@ -69,19 +70,19 @@ class InventoryTenantScopingTests(TestCase):
         set_current_tenant(self.tenant_a)
 
         # Accessories
-        accs = list(Accessory.objects.all())
+        accs = list(Accessory.objects.for_scope(Scope.current()))
         self.assertIn(self.acc_a, accs)
         self.assertIn(self.acc_global, accs)
         self.assertNotIn(self.acc_b, accs)
 
         # Consumables
-        cons = list(Consumable.objects.all())
+        cons = list(Consumable.objects.for_scope(Scope.current()))
         self.assertIn(self.con_a, cons)
         self.assertIn(self.con_global, cons)
         self.assertNotIn(self.con_b, cons)
 
         # Kits
-        kits = list(Kit.objects.all())
+        kits = list(Kit.objects.for_scope(Scope.current()))
         self.assertIn(self.kit_a, kits)
         self.assertIn(self.kit_global, kits)
         self.assertNotIn(self.kit_b, kits)
@@ -92,19 +93,19 @@ class InventoryTenantScopingTests(TestCase):
         set_current_tenant(self.tenant_b)
 
         # Accessories
-        accs = list(Accessory.objects.all())
+        accs = list(Accessory.objects.for_scope(Scope.current()))
         self.assertIn(self.acc_b, accs)
         self.assertIn(self.acc_global, accs)
         self.assertNotIn(self.acc_a, accs)
 
         # Consumables
-        cons = list(Consumable.objects.all())
+        cons = list(Consumable.objects.for_scope(Scope.current()))
         self.assertIn(self.con_b, cons)
         self.assertIn(self.con_global, cons)
         self.assertNotIn(self.con_a, cons)
 
         # Kits
-        kits = list(Kit.objects.all())
+        kits = list(Kit.objects.for_scope(Scope.current()))
         self.assertIn(self.kit_b, kits)
         self.assertIn(self.kit_global, kits)
         self.assertNotIn(self.kit_a, kits)
@@ -115,19 +116,19 @@ class InventoryTenantScopingTests(TestCase):
         set_current_tenant(None)
 
         # Accessories
-        accs = list(Accessory.objects.all())
+        accs = list(Accessory.objects.for_scope(Scope.current()))
         self.assertIn(self.acc_a, accs)
         self.assertIn(self.acc_b, accs)
         self.assertIn(self.acc_global, accs)
 
         # Consumables
-        cons = list(Consumable.objects.all())
+        cons = list(Consumable.objects.for_scope(Scope.current()))
         self.assertIn(self.con_a, cons)
         self.assertIn(self.con_b, cons)
         self.assertIn(self.con_global, cons)
 
         # Kits
-        kits = list(Kit.objects.all())
+        kits = list(Kit.objects.for_scope(Scope.current()))
         self.assertIn(self.kit_a, kits)
         self.assertIn(self.kit_b, kits)
         self.assertIn(self.kit_global, kits)

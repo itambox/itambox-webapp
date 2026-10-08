@@ -61,7 +61,7 @@ class LocationDetailView(ObjectDetailView):
         from inventory.models import AccessoryStock
         from inventory.tables import AccessoryStockTable
 
-        acc_stock_qs = AccessoryStock.objects.filter(location=location)
+        acc_stock_qs = AccessoryStock.objects.for_scope(Scope.current()).filter(location=location)
         accessory_stocks_table = AccessoryStockTable(acc_stock_qs, request=self.request)
         accessory_stocks_table.configure(self.request)
         context["accessory_stocks_table"] = accessory_stocks_table
@@ -70,7 +70,7 @@ class LocationDetailView(ObjectDetailView):
         from inventory.models import ConsumableStock
         from inventory.tables import ConsumableStockTable
 
-        con_stock_qs = ConsumableStock.objects.filter(location=location)
+        con_stock_qs = ConsumableStock.objects.for_scope(Scope.current()).filter(location=location)
         consumable_stocks_table = ConsumableStockTable(con_stock_qs, request=self.request)
         consumable_stocks_table.configure(self.request)
         context["consumable_stocks_table"] = consumable_stocks_table
@@ -79,7 +79,7 @@ class LocationDetailView(ObjectDetailView):
         from inventory.models import ComponentStock
         from inventory.tables import ComponentStockTable
 
-        comp_stock_qs = ComponentStock.objects.filter(location=location)
+        comp_stock_qs = ComponentStock.objects.for_scope(Scope.current()).filter(location=location)
         component_stocks_table = ComponentStockTable(comp_stock_qs, request=self.request)
         component_stocks_table.configure(self.request)
         context["component_stocks_table"] = component_stocks_table

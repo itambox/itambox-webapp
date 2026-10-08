@@ -77,7 +77,7 @@ class LicenseDetailView(ObjectDetailView):
         from inventory.models import Kit
         from inventory.tables import KitTable
 
-        kits_qs = Kit.objects.filter(items__license=license_obj).distinct()
+        kits_qs = Kit.objects.for_scope(Scope.current()).filter(items__license=license_obj).distinct()
         kits_table = KitTable(kits_qs, request=self.request)
         kits_table.configure(self.request)
         context["kits_table"] = kits_table

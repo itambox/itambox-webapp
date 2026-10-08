@@ -153,16 +153,20 @@ class AssetDetailView(ObjectDetailView):
         RequestConfig(self.request, paginate={"per_page": 10}).configure(maint_table)
         context["maintenances_table"] = maint_table
 
-        acc_qs = AccessoryAssignment.objects.filter(assigned_asset=asset).select_related(
-            "accessory", "accessory__manufacturer"
+        acc_qs = (
+            AccessoryAssignment.objects.for_scope(Scope.current())
+            .filter(assigned_asset=asset)
+            .select_related("accessory", "accessory__manufacturer")
         )
         acc_table = AccessoryAssignmentTable(acc_qs, request=self.request)
         acc_table.exclude = ("assigned_to",)
         RequestConfig(self.request, paginate={"per_page": 10}).configure(acc_table)
         context["accessory_table"] = acc_table
 
-        con_qs = ConsumableAssignment.objects.filter(assigned_asset=asset).select_related(
-            "consumable", "consumable__manufacturer"
+        con_qs = (
+            ConsumableAssignment.objects.for_scope(Scope.current())
+            .filter(assigned_asset=asset)
+            .select_related("consumable", "consumable__manufacturer")
         )
         con_table = ConsumableAssignmentTable(con_qs, request=self.request)
         con_table.exclude = ("assigned_to",)
