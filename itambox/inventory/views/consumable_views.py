@@ -30,7 +30,10 @@ from .stock_actions import StockAdjustView, StockCreateModalView
 
 class ConsumableListView(ObjectListView):
     queryset = (
-        Consumable.objects.with_counts().select_related("tenant", "manufacturer", "category").prefetch_related("tags")
+        Consumable.objects.for_scope(Scope.current())
+        .with_counts()
+        .select_related("tenant", "manufacturer", "category")
+        .prefetch_related("tags")
     )
     filterset = filters.ConsumableFilterSet
     filterset_form = forms.ConsumableFilterForm
@@ -79,7 +82,7 @@ class ConsumableDetailView(ObjectDetailView):
         context["stocks_table"] = stocks_table
 
         # Kits
-        kits_qs = Kit.objects.filter(items__consumable=consumable).distinct()
+        kits_qs = Kit.objects.for_scope(Scope.current()).filter(items__consumable=consumable).distinct()
         kits_table = tables.KitTable(kits_qs, request=self.request)
         kits_table.configure(self.request)
         context["kits_table"] = kits_table

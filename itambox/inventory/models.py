@@ -8,12 +8,13 @@ from django.utils.translation import gettext_lazy as _
 from core.context import _deletion_cascade_allows
 from core.managers import (
     AllObjectsManager,
+    ExplicitScopeAllObjectsManager,
+    ExplicitScopeManager,
+    ExplicitScopeSoftDeleteManager,
+    Scope,
     SoftDeleteManager,
     SoftDeleteQuerySet,
-    TenantScopingAllObjectsManager,
-    TenantScopingManager,
     TenantScopingQuerySet,
-    TenantScopingSoftDeleteManager,
     TenantScopingSoftDeleteQuerySet,
 )
 from core.mixins import (
@@ -90,11 +91,11 @@ class AssignmentBaseManager(models.Manager.from_queryset(AssignmentBaseQuerySet)
     """Unscoped base reads while retaining the fail-closed write boundary."""
 
 
-class AssignmentSoftDeleteManager(TenantScopingSoftDeleteManager.from_queryset(AssignmentTenantSoftDeleteQuerySet)):
+class AssignmentSoftDeleteManager(ExplicitScopeSoftDeleteManager.from_queryset(AssignmentTenantSoftDeleteQuerySet)):
     pass
 
 
-class AssignmentAllObjectsManager(TenantScopingAllObjectsManager.from_queryset(AssignmentTenantAllObjectsQuerySet)):
+class AssignmentAllObjectsManager(ExplicitScopeAllObjectsManager.from_queryset(AssignmentTenantAllObjectsQuerySet)):
     pass
 
 
@@ -108,7 +109,8 @@ class AccessoryQuerySet(TenantScopingSoftDeleteQuerySet):
         # produces a |stocks|x|assignments| cartesian JOIN that inflates BOTH
         # sums; Subqueries keep each aggregate independent and un-inflated.
         total_stock_subquery = (
-            AccessoryStock.objects.filter(accessory=OuterRef("pk"))
+            AccessoryStock.objects.for_scope(Scope.current())
+            .filter(accessory=OuterRef("pk"))
             .order_by()
             .values("accessory")
             .annotate(total=Sum("qty"))
@@ -116,7 +118,8 @@ class AccessoryQuerySet(TenantScopingSoftDeleteQuerySet):
         )
 
         checked_out_subquery = (
-            AccessoryAssignment.objects.filter(accessory=OuterRef("pk"), deleted_at__isnull=True)
+            AccessoryAssignment.objects.for_scope(Scope.current())
+            .filter(accessory=OuterRef("pk"), deleted_at__isnull=True)
             .order_by()
             .values("accessory")
             .annotate(total=Sum("qty"))
@@ -129,9 +132,11 @@ class AccessoryQuerySet(TenantScopingSoftDeleteQuerySet):
         )
 
 
-class TenantScopingAccessoryManager(models.Manager.from_queryset(AccessoryQuerySet)):
+class ExplicitAccessoryManager(models.Manager.from_queryset(AccessoryQuerySet)):
+    """Soft-delete filtering only; readers scope explicitly through ``for_scope``."""
+
     def get_queryset(self):
-        qs = super().get_queryset().filter_by_tenant()
+        qs = super().get_queryset()
         try:
             return qs.filter(deleted_at__isnull=True)
         except FieldError:
@@ -139,8 +144,7 @@ class TenantScopingAccessoryManager(models.Manager.from_queryset(AccessoryQueryS
 
 
 class AllObjectsAccessoryManager(models.Manager.from_queryset(AccessoryQuerySet)):
-    def get_queryset(self):
-        return super().get_queryset().filter_by_tenant()
+    pass
 
 
 class ConsumableQuerySet(TenantScopingSoftDeleteQuerySet):
@@ -151,7 +155,8 @@ class ConsumableQuerySet(TenantScopingSoftDeleteQuerySet):
         # See AccessoryQuerySet.with_counts: independent Subqueries avoid the
         # stocks x consumptions cartesian-product double-count.
         total_stock_subquery = (
-            ConsumableStock.objects.filter(consumable=OuterRef("pk"))
+            ConsumableStock.objects.for_scope(Scope.current())
+            .filter(consumable=OuterRef("pk"))
             .order_by()
             .values("consumable")
             .annotate(total=Sum("qty"))
@@ -159,7 +164,8 @@ class ConsumableQuerySet(TenantScopingSoftDeleteQuerySet):
         )
 
         consumed_subquery = (
-            ConsumableAssignment.objects.filter(consumable=OuterRef("pk"), deleted_at__isnull=True)
+            ConsumableAssignment.objects.for_scope(Scope.current())
+            .filter(consumable=OuterRef("pk"), deleted_at__isnull=True)
             .order_by()
             .values("consumable")
             .annotate(total=Sum("qty"))
@@ -172,9 +178,11 @@ class ConsumableQuerySet(TenantScopingSoftDeleteQuerySet):
         )
 
 
-class TenantScopingConsumableManager(models.Manager.from_queryset(ConsumableQuerySet)):
+class ExplicitConsumableManager(models.Manager.from_queryset(ConsumableQuerySet)):
+    """Soft-delete filtering only; readers scope explicitly through ``for_scope``."""
+
     def get_queryset(self):
-        qs = super().get_queryset().filter_by_tenant()
+        qs = super().get_queryset()
         try:
             return qs.filter(deleted_at__isnull=True)
         except FieldError:
@@ -182,8 +190,7 @@ class TenantScopingConsumableManager(models.Manager.from_queryset(ConsumableQuer
 
 
 class AllObjectsConsumableManager(models.Manager.from_queryset(ConsumableQuerySet)):
-    def get_queryset(self):
-        return super().get_queryset().filter_by_tenant()
+    pass
 
 
 class ComponentQuerySet(SoftDeleteQuerySet, TenantScopingQuerySet):
@@ -193,7 +200,8 @@ class ComponentQuerySet(SoftDeleteQuerySet, TenantScopingQuerySet):
 
         # Subquery to sum the quantities in ComponentStock for this component
         total_stock_subquery = (
-            ComponentStock.objects.filter(component=OuterRef("pk"))
+            ComponentStock.objects.for_scope(Scope.current())
+            .filter(component=OuterRef("pk"))
             .order_by()
             .values("component")
             .annotate(total=Sum("qty"))
@@ -202,14 +210,16 @@ class ComponentQuerySet(SoftDeleteQuerySet, TenantScopingQuerySet):
 
         # Subquery to sum active qty in ComponentAllocation for this component
         allocated_stock_subquery = (
-            ComponentAllocation.objects.filter(component=OuterRef("pk"), deleted_at__isnull=True)
+            ComponentAllocation.objects.for_scope(Scope.current())
+            .filter(component=OuterRef("pk"), deleted_at__isnull=True)
             .order_by()
             .values("component")
             .annotate(total=Sum("qty"))
             .values("total")
         )
         target_only_allocated_subquery = (
-            ComponentAllocation.objects.filter(
+            ComponentAllocation.objects.for_scope(Scope.current())
+            .filter(
                 component=OuterRef("pk"),
                 deleted_at__isnull=True,
                 from_location__isnull=True,
@@ -230,9 +240,11 @@ class ComponentQuerySet(SoftDeleteQuerySet, TenantScopingQuerySet):
         )
 
 
-class TenantScopingComponentManager(models.Manager.from_queryset(ComponentQuerySet)):
+class ExplicitComponentManager(models.Manager.from_queryset(ComponentQuerySet)):
+    """Soft-delete filtering only; readers scope explicitly through ``for_scope``."""
+
     def get_queryset(self):
-        qs = super().get_queryset().filter_by_tenant()
+        qs = super().get_queryset()
         try:
             return qs.filter(deleted_at__isnull=True)
         except FieldError:
@@ -244,7 +256,7 @@ class AllObjectsComponentManager(models.Manager.from_queryset(ComponentQuerySet)
 
 
 class Component(AbstractInventoryItem):
-    objects = TenantScopingComponentManager()
+    objects = ExplicitComponentManager()
     all_objects = AllObjectsComponentManager()
 
     specs = models.JSONField(default=dict, blank=True, verbose_name=_("Specs"))
@@ -307,7 +319,7 @@ class Component(AbstractInventoryItem):
 
 
 class Accessory(AbstractInventoryItem):
-    objects = TenantScopingAccessoryManager()
+    objects = ExplicitAccessoryManager()
     all_objects = AllObjectsAccessoryManager()
 
     manufacturer = models.ForeignKey(
@@ -376,7 +388,7 @@ class Accessory(AbstractInventoryItem):
 
 
 class Consumable(AbstractInventoryItem):
-    objects = TenantScopingConsumableManager()
+    objects = ExplicitConsumableManager()
     all_objects = AllObjectsConsumableManager()
 
     class Meta(AbstractInventoryItem.Meta):
@@ -417,7 +429,7 @@ class ComponentStock(AbstractStock):
     # tenant is a REAL field derived from location.tenant (AbstractStock);
     # scoping runs on it directly — the catalogue item's tenant is irrelevant
     # to pool ownership.
-    objects = TenantScopingManager()
+    objects = ExplicitScopeManager()
 
     component = models.ForeignKey(
         Component, on_delete=models.PROTECT, related_name="stocks", verbose_name=_("Component"), db_index=True
@@ -444,7 +456,7 @@ class ComponentStock(AbstractStock):
 
 class AccessoryStock(AbstractStock):
     # See ComponentStock — tenant derives from location.tenant.
-    objects = TenantScopingManager()
+    objects = ExplicitScopeManager()
 
     accessory = models.ForeignKey(
         Accessory, on_delete=models.PROTECT, related_name="stocks", verbose_name=_("Accessory"), db_index=True
@@ -468,7 +480,7 @@ class AccessoryStock(AbstractStock):
 
 class ConsumableStock(AbstractStock):
     # See ComponentStock — tenant derives from location.tenant.
-    objects = TenantScopingManager()
+    objects = ExplicitScopeManager()
 
     consumable = models.ForeignKey(
         Consumable, on_delete=models.PROTECT, related_name="stocks", verbose_name=_("Consumable"), db_index=True
@@ -666,8 +678,8 @@ class ConsumableAssignment(AbstractAssignment):
 class Kit(
     JournalingMixin, TaggableMixin, CloneableMixin, ExportableMixin, SoftDeleteMixin, ChangeLoggingMixin, BaseModel
 ):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     allow_global_tenant = True
 
     name = models.CharField(max_length=100, verbose_name=_("Kit Name"))
@@ -706,7 +718,7 @@ class KitItem(ChangeLoggingMixin, BaseModel):
     # READABLE by default (the manager's default behaviour for tenant_lookup
     # models). Cross-tenant WRITE is blocked by StrictTenantPermission /
     # perform_create tenant-defaulting.
-    objects = TenantScopingManager()
+    objects = ExplicitScopeManager()
 
     @property
     def tenant(self):

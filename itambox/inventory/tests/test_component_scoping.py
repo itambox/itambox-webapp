@@ -1,6 +1,7 @@
 from django.test import TestCase
 
 from assets.models import Category, Manufacturer
+from core.managers import Scope
 from inventory.models import Component
 from organization.models import Tenant, TenantGroup
 
@@ -34,7 +35,7 @@ class ComponentTenantScopingTests(TestCase):
 
         set_current_tenant(self.tenant_a)
 
-        components = list(Component.objects.all())
+        components = list(Component.objects.for_scope(Scope.current()))
         self.assertIn(self.comp_a, components)
         self.assertIn(self.comp_global, components)
         self.assertNotIn(self.comp_b, components)
@@ -44,7 +45,7 @@ class ComponentTenantScopingTests(TestCase):
 
         set_current_tenant(self.tenant_b)
 
-        components = list(Component.objects.all())
+        components = list(Component.objects.for_scope(Scope.current()))
         self.assertIn(self.comp_b, components)
         self.assertIn(self.comp_global, components)
         self.assertNotIn(self.comp_a, components)
@@ -54,7 +55,7 @@ class ComponentTenantScopingTests(TestCase):
 
         set_current_tenant(None)
 
-        components = list(Component.objects.all())
+        components = list(Component.objects.for_scope(Scope.current()))
         self.assertIn(self.comp_a, components)
         self.assertIn(self.comp_b, components)
         self.assertIn(self.comp_global, components)
@@ -80,7 +81,7 @@ class ComponentTenantScopingTests(TestCase):
         set_current_tenant(self.tenant_a)
         set_current_tenant_group(None)
 
-        components = list(Component.objects.all())
+        components = list(Component.objects.for_scope(Scope.current()))
         self.assertIn(self.comp_a, components)
         self.assertIn(self.comp_global, components)
         self.assertNotIn(comp_c, components)
@@ -91,7 +92,7 @@ class ComponentTenantScopingTests(TestCase):
         set_current_tenant_group(group)
 
         # The Group should be able to see Component A, Component Global, and Component C, but NOT Component B
-        components = list(Component.objects.all())
+        components = list(Component.objects.for_scope(Scope.current()))
         self.assertIn(self.comp_a, components)
         self.assertIn(self.comp_global, components)
         self.assertIn(comp_c, components)
