@@ -4,13 +4,14 @@ from pathlib import Path
 
 import django_filters
 from django.http import HttpResponse
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
 from model_bakery import baker
 from rest_framework.test import APIRequestFactory
 
 from assets.models import Asset, AssetType, Manufacturer
 from core.filters import BaseFilterSet
 from core.managers import set_current_tenant
+from core.paginator import EnhancedPaginator
 from itambox.api.pagination import ITAMBoxPagination
 from itambox.middleware import CSPMiddleware
 from organization.models import Location, Tenant
@@ -23,6 +24,13 @@ class MockAssetFilterSet(BaseFilterSet):
     class Meta:
         model = Asset
         fields = []
+
+
+class EnhancedPaginatorTests(SimpleTestCase):
+    def test_enhanced_page_marks_gaps_between_visible_pages(self):
+        paginator = EnhancedPaginator(range(100), 10)
+
+        self.assertEqual(paginator.page(5).smart_pages(), [1, False, 3, 4, 5, 6, 7, False, 10])
 
 
 class MitigationsPhase2Tests(TestCase):

@@ -5,6 +5,7 @@ import types
 from pathlib import Path
 from unittest.mock import patch
 
+import strawberry
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.test import SimpleTestCase, TestCase
@@ -224,6 +225,44 @@ class PluginLoaderTestCase(SimpleTestCase):
         record_failure.assert_called_once()
         self.assertEqual(record_failure.call_args.args[0], dummy_name)
         self.assertEqual(record_failure.call_args.kwargs["stage"], "graphql")
+
+    def test_graphql_schema_adds_plugin_query_and_mutation_types(self):
+        dummy_name = "test_mock_plugin_graphql_success"
+        module_path = Path(__file__).resolve().parents[1] / "schema.py"
+
+        @strawberry.type
+        class PluginQuery:
+            plugin_value: str = "available"
+
+        @strawberry.type
+        class PluginMutation:
+            @strawberry.mutation
+            def update_plugin_value(self) -> bool:
+                return True
+
+        plugin_schema = types.SimpleNamespace(Query=PluginQuery, Mutation=PluginMutation)
+
+        def import_plugin_schema(name, *args, **kwargs):
+            if name == "test_mock_plugin.graphql":
+                return plugin_schema
+            return _ORIGINAL_IMPORT_MODULE(name, *args, **kwargs)
+
+        with (
+            self.settings(PLUGINS=[dummy_name]),
+            patch("itambox.plugins.utils.is_plugin_active", return_value=True),
+            patch("itambox.plugins.utils.record_plugin_failure") as record_failure,
+            patch(
+                "django.apps.apps.get_app_config",
+                return_value=types.SimpleNamespace(graphql_schema="test_mock_plugin.graphql"),
+            ),
+            patch("importlib.import_module", side_effect=import_plugin_schema),
+        ):
+            namespace = runpy.run_path(str(module_path), run_name="issue99_core_schema_with_plugin")
+
+        self.assertIn(PluginQuery, namespace["query_bases"])
+        self.assertIn(PluginMutation, namespace["mutation_bases"])
+        self.assertIsNotNone(namespace["Mutation"])
+        record_failure.assert_not_called()
 
     def test_plugin_urlconf_failure_isolated_from_core_url_startup(self):
         dummy_name = "test_mock_plugin_urlconf_failure"

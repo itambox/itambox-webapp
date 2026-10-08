@@ -59,7 +59,7 @@ def get_action_color(action_value):
     from core.choices import ObjectChangeActionChoices
 
     # Find the choice tuple matching the action_value
-    for value, label, color in ObjectChangeActionChoices.CHOICES:
+    for value, _label, color in ObjectChangeActionChoices.CHOICES:
         if value == action_value:
             return color
     return "secondary"  # Default color if not found
