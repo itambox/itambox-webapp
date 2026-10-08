@@ -6,7 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from assets.models import Supplier
-from core.managers import set_current_tenant, set_current_tenant_group
+from core.managers import Scope, set_current_tenant, set_current_tenant_group
 from core.models import ObjectChange
 from core.tasks.context import TaskContext
 from core.tests.mixins import TenantTestMixin
@@ -35,7 +35,7 @@ class SupplierScopingTests(TenantTestMixin, TestCase):
 
     def test_active_tenant_sees_global_and_group_suppliers_but_not_other_tenants(self):
         with self.tenant_context(self.tenant):
-            supplier_ids = set(Supplier.objects.values_list("pk", flat=True))
+            supplier_ids = set(Supplier.objects.for_scope(Scope.current()).values_list("pk", flat=True))
 
         self.assertIn(self.global_supplier.pk, supplier_ids)
         self.assertIn(self.group_supplier.pk, supplier_ids)
