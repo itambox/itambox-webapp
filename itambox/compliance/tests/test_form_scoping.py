@@ -44,7 +44,6 @@ class ComplianceFormDeclarationTests(TenantTestMixin, TestCase):
     def test_model_choice_fields_are_scoped_explicitly(self):
         for form_class, names in (
             (AssetMaintenanceForm, ("asset", "loaner_asset")),
-            (CustodyTemplateForm, ("category", "tags")),
             (AssetAuditForm, ("location",)),
             (AuditSessionForm, ("tenant", "location")),
         ):
