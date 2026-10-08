@@ -6,10 +6,11 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.models import StatusLabel
 from compliance.models import AssetAudit, AuditSession
+from core.forms import TenantScopedFormMixin, apply_tenant_scoped_choices
 from organization.models import Location, Tenant
 
 
-class AssetAuditForm(forms.ModelForm):
+class AssetAuditForm(TenantScopedFormMixin, forms.ModelForm):
     class Meta:
         model = AssetAudit
         fields = ["location", "status", "notes", "verification_method"]
@@ -36,8 +37,15 @@ class AssetAuditForm(forms.ModelForm):
             self.fields["location"].initial = asset.location
             self.fields["status"].initial = asset.status
 
+        # The fields above are replaced after the mixin ran; scope them explicitly.
+        apply_tenant_scoped_choices(self)
 
-class AuditSessionForm(forms.ModelForm):
+
+class AuditSessionForm(TenantScopedFormMixin, forms.ModelForm):
+    # ``tenant`` is optional here (blank = global MSP-wide audit).
+    tenant_required = False
+    tenant_autoset_when_single = False
+
     start_immediately = forms.BooleanField(
         required=False,
         initial=True,
@@ -87,6 +95,9 @@ class AuditSessionForm(forms.ModelForm):
             help_text=_("Expected location to audit. Leave blank to audit globally."),
             widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
         )
+
+        # Tenant and location were redeclared above; scope the replacements.
+        apply_tenant_scoped_choices(self)
 
         cancel_url = reverse("compliance:auditsession_list")
         button_text = _("Update") if self.instance and self.instance.pk else _("Create")
