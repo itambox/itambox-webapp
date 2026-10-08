@@ -30,6 +30,7 @@ from compliance.models import CustodyHandoffDelivery, CustodyReceipt, CustodySig
 from compliance.services import _custody_handoff_email_content
 from compliance.views import CustodyReceiptPrepareView
 from core.events import DeliveryDisposition, DeliveryResult
+from core.managers import Scope
 from core.management.commands._seed.access import SeedAccessMixin
 from core.models import ObjectChange
 from core.tests.mixins import TenantTestMixin, grant
@@ -1501,9 +1502,9 @@ class CustodySigningSessionHandoffTests(CustodyRBACFixtureMixin, TestCase):
             status=CustodyHandoffDelivery.STATUS_REQUESTED,
         )
         with self.tenant_context(self.tenant_a):
-            self.assertTrue(CustodyHandoffDelivery.objects.filter(pk=delivery.pk).exists())
+            self.assertTrue(CustodyHandoffDelivery.objects.for_scope(Scope.current()).filter(pk=delivery.pk).exists())
         with self.tenant_context(self.tenant_b):
-            self.assertFalse(CustodyHandoffDelivery.objects.filter(pk=delivery.pk).exists())
+            self.assertFalse(CustodyHandoffDelivery.objects.for_scope(Scope.current()).filter(pk=delivery.pk).exists())
 
     def test_intended_recipient_accept_consumes_session_with_accepted_outcome(self):
         self._login_to_tenant(self.recipient, self.tenant_a)
