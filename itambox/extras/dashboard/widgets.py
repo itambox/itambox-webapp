@@ -555,9 +555,10 @@ class FinancialWidget(DashboardWidget):
         tenant = None
         tenant_id = self.get_config_value("tenant_id") or self.config.get("tenant_id")
         if tenant_id:
+            from core.managers import Scope
             from organization.models import Tenant
 
-            tenant = Tenant.objects.filter(id=tenant_id).first()
+            tenant = Tenant.objects.for_scope(Scope.current()).filter(id=tenant_id).first()
         if tenant is None:
             tenant = getattr(request, "active_tenant", None)
 
@@ -1018,9 +1019,10 @@ class RenewalsWidget(DashboardWidget):
         tenant = None
         tenant_id = self.get_config_value("tenant_id") or self.config.get("tenant_id")
         if tenant_id:
+            from core.managers import Scope
             from organization.models import Tenant
 
-            tenant = Tenant.objects.filter(id=tenant_id).first()
+            tenant = Tenant.objects.for_scope(Scope.current()).filter(id=tenant_id).first()
         if tenant is None:
             tenant = getattr(request, "active_tenant", None)
 

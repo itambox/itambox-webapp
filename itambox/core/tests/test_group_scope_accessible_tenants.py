@@ -13,6 +13,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from core.managers import (
+    Scope,
     set_current_membership,
     set_current_tenant,
     set_current_tenant_group,
@@ -84,7 +85,7 @@ class GroupScopeAccessibleTenantsTests(TestCase):
         _current_user.set(user)
         set_current_tenant(None)
         set_current_tenant_group(group)
-        return set(Tenant.objects.values_list("slug", flat=True))
+        return set(Tenant.objects.for_scope(Scope.current()).values_list("slug", flat=True))
 
     def _managed_staff(self, username, assigned):
         user = User.objects.create_user(username=username, password="pw")
@@ -192,7 +193,7 @@ class GroupVisibilityAccessibleTests(TestCase):
         _current_user.set(staff)
         set_current_tenant(self.provider)  # single-tenant scope
         set_current_tenant_group(None)
-        slugs = set(TenantGroup.objects.values_list("slug", flat=True))
+        slugs = set(TenantGroup.objects.for_scope(Scope.current()).values_list("slug", flat=True))
         # The managed customer sits in `child`; its group + ancestor `root` are visible.
         self.assertIn("ws5g-child", slugs)
         self.assertIn("ws5g-root", slugs)

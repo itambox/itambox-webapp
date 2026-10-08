@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from core.managers import Scope
 from organization.models import AssetHolder, Location, Region, Site, SiteGroup, Tenant, TenantGroup
 
 User = get_user_model()
@@ -112,21 +113,21 @@ class OrganizationTenantScopingTests(TestCase):
 
         set_current_tenant(self.tenant_a)
 
-        tenants = list(Tenant.objects.all())
+        tenants = list(Tenant.objects.for_scope(Scope.current()))
         self.assertIn(self.tenant_a, tenants)
         self.assertNotIn(self.tenant_b, tenants)
 
-        sites = list(Site.objects.all())
+        sites = list(Site.objects.for_scope(Scope.current()))
         self.assertIn(self.site_a, sites)
         self.assertNotIn(self.site_global, sites)
         self.assertNotIn(self.site_b, sites)
 
-        locs = list(Location.objects.all())
+        locs = list(Location.objects.for_scope(Scope.current()))
         self.assertIn(self.loc_a, locs)
         self.assertNotIn(self.loc_global, locs)
         self.assertNotIn(self.loc_b, locs)
 
-        holders = list(AssetHolder.objects.all())
+        holders = list(AssetHolder.objects.for_scope(Scope.current()))
         self.assertIn(self.holder_a, holders)
         self.assertNotIn(self.holder_global, holders)
         self.assertNotIn(self.holder_b, holders)
@@ -136,21 +137,21 @@ class OrganizationTenantScopingTests(TestCase):
 
         set_current_tenant(self.tenant_b)
 
-        tenants = list(Tenant.objects.all())
+        tenants = list(Tenant.objects.for_scope(Scope.current()))
         self.assertIn(self.tenant_b, tenants)
         self.assertNotIn(self.tenant_a, tenants)
 
-        sites = list(Site.objects.all())
+        sites = list(Site.objects.for_scope(Scope.current()))
         self.assertIn(self.site_b, sites)
         self.assertNotIn(self.site_global, sites)
         self.assertNotIn(self.site_a, sites)
 
-        locs = list(Location.objects.all())
+        locs = list(Location.objects.for_scope(Scope.current()))
         self.assertIn(self.loc_b, locs)
         self.assertNotIn(self.loc_global, locs)
         self.assertNotIn(self.loc_a, locs)
 
-        holders = list(AssetHolder.objects.all())
+        holders = list(AssetHolder.objects.for_scope(Scope.current()))
         self.assertIn(self.holder_b, holders)
         self.assertNotIn(self.holder_global, holders)
         self.assertNotIn(self.holder_a, holders)
@@ -160,21 +161,21 @@ class OrganizationTenantScopingTests(TestCase):
 
         set_current_tenant(None)
 
-        tenants = list(Tenant.objects.all())
+        tenants = list(Tenant.objects.for_scope(Scope.current()))
         self.assertIn(self.tenant_a, tenants)
         self.assertIn(self.tenant_b, tenants)
 
-        sites = list(Site.objects.all())
+        sites = list(Site.objects.for_scope(Scope.current()))
         self.assertIn(self.site_a, sites)
         self.assertIn(self.site_b, sites)
         self.assertIn(self.site_global, sites)
 
-        locs = list(Location.objects.all())
+        locs = list(Location.objects.for_scope(Scope.current()))
         self.assertIn(self.loc_a, locs)
         self.assertIn(self.loc_b, locs)
         self.assertIn(self.loc_global, locs)
 
-        holders = list(AssetHolder.objects.all())
+        holders = list(AssetHolder.objects.for_scope(Scope.current()))
         self.assertIn(self.holder_a, holders)
         self.assertIn(self.holder_b, holders)
         self.assertIn(self.holder_global, holders)
@@ -193,12 +194,12 @@ class OrganizationTenantScopingTests(TestCase):
         set_current_tenant(self.tenant_a)
         set_current_tenant_group(None)
 
-        tenants = list(Tenant.objects.all())
+        tenants = list(Tenant.objects.for_scope(Scope.current()))
         self.assertIn(self.tenant_a, tenants)
         self.assertNotIn(tenant_c, tenants)
         self.assertNotIn(self.tenant_b, tenants)
 
-        sites = list(Site.objects.all())
+        sites = list(Site.objects.for_scope(Scope.current()))
         self.assertIn(self.site_a, sites)
         self.assertNotIn(self.site_global, sites)
         self.assertNotIn(site_c, sites)
@@ -207,12 +208,12 @@ class OrganizationTenantScopingTests(TestCase):
         set_current_tenant(None)
         set_current_tenant_group(group)
 
-        tenants = list(Tenant.objects.all())
+        tenants = list(Tenant.objects.for_scope(Scope.current()))
         self.assertIn(self.tenant_a, tenants)
         self.assertIn(tenant_c, tenants)
         self.assertNotIn(self.tenant_b, tenants)
 
-        sites = list(Site.objects.all())
+        sites = list(Site.objects.for_scope(Scope.current()))
         self.assertIn(self.site_a, sites)
         self.assertNotIn(self.site_global, sites)
         self.assertIn(site_c, sites)
