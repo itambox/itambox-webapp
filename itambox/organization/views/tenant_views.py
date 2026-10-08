@@ -79,7 +79,9 @@ class TenantDetailView(ObjectDetailView):
 
         from compliance.models import CustodyTemplate
 
-        context["tenant_custody_count"] = CustodyTemplate.objects.for_scope(Scope.current()).filter(tenant=tenant).count()
+        context["tenant_custody_count"] = (
+            CustodyTemplate.objects.for_scope(Scope.current()).filter(tenant=tenant).count()
+        )
         context["tenant_license_count"] = tenant.licenses.count()
         context["tenant_kit_count"] = tenant.kits.count()
         context["tenant_subscription_count"] = tenant.subscriptions_org.count()

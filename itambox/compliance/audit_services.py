@@ -15,13 +15,13 @@ from django.utils.translation import gettext_lazy as _
 from assets.models import Asset, StatusLabel
 from compliance.models import AssetAudit, AuditSession
 from core import tenant_scope
-from core.managers import Scope
 from core.authorization_cache import force_authorization_generation_check
 from core.context import (
     SystemAuthorizationContext,
     get_current_request_id,
     get_current_tenant,
 )
+from core.managers import Scope
 from organization.models import Location, Tenant
 
 if (
@@ -514,7 +514,10 @@ def audit_asset_from_form(
     allowed_tenants = _authorized_asset_tenants(user)
     session_scope = Q(tenant_id__isnull=True) | Q(tenant_id__in=allowed_tenants)
     session = (
-        AuditSession.objects.for_scope(Scope.current()).filter(status="active", location=location).filter(session_scope).first()
+        AuditSession.objects.for_scope(Scope.current())
+        .filter(status="active", location=location)
+        .filter(session_scope)
+        .first()
         or AuditSession.objects.for_scope(Scope.current())
         .filter(status="active", location__isnull=True)
         .filter(session_scope)

@@ -30,8 +30,8 @@ from compliance.models import CustodyHandoffDelivery, CustodyReceipt, CustodySig
 from compliance.services import _custody_handoff_email_content
 from compliance.views import CustodyReceiptPrepareView
 from core.events import DeliveryDisposition, DeliveryResult
-from core.managers import Scope
 from core.management.commands._seed.access import SeedAccessMixin
+from core.managers import Scope
 from core.models import ObjectChange
 from core.tests.mixins import TenantTestMixin, grant
 from extras.models import JournalEntry
