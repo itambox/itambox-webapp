@@ -36,6 +36,7 @@ from compliance.forms_audit import AssetAuditForm, AuditBarcodeScanForm, AuditSe
 from compliance.forms_filter import AuditSessionFilterForm
 from compliance.models import AssetAudit, AuditSession
 from core.csv_utils import csv_safe
+from core.managers import Scope
 from core.tables import ActionsColumn, BaseTable, ToggleColumn
 from itambox.views.generic import ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
 from itambox.views.generic.service_views import GenericTransactionView, SimplePostView
@@ -197,7 +198,7 @@ class AssetAuditScanView(LoginRequiredMixin, PermissionRequiredMixin, View):
         return super().handle_no_permission()
 
     def post(self, request, pk, *args, **kwargs):
-        session = get_object_or_404(AuditSession, pk=pk, status="active")
+        session = get_object_or_404(AuditSession.objects.for_scope(Scope.current()), pk=pk, status="active")
         form = AuditBarcodeScanForm(request.POST)
 
         if form.is_valid():
@@ -256,7 +257,7 @@ class AuditSessionValidateView(LoginRequiredMixin, PermissionRequiredMixin, View
     permission_required = "compliance.add_assetaudit"
 
     def get(self, request, pk, *args, **kwargs):
-        session = get_object_or_404(AuditSession, pk=pk, status="active")
+        session = get_object_or_404(AuditSession.objects.for_scope(Scope.current()), pk=pk, status="active")
         code = request.GET.get("code", "").strip()
         if not code:
             return JsonResponse({"found": False}, status=400)
@@ -295,7 +296,7 @@ class AuditSessionCommitView(LoginRequiredMixin, PermissionRequiredMixin, View):
     permission_required = "compliance.add_assetaudit"
 
     def post(self, request, pk, *args, **kwargs):
-        session = get_object_or_404(AuditSession, pk=pk, status="active")
+        session = get_object_or_404(AuditSession.objects.for_scope(Scope.current()), pk=pk, status="active")
         asset_pks = request.POST.getlist("pk")
 
         if not asset_pks:
@@ -397,7 +398,7 @@ class AuditSessionReportCsvView(LoginRequiredMixin, PermissionRequiredMixin, Vie
     permission_required = "compliance.view_auditsession"
 
     def get(self, request, pk, *args, **kwargs):
-        session = get_object_or_404(AuditSession, pk=pk, status="completed")
+        session = get_object_or_404(AuditSession.objects.for_scope(Scope.current()), pk=pk, status="completed")
         report = _read_report_or_deny(session, request.user)
         rows = report["rows"]
 

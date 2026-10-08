@@ -491,6 +491,14 @@ class ExplicitScopeSoftDeleteManager(models.Manager.from_queryset(TenantScopingS
             return qs
 
 
+class ExplicitScopeManager(models.Manager.from_queryset(TenantScopingQuerySet)):
+    """Plain default manager for models without soft delete: no ambient tenant scope."""
+
+
+class ExplicitScopeAllObjectsManager(models.Manager.from_queryset(TenantScopingSoftDeleteQuerySet)):
+    """Plain including-deleted manager: no soft-delete filter, no ambient tenant scope."""
+
+
 class TenantScopingAllObjectsManager(models.Manager.from_queryset(TenantScopingSoftDeleteQuerySet)):
     def get_queryset(self):
         return super().get_queryset().filter_by_tenant()

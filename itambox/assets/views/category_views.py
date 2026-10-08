@@ -3,6 +3,7 @@ from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
 
+from core.managers import Scope
 from inventory.models import Accessory
 from itambox.panels import Panel
 from itambox.utils import get_paginate_count
@@ -85,8 +86,10 @@ class CategoryDetailView(ObjectDetailView):
         # Query active custody templates (Policies) linked to this category
         from compliance.models import CustodyTemplate
 
-        context["custody_templates"] = CustodyTemplate.objects.filter(category=category, is_active=True).select_related(
-            "tenant", "tenant_group"
+        context["custody_templates"] = (
+            CustodyTemplate.objects.for_scope(Scope.current())
+            .filter(category=category, is_active=True)
+            .select_related("tenant", "tenant_group")
         )
 
         related_objects_list = []

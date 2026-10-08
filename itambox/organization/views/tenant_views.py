@@ -13,6 +13,7 @@ from django.views.decorators.http import require_POST
 from django_tables2 import RequestConfig
 
 from assets.tables import AccessoryTable, AssetTable, ConsumableTable, KitTable
+from core.managers import Scope
 from itambox.panels import Panel
 from itambox.utils import get_paginate_count
 from itambox.views.generic import (
@@ -78,7 +79,9 @@ class TenantDetailView(ObjectDetailView):
 
         from compliance.models import CustodyTemplate
 
-        context["tenant_custody_count"] = CustodyTemplate.objects.filter(tenant=tenant).count()
+        context["tenant_custody_count"] = (
+            CustodyTemplate.objects.for_scope(Scope.current()).filter(tenant=tenant).count()
+        )
         context["tenant_license_count"] = tenant.licenses.count()
         context["tenant_kit_count"] = tenant.kits.count()
         context["tenant_subscription_count"] = tenant.subscriptions_org.count()
@@ -207,7 +210,7 @@ class TenantDetailView(ObjectDetailView):
         from compliance.models import CustodyTemplate
         from compliance.tables import CustodyTemplateTable
 
-        custody_templates_qs = CustodyTemplate.objects.filter(tenant=tenant)
+        custody_templates_qs = CustodyTemplate.objects.for_scope(Scope.current()).filter(tenant=tenant)
         table = CustodyTemplateTable(custody_templates_qs, request=request)
         table.configure(request)
         return render(
