@@ -198,13 +198,13 @@ class ExtrasListProviderTests(TenantTestMixin, TestCase):
 
     def test_optional_catalogue_failure_degrades_but_activation_failure_propagates(self):
         failure = DatabaseError("saved-filter catalogue unavailable")
-        with patch.object(SavedFilter.objects, "filter", side_effect=failure):
+        with patch.object(SavedFilter.objects, "for_scope", side_effect=failure):
             resolution = self._resolve()
 
         self.assertEqual(resolution.provider_state["extras"]["saved_filters"], [])
         self.assertIsNone(resolution.provider_state["extras"]["active_saved_filter_id"])
 
-        with patch.object(SavedFilter.objects, "filter", side_effect=failure):
+        with patch.object(SavedFilter.objects, "for_scope", side_effect=failure):
             with self.assertRaisesRegex(DatabaseError, "catalogue unavailable"):
                 self._resolve({"filter": self.saved_filter.pk})
 

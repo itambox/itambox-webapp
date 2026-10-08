@@ -14,7 +14,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core.data_transfer import policy_for
 from core.forms import ColorFieldFormMixin, FilterForm
-from core.managers import get_current_tenant
+from core.managers import Scope, get_current_tenant
 from core.validators import validate_external_url
 from itambox.middleware import get_current_user
 
@@ -723,7 +723,7 @@ class EventRuleForm(forms.ModelForm):
         # Only models that emit Events are selectable — others would never trigger the rule.
         self.fields["model"].queryset = logged_content_types()
         self.fields["model"].label = _("Target Model")
-        self.fields["webhook"].queryset = WebhookEndpoint.objects.filter(enabled=True)
+        self.fields["webhook"].queryset = WebhookEndpoint.objects.for_scope(Scope.current()).filter(enabled=True)
         self.fields["webhook"].label = _("Webhook Endpoint")
         self.fields["webhook"].help_text = _(
             "Required for Webhook rules. Manage endpoints under Webhook Endpoints. "
@@ -1253,8 +1253,8 @@ class ScheduledReportForm(forms.ModelForm):
             # tenant-scoping managers — never an arbitrary AssetHolder profile
             # tenant, which under a multi-tenant scope would hide records the
             # actor can legitimately reach.
-            self.fields["report"].queryset = ReportTemplate.objects.all()
-            self.fields["channels"].queryset = NotificationChannel.objects.all()
+            self.fields["report"].queryset = ReportTemplate.objects.for_scope(Scope.current())
+            self.fields["channels"].queryset = NotificationChannel.objects.for_scope(Scope.current())
         else:
             if "tenant" in self.fields:
                 self.fields["tenant"].required = False
@@ -1378,7 +1378,7 @@ class AlertRuleForm(forms.ModelForm):
             # Channel choices follow the active canonical read scope resolved by
             # the tenant-scoping manager — rebound per request so the dropdown
             # never lists channels outside the actor's scope.
-            self.fields["channels"].queryset = NotificationChannel.objects.all()
+            self.fields["channels"].queryset = NotificationChannel.objects.for_scope(Scope.current())
 
         # Make the threshold label/help reflect what the number actually means
         # for the selected alert type (days horizon vs. unit count).

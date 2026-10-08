@@ -8,6 +8,7 @@ from django.test import TransactionTestCase
 from django.utils import timezone
 
 from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
+from core.managers import Scope
 from core.models import Job, Notification
 from core.tasks import import_csv_task
 from extras.models import AlertLog, AlertRule, NotificationChannel
@@ -247,8 +248,8 @@ class AlertDedupRegressionTests(TransactionTestCase):
         member = User.objects.create_user(username="member_prefetch", password="x")
         token = _current_user.set(member)
         try:
-            # Sanity: the scoping manager really does fail closed here.
-            self.assertEqual(AlertLog.objects.count(), 0)
+            # Sanity: the scoped read really does fail closed here.
+            self.assertEqual(AlertLog.objects.for_scope(Scope.current()).count(), 0)
             prefetched = _prefetch_open_logs()
         finally:
             _current_user.reset(token)
@@ -376,7 +377,7 @@ class AlertDedupRegressionTests(TransactionTestCase):
         member = User.objects.create_user(username="member_resolve", password="x")
         token = _current_user.set(member)
         try:
-            self.assertEqual(AlertLog.objects.count(), 0)  # fail-closed sanity
+            self.assertEqual(AlertLog.objects.for_scope(Scope.current()).count(), 0)  # fail-closed sanity
             # Empty matched_keys -> the stale open log no longer matches and must
             # be auto-resolved.
             _auto_resolve_cleared(rule, set())
