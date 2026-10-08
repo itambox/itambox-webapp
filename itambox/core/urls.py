@@ -29,9 +29,11 @@ from django.views.i18n import JavaScriptCatalog
 
 from assets import views as asset_views  # Import the assets views
 from assets.views_scan import ScanResolveView
+from core.auth.oidc import TenantOIDCAuthorizeView, TenantOIDCCallbackView
 from core.schema import schema
 from core.views.auth import ITAMboxLoginView, TenantSamlAcsView, TenantSamlLoginView
 from core.views.graphql import PrivateGraphQLView
+from core.views.mfa import MFASetupView
 from extras.attachment_views import (
     FileAttachmentDeleteView,
     FileAttachmentDownloadView,
@@ -61,8 +63,6 @@ from users.table_config_views import table_config
 
 mimetypes.add_type("application/zip", ".zip")
 
-from core.auth.oidc import TenantOIDCAuthorizeView, TenantOIDCCallbackView
-from core.views.mfa import MFASetupView
 
 # Main URL Patterns
 urlpatterns = [

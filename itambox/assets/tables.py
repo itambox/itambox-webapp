@@ -20,7 +20,12 @@ from core.tables import (
     ToggleColumn,
 )
 from core.tables.constants import TABLE_EMPTY_VALUE
-from extras.tables import TagColumn  # Import TagColumn
+from extras.tables import (
+    CustomFieldsetTable,
+    CustomFieldTable,
+    TagColumn,  # Import TagColumn
+)
+from inventory.tables import AccessoryTable, ComponentAllocationTable, ConsumableTable, KitTable
 
 from .models import (
     Asset,
@@ -562,10 +567,6 @@ class AssetDisposalTable(BaseTable):
         from extras.templatetags.money import money
 
         return money(value, record)
-
-
-from extras.tables import CustomFieldsetTable, CustomFieldTable
-from inventory.tables import AccessoryTable, ComponentAllocationTable, ConsumableTable, KitTable
 
 
 class DepreciationTable(BaseTable):

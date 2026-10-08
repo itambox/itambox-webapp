@@ -13,8 +13,13 @@ from assets.services import (
     complete_repair,
     issue_repair_loaner,
 )
+from compliance.registry import signature_providers
 from core.forms import FilterForm, TenantScopedFormMixin, scope_tenant_field, scope_tenant_group_field
 from core.managers import Scope
+from extras.models import Tag
+from organization.models import Tenant, TenantGroup
+
+from .models import CustodyTemplate
 
 
 class AssetMaintenanceFilterForm(FilterForm):
@@ -258,13 +263,6 @@ class AssetMaintenanceForm(TenantScopedFormMixin, forms.ModelForm):
         if not self.can_dispose or not self.cleaned_data.get("dispose_original"):
             return ""
         return self.cleaned_data.get("disposal_method") or ""
-
-
-from compliance.registry import signature_providers
-from extras.models import Tag
-from organization.models import Tenant, TenantGroup
-
-from .models import CustodyTemplate
 
 
 class CustodyTemplateForm(TenantScopedFormMixin, forms.ModelForm):

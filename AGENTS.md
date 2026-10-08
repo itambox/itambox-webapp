@@ -157,9 +157,10 @@ uv run --locked --only-group dev python scripts/check_flake8_baseline.py
 uv run --locked --only-group dev python scripts/check_flake8_baseline.py --write-baseline
 ```
 Policy (`select`/`ignore`, each ignore documented with a reason) lives in `setup.cfg`
-at the repo root and covers the rules not yet migrated to Ruff; migrated rule groups
-move over one phase at a time under issue #622 (current admission: see the Ruff
-section below). The pinned Flake8/Bugbear toolchain is blocking; pre-existing
+at the repo root and covers the rules not yet migrated to Ruff (`B017`, `B907`,
+`B908`, `C901`, `F401`, `F403`, `F405`); migrated rule groups move over one phase
+at a time under issue #622 (current admission: see the Ruff section below). The
+pinned Flake8/Bugbear toolchain is blocking; pre-existing
 violations are grandfathered via `scripts/flake8_baseline.json`, a
 schema-v3 identity baseline keyed by path, code, message, source statement, and
 stable AST context. Its policy SHA-256 binds it to the effective Flake8 config,
@@ -200,7 +201,7 @@ length 120 and `target-version = "py312"` to match the Flake8 policy above,
 plus repository-appropriate excludes (migrations, `itambox/static/dist`,
 and `itambox/static/docs`). `[tool.ruff.lint] select` carries import ordering
 plus the rule groups already migrated from Flake8 (`B007`, `B009`, `B010`,
-`B028`, `B905`, `E501`, `E741`, `F541`); `E501` replaced the retired `B950`
+`B028`, `B905`, `E402`, `E501`, `E741`, `F541`); `E501` replaced the retired `B950`
 via the 132-character `[tool.ruff.lint.pycodestyle]` setting. Flake8 remains
 the blocking identity-baseline gate for the rules not yet migrated (see the
 Flake8 section above); each phase moves one bounded rule group onto Ruff only

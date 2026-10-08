@@ -1,9 +1,15 @@
 """Test for the hardware_inventory report type."""
 
+import pytest
 from django.test import TestCase
 from django.utils.translation import gettext as _
+from model_bakery import baker
 
+from assets.models import Asset, StatusLabel
+from compliance.models import CustodyReceipt
 from core.tests.mixins import TenantTestMixin, compile_report_with_system_authorization
+from extras.models import ReportTemplate
+from organization.models import AssetHolder, Tenant
 
 
 class HardwareInventoryReportTests(TenantTestMixin, TestCase):
@@ -34,14 +40,6 @@ class HardwareInventoryReportTests(TenantTestMixin, TestCase):
 
 
 """Tests for the Custody & EULA Sign-off Compliance report type."""
-import pytest
-from django.test import TestCase
-from model_bakery import baker
-
-from assets.models import Asset, StatusLabel
-from compliance.models import CustodyReceipt
-from extras.models import ReportTemplate
-from organization.models import AssetHolder, Tenant
 
 
 def _summary(cards, label):
