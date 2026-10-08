@@ -9,6 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
+from core.managers import Scope
 from itambox.views.generic import ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
 from itambox.views.generic.service_views import SimplePostView
 
@@ -62,9 +63,11 @@ class PurchaseOrderDetailView(ObjectDetailView):
         # Fetch linked fulfillment links
         from procurement.models import FulfillmentLink
 
-        context["fulfillment_links"] = FulfillmentLink.objects.filter(
-            purchase_order_line__purchase_order=self.object
-        ).select_related("asset_request", "purchase_order_line")
+        context["fulfillment_links"] = (
+            FulfillmentLink.objects.for_scope(Scope.current())
+            .filter(purchase_order_line__purchase_order=self.object)
+            .select_related("asset_request", "purchase_order_line")
+        )
 
         return context
 
@@ -149,7 +152,7 @@ class PurchaseOrderLineAddView(PermissionRequiredMixin, View):
     permission_required = "procurement.change_purchaseorder"
 
     def get(self, request, *args, **kwargs):
-        po = get_object_or_404(PurchaseOrder, pk=kwargs.get("po_pk"))
+        po = get_object_or_404(PurchaseOrder.objects.for_scope(Scope.current()), pk=kwargs.get("po_pk"))
         context = {
             "object": po,
             "lines": po.lines.all(),
@@ -158,7 +161,7 @@ class PurchaseOrderLineAddView(PermissionRequiredMixin, View):
         return render(request, "procurement/includes/purchaseorder_lines_container.html", context)
 
     def post(self, request, *args, **kwargs):
-        po = get_object_or_404(PurchaseOrder, pk=kwargs.get("po_pk"))
+        po = get_object_or_404(PurchaseOrder.objects.for_scope(Scope.current()), pk=kwargs.get("po_pk"))
         if po.status != PurchaseOrder.STATUS_DRAFT:
             messages.error(request, _("Line items can only be added while the purchase order is in Draft status."))
             return redirect(po.get_absolute_url())
@@ -226,7 +229,7 @@ class PurchaseOrderLineEditView(PermissionRequiredMixin, View):
     permission_required = "procurement.change_purchaseorder"
 
     def get(self, request, *args, **kwargs):
-        line = get_object_or_404(PurchaseOrderLine, pk=kwargs.get("pk"))
+        line = get_object_or_404(PurchaseOrderLine.objects.for_scope(Scope.current()), pk=kwargs.get("pk"))
         po = line.purchase_order
         context = {
             "object": po,
@@ -237,7 +240,7 @@ class PurchaseOrderLineEditView(PermissionRequiredMixin, View):
         return render(request, "procurement/includes/purchaseorder_lines_container.html", context)
 
     def post(self, request, *args, **kwargs):
-        line = get_object_or_404(PurchaseOrderLine, pk=kwargs.get("pk"))
+        line = get_object_or_404(PurchaseOrderLine.objects.for_scope(Scope.current()), pk=kwargs.get("pk"))
         po = line.purchase_order
 
         if po.status != PurchaseOrder.STATUS_DRAFT:
