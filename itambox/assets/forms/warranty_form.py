@@ -5,10 +5,11 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Supplier, Warranty
+from core.forms import TenantScopedFormMixin
 from core.managers import Scope
 
 
-class WarrantyForm(forms.ModelForm):
+class WarrantyForm(TenantScopedFormMixin, forms.ModelForm):
     start_date = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
         required=True,

@@ -5,12 +5,13 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, AssetDisposal
+from core.forms import TenantScopedFormMixin
 from core.managers import Scope
 
 from .fields import selectable_repair_maintenances
 
 
-class AssetDisposalForm(forms.ModelForm):
+class AssetDisposalForm(TenantScopedFormMixin, forms.ModelForm):
     """Form for recording an AssetDisposal end-of-life record.
 
     The record is created and amended exclusively through the disposal services
