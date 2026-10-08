@@ -6,6 +6,7 @@ from typing import Any
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_noop
 
+from core.managers import Scope
 from core.reports.charts import generate_doughnut_chart
 from core.reports.contracts import ReportDefinition, ReportRequest, ReportResult
 from core.reports.registry import register_report_provider
@@ -119,7 +120,11 @@ class HardwareInventoryReportProvider(ReportDefinition):
         )
 
     def _catalogue(self, model, request: ReportRequest):
-        queryset = model.objects.filter(deleted_at__isnull=True).select_related("manufacturer", "category")
+        queryset = (
+            model.objects.for_scope(Scope.current())
+            .filter(deleted_at__isnull=True)
+            .select_related("manufacturer", "category")
+        )
         return self.scope_to_tenants(queryset, request)
 
     def build(self, request: ReportRequest) -> ReportResult:

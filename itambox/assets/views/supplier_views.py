@@ -72,7 +72,8 @@ class SupplierDetailView(ObjectDetailView):
         from inventory.tables import AccessoryTable
 
         accessory_qs = (
-            Accessory.objects.filter(supplier=supplier)
+            Accessory.objects.for_scope(Scope.current())
+            .filter(supplier=supplier)
             .select_related("manufacturer", "category", "tenant")
             .prefetch_related("tags")
         )

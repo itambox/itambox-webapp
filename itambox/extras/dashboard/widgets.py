@@ -1168,13 +1168,13 @@ class LowStockWidget(DashboardWidget):
         acc_qs = get_scoped_queryset(Accessory, request, config=self.config.get("config", {})).filter(min_qty__gt=0)
 
         # Scoped total stock subquery
-        stock_sub = AccessoryStock.objects.filter(accessory=OuterRef("pk"))
+        stock_sub = AccessoryStock.objects.for_scope(Scope.current()).filter(accessory=OuterRef("pk"))
         if target_id:
             stock_sub = stock_sub.filter(location__tenant_id=target_id)
         stock_sub = stock_sub.values("accessory").annotate(sum_qty=Sum("qty")).values("sum_qty")
 
         # Scoped checked out subquery
-        assignment_sub = AccessoryAssignment.objects.filter(accessory=OuterRef("pk"))
+        assignment_sub = AccessoryAssignment.objects.for_scope(Scope.current()).filter(accessory=OuterRef("pk"))
         if target_id:
             assignment_sub = assignment_sub.filter(
                 Q(assigned_location__tenant_id=target_id) | Q(assigned_holder__tenant_id=target_id)
@@ -1197,13 +1197,13 @@ class LowStockWidget(DashboardWidget):
         con_qs = get_scoped_queryset(Consumable, request, config=self.config.get("config", {})).filter(min_qty__gt=0)
 
         # Scoped total stock subquery
-        stock_sub = ConsumableStock.objects.filter(consumable=OuterRef("pk"))
+        stock_sub = ConsumableStock.objects.for_scope(Scope.current()).filter(consumable=OuterRef("pk"))
         if target_id:
             stock_sub = stock_sub.filter(location__tenant_id=target_id)
         stock_sub = stock_sub.values("consumable").annotate(sum_qty=Sum("qty")).values("sum_qty")
 
         # Scoped consumed subquery
-        consumption_sub = ConsumableAssignment.objects.filter(consumable=OuterRef("pk"))
+        consumption_sub = ConsumableAssignment.objects.for_scope(Scope.current()).filter(consumable=OuterRef("pk"))
         if target_id:
             consumption_sub = consumption_sub.filter(
                 Q(assigned_location__tenant_id=target_id) | Q(assigned_holder__tenant_id=target_id)
@@ -1223,16 +1223,18 @@ class LowStockWidget(DashboardWidget):
         return low_consumables
 
     def _low_stock_components(self, request, target_id):
-        comp_qs = Component.objects.filter(min_qty__gt=0).order_by("name")
+        comp_qs = Component.objects.for_scope(Scope.current()).filter(min_qty__gt=0).order_by("name")
 
         # Scoped total stock subquery
-        stock_sub = ComponentStock.objects.filter(component=OuterRef("pk"))
+        stock_sub = ComponentStock.objects.for_scope(Scope.current()).filter(component=OuterRef("pk"))
         if target_id:
             stock_sub = stock_sub.filter(location__tenant_id=target_id)
         stock_sub = stock_sub.values("component").annotate(sum_qty=Sum("qty")).values("sum_qty")
 
         # Scoped allocated subquery
-        allocation_sub = ComponentAllocation.objects.filter(component=OuterRef("pk"), deleted_at__isnull=True)
+        allocation_sub = ComponentAllocation.objects.for_scope(Scope.current()).filter(
+            component=OuterRef("pk"), deleted_at__isnull=True
+        )
         if target_id:
             allocation_sub = allocation_sub.filter(assigned_asset__tenant_id=target_id)
         target_only_allocation_sub = allocation_sub.filter(from_location__isnull=True)
