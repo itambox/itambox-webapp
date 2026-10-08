@@ -557,7 +557,7 @@ class FinancialWidget(DashboardWidget):
         if tenant_id:
             from organization.models import Tenant
 
-            tenant = Tenant.objects.filter(id=tenant_id).first()
+            tenant = Tenant.objects.for_scope(Scope.current()).filter(id=tenant_id).first()
         if tenant is None:
             tenant = getattr(request, "active_tenant", None)
 
@@ -1020,7 +1020,7 @@ class RenewalsWidget(DashboardWidget):
         if tenant_id:
             from organization.models import Tenant
 
-            tenant = Tenant.objects.filter(id=tenant_id).first()
+            tenant = Tenant.objects.for_scope(Scope.current()).filter(id=tenant_id).first()
         if tenant is None:
             tenant = getattr(request, "active_tenant", None)
 

@@ -15,7 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from core.managers import AllObjectsManager, SoftDeleteManager, TenantScopingAllObjectsManager
+from core.managers import AllObjectsManager, ExplicitScopeAllObjectsManager, SoftDeleteManager
 from core.mixins import AutoSlugMixin, SoftDeleteMixin
 from core.models import ChangeLoggingMixin, StandardModel
 from core.oidc_identity import (
@@ -316,7 +316,7 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     # in cross-tenant projections. Every UI/API surface scopes them explicitly.
     # ``all_objects`` keeps recycle-bin/export access tenant-aware.
     objects = SoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     name = models.CharField(max_length=100, verbose_name=_("Name"))
     slug = models.SlugField(max_length=100, verbose_name=_("Slug"))

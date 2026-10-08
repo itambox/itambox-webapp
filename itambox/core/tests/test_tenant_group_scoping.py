@@ -17,7 +17,7 @@ walk, middleware group resolution) stays on TenantGroup._base_manager.
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from core.managers import set_current_tenant, set_current_tenant_group
+from core.managers import Scope, set_current_tenant, set_current_tenant_group
 from core.tests.mixins import grant
 from itambox.middleware import _current_user
 from organization.models import Membership, Role, Tenant, TenantGroup
@@ -43,7 +43,7 @@ class TenantGroupScopingTests(TestCase):
         grant(self.member, self.tenant, role)
 
     def _visible_slugs(self):
-        return set(TenantGroup.objects.values_list("slug", flat=True))
+        return set(TenantGroup.objects.for_scope(Scope.current()).values_list("slug", flat=True))
 
     def test_member_sees_only_member_group_and_ancestors(self):
         _current_user.set(self.member)

@@ -50,7 +50,7 @@ class ComponentListView(ObjectListView):
             from organization.models import AssetHolder, Location
 
             context["asset_holders"] = AssetHolder.objects.all().order_by("last_name", "first_name")
-            context["locations"] = Location.objects.all().order_by("name")
+            context["locations"] = Location.objects.for_scope(Scope.current()).order_by("name")
             context["assets"] = Asset.objects.for_scope(Scope.current()).all().order_by("asset_tag")
         return context
 
@@ -130,7 +130,7 @@ class ComponentStockListView(ObjectListView):
             from organization.models import AssetHolder, Location
 
             context["asset_holders"] = AssetHolder.objects.all().order_by("last_name", "first_name")
-            context["locations"] = Location.objects.all().order_by("name")
+            context["locations"] = Location.objects.for_scope(Scope.current()).order_by("name")
             context["assets"] = Asset.objects.for_scope(Scope.current()).all().order_by("asset_tag")
         return context
 
