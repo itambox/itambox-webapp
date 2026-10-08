@@ -11,6 +11,7 @@ from django import forms
 from django.apps import apps
 
 from core.context import get_current_user
+from core.managers import Scope
 
 
 def scope_tenant_field(form, field_name="tenant", autoset_when_single=True):
@@ -43,7 +44,7 @@ def scope_tenant_field(form, field_name="tenant", autoset_when_single=True):
         return  # operator / system context keeps the full picker
 
     Tenant = apps.get_model("organization", "Tenant")
-    accessible = Tenant.objects.all()  # tenant-scoping manager → accessible set
+    accessible = Tenant.objects.for_scope(Scope.current())  # accessible set
     field.queryset = accessible
 
     if not autoset_when_single:

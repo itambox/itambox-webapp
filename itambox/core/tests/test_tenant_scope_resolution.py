@@ -275,7 +275,7 @@ class AllAccessibleScopeTests(TestCase):
         set_current_tenant(None)
         set_current_tenant_group(None)
         set_current_all_accessible(True)
-        return set(Tenant.objects.values_list("slug", flat=True))
+        return set(Tenant.objects.for_scope(Scope.current()).values_list("slug", flat=True))
 
     def test_all_accessible_includes_direct_membership(self):
         self.assertIn("i29a-a", self._all_accessible_slugs(self.member))
@@ -410,7 +410,7 @@ class AllAccessibleScopeTests(TestCase):
             mock.patch("organization.access.timezone.now", return_value=after_expiry),
             mock.patch("organization.rbac.timezone.now", return_value=after_expiry),
         ):
-            visible = set(Tenant.objects.values_list("slug", flat=True))
+            visible = set(Tenant.objects.for_scope(Scope.current()).values_list("slug", flat=True))
 
         self.assertNotIn("i29a-b", visible)
         self.assertEqual(visible, {"i29a-p", "i29a-a", "i29a-c"})
@@ -482,7 +482,7 @@ class AllAccessibleScopeTests(TestCase):
         set_current_tenant(self.cust_a)
         set_current_all_accessible(True)
         self.assertTrue(get_current_all_accessible())
-        self.assertEqual(Tenant.objects.count(), 0)
+        self.assertEqual(Tenant.objects.for_scope(Scope.current()).count(), 0)
 
 
 class AllAccessibleAmbientPermTests(TestCase):

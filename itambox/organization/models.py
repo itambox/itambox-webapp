@@ -13,11 +13,11 @@ from django.utils.translation import gettext_lazy as _
 from core.choices import ObjectChangeActionChoices
 from core.managers import (
     AllObjectsManager,
+    ExplicitScopeAllObjectsManager,
+    ExplicitScopeManager,
+    ExplicitScopeSoftDeleteManager,
     SoftDeleteManager,
-    TenantScopingAllObjectsManager,
-    TenantScopingManager,
     TenantScopingQuerySet,
-    TenantScopingSoftDeleteManager,
 )
 from core.mfa import role_is_privileged
 from core.mixins import (
@@ -45,8 +45,8 @@ def _default_currency():
 
 
 class Location(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDeleteMixin):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     STATUS_PLANNED = "planned"
     STATUS_STAGING = "staging"
     STATUS_ACTIVE = "active"
@@ -188,7 +188,7 @@ class TenantGroup(StandardModel, SoftDeleteMixin):
     # groups containing a tenant they're a member of, plus those groups'
     # ancestors. Internal tenancy machinery (the descendant walk, middleware
     # group resolution) uses TenantGroup._base_manager to stay unscoped.
-    objects = TenantScopingSoftDeleteManager()
+    objects = ExplicitScopeSoftDeleteManager()
     all_objects = AllObjectsManager()
     name = models.CharField(max_length=100, verbose_name=_("Name"))
     slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
@@ -245,8 +245,8 @@ class TenantGroup(StandardModel, SoftDeleteMixin):
 
 class Tenant(DeletableVaultModel, BookmarkableMixin):
     tenant_scope_self = "tenant"
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     name = models.CharField(max_length=100, verbose_name=_("Name"))
     slug = models.SlugField(max_length=100, verbose_name=_("Slug"))
     group = models.ForeignKey(
@@ -365,8 +365,8 @@ class Tenant(DeletableVaultModel, BookmarkableMixin):
 
 
 class Site(DeletableVaultModel, BookmarkableMixin):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     STATUS_PLANNED = "planned"
     STATUS_STAGING = "staging"
     STATUS_ACTIVE = "active"
@@ -447,8 +447,8 @@ class Site(DeletableVaultModel, BookmarkableMixin):
 
 # +++ AssetHolder Model +++
 class AssetHolder(CustomFieldDataMixin, SubscribableMixin, StandardModel, SoftDeleteMixin):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,  # Keep holder if user is deleted, set user link to null
@@ -534,8 +534,8 @@ class ContactRole(AutoSlugMixin, StandardModel, SoftDeleteMixin):
 
 
 class Contact(CustomFieldDataMixin, StandardModel, SoftDeleteMixin):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     # Hybrid tenancy: tenant=None is a global/shared contact (manufacturers,
     # service desks) visible to every tenant; a set tenant makes the contact
     # private to that tenant. allow_global_tenant surfaces the tenant=None rows
@@ -645,8 +645,8 @@ class Role(AutoSlugMixin, StandardModel, SoftDeleteMixin):
     definition, not a clone, so an edit at the owner propagates everywhere.
     """
 
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     tenant = models.ForeignKey(
         "organization.Tenant",
@@ -1146,8 +1146,8 @@ class CostCenter(AutoSlugMixin, CustomFieldDataMixin, StandardModel, SoftDeleteM
     The same model handles both via the optional self-referential parent.
     """
 
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     tenant = models.ForeignKey(
         "Tenant",
@@ -1477,7 +1477,7 @@ class TenantResourceGrant(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
 class TenantResourceGrantExpiryRun(BaseModel):
     """One generation-bound expiry sweep for one owner tenant and hour."""
 
-    objects = TenantScopingManager()
+    objects = ExplicitScopeManager()
     deny_global_tenant = True
 
     STATE_QUEUED = "queued"
@@ -1642,7 +1642,7 @@ class TenantResourceGrantExpiryRevocationQuerySet(TenantScopingQuerySet):
 class TenantResourceGrantExpiryRevocation(BaseModel):
     """Immutable evidence for one expiry-driven grant soft deletion."""
 
-    objects = TenantScopingManager.from_queryset(TenantResourceGrantExpiryRevocationQuerySet)()
+    objects = ExplicitScopeManager.from_queryset(TenantResourceGrantExpiryRevocationQuerySet)()
     all_objects = TenantResourceGrantExpiryRevocationQuerySet.as_manager()
     tenant_lookup = "run__tenant"
     deny_global_tenant = True

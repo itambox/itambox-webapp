@@ -15,6 +15,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core import events as core_events
 from core.events import DeliveryDisposition, DeliveryResult
+from core.managers import Scope
 from core.models import EmailSettings
 from extras.models import JournalEntry
 from organization.models import Tenant
@@ -367,7 +368,7 @@ def scope_custody_receipts(queryset, *, user, permission=None):
     if user is None or not user.is_authenticated:
         return queryset.none()
 
-    candidate_tenants = Tenant.objects.all()
+    candidate_tenants = Tenant.objects.for_scope(Scope.current())
     if permission and not user.is_superuser:
         tenant_ids = [tenant.pk for tenant in candidate_tenants if user.has_perm(permission, obj=tenant)]
     else:

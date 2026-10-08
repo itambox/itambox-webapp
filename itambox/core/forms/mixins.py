@@ -110,6 +110,17 @@ BULK_EDIT_FIELD_TYPE_MAP = {
 }
 
 
+def _scoped_choices(model):
+    """Rows of ``model`` visible in the current scope (explicit, not manager-ambient)."""
+    # inline import: app-registry: core.managers imports models at call time
+    from core.managers import Scope
+
+    qs = model.objects.all()
+    if hasattr(qs, "for_scope"):
+        return qs.for_scope(Scope.current())
+    return qs
+
+
 class BulkEditForm(forms.Form):
     _selected_fields = forms.MultipleChoiceField(widget=forms.MultipleHiddenInput(), required=False)
     add_tags = forms.ModelMultipleChoiceField(
@@ -172,7 +183,7 @@ class BulkEditForm(forms.Form):
                 related_model = field.remote_field.model
                 if related_model:
                     field_kwargs["choices"] = [("", "---------")] + [
-                        (obj.pk, str(obj)) for obj in related_model.objects.all()[:200]
+                        (obj.pk, str(obj)) for obj in _scoped_choices(related_model)[:200]
                     ]
 
             self.fields[field.name] = form_field_cls(**field_kwargs)

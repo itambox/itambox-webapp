@@ -8,7 +8,7 @@ Covers:
 - Self-parent cycle guard (model clean + form validation)
 - Multi-hop ancestor cycle guard
 - Basic CRUD views (list / detail / create / edit / delete)
-- Tenant scoping (TenantScopingSoftDeleteManager)
+- Tenant scoping (explicit scoping)
 """
 
 from django.contrib.auth import get_user_model
@@ -16,6 +16,7 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
+from core.managers import Scope
 from organization.models import CostCenter, Tenant
 
 User = get_user_model()
@@ -212,7 +213,7 @@ class CostCenterViewTests(TestCase):
 
 
 class CostCenterTenantScopingTests(TestCase):
-    """Verify TenantScopingSoftDeleteManager filters correctly."""
+    """Verify explicit scoping filters correctly."""
 
     def setUp(self):
         self.tenant_a = Tenant.objects.create(name="Tenant A", slug="tenant-a")
@@ -229,7 +230,7 @@ class CostCenterTenantScopingTests(TestCase):
         from core.managers import set_current_tenant
 
         set_current_tenant(self.tenant_a)
-        qs = list(CostCenter.objects.all())
+        qs = list(CostCenter.objects.for_scope(Scope.current()))
         self.assertIn(self.cc_a, qs)
         self.assertNotIn(self.cc_b, qs)
 
@@ -237,7 +238,7 @@ class CostCenterTenantScopingTests(TestCase):
         from core.managers import set_current_tenant
 
         set_current_tenant(self.tenant_b)
-        qs = list(CostCenter.objects.all())
+        qs = list(CostCenter.objects.for_scope(Scope.current()))
         self.assertIn(self.cc_b, qs)
         self.assertNotIn(self.cc_a, qs)
 
@@ -245,6 +246,6 @@ class CostCenterTenantScopingTests(TestCase):
         from core.managers import set_current_tenant
 
         set_current_tenant(None)
-        qs = list(CostCenter.objects.all())
+        qs = list(CostCenter.objects.for_scope(Scope.current()))
         self.assertIn(self.cc_a, qs)
         self.assertIn(self.cc_b, qs)
