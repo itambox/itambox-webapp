@@ -17,11 +17,12 @@ from django.utils.translation import gettext_lazy as _
 from core.csv_utils import csv_safe, safe_csv_filename
 from core.managers import (
     AllObjectsManager,
+    ExplicitScopeAllObjectsManager,
+    ExplicitScopeManager,
+    ExplicitScopeSoftDeleteManager,
+    Scope,
     SoftDeleteManager,
-    TenantScopingAllObjectsManager,
-    TenantScopingManager,
     TenantScopingQuerySet,
-    TenantScopingSoftDeleteManager,
 )
 from core.mixins import BookmarkableMixin, SoftDeleteMixin
 from core.models import BaseModel, ChangeLoggingMixin
@@ -887,8 +888,8 @@ class Event(BaseModel):
 
 
 class EventRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     allow_global_tenant = True
 
     ACTION_WEBHOOK = "webhook"
@@ -969,8 +970,8 @@ class EventRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
 
 
 class WebhookEndpoint(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     allow_global_tenant = True
     # Keep the (encrypted) HMAC secret and the headers — which may carry
     # Authorization tokens — out of the changelog JSON.
@@ -1066,15 +1067,14 @@ class WebhookDeliveryQuerySet(TenantScopingQuerySet):
         if user is None or not getattr(user, "is_authenticated", False):
             return self.none()
         if getattr(user, "is_superuser", False) or user.has_perm("extras.view_webhookdelivery"):
+            # Platform-wide read: tenant=None operational history must stay visible
+            # whatever tenant the session selected, so this bypasses the scope.
             return self.model._base_manager.all()
-        return self
+        return self.for_scope(Scope.current())
 
 
 class WebhookDeliveryManager(models.Manager.from_queryset(WebhookDeliveryQuerySet)):
-    """Tenant-scoped manager exposing the delivery visibility helper."""
-
-    def get_queryset(self):
-        return super().get_queryset().filter_by_tenant()
+    """Plain manager exposing the delivery visibility helper; readers scope explicitly."""
 
     def visible_to(self, user):
         return self.get_queryset().visible_to(user)
@@ -1082,7 +1082,7 @@ class WebhookDeliveryManager(models.Manager.from_queryset(WebhookDeliveryQuerySe
 
 class WebhookDelivery(BaseModel):
     objects = WebhookDeliveryManager()
-    all_objects = TenantScopingAllObjectsManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     STATUS_PENDING = "pending"
     STATUS_SUCCESS = "success"
@@ -1211,7 +1211,7 @@ class WebhookDelivery(BaseModel):
 
 
 class JournalEntry(ChangeLoggingMixin, BaseModel):
-    objects = TenantScopingManager()
+    objects = ExplicitScopeManager()
     # Journal entries are scoped to the tenant (or tenant group) that owns the
     # journaled object (denormalised in the `tenant` / `tenant_group` fields
     # below). allow_global_tenant keeps entries on truly global/shared objects
@@ -1533,8 +1533,8 @@ class LabelTemplate(ChangeLoggingMixin, BaseModel):
 
 
 class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     allow_global_tenant = True
 
     REPORT_TYPE_ASSET_SUMMARY = "asset_summary"
@@ -1670,7 +1670,7 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
 
 
 class ScheduledReport(ChangeLoggingMixin, BaseModel):
-    objects = TenantScopingManager()
+    objects = ExplicitScopeManager()
     allow_global_tenant = True
 
     FORMAT_HTML = "html"
@@ -2037,7 +2037,7 @@ class ScheduledReportScopeAuthorization(models.Model):
 
 
 class ReportGenerationArchive(ChangeLoggingMixin, BaseModel):
-    objects = TenantScopingManager()
+    objects = ExplicitScopeManager()
 
     scheduled_report = models.ForeignKey(
         ScheduledReport, on_delete=models.CASCADE, related_name="archives", verbose_name=_("Scheduled Report")
@@ -2124,8 +2124,8 @@ class ReportGenerationArchive(ChangeLoggingMixin, BaseModel):
 
 
 class NotificationChannel(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     # config holds channel secrets (SMTP password, Slack/Teams webhook URLs with
     # embedded tokens); keep it out of the changelog JSON.
     _change_logging_excluded_fields = ["updated_at", "config"]
@@ -2205,8 +2205,8 @@ def alert_rule_channel_scope_errors(channels, tenant_id):
 
 
 class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     allow_global_tenant = True
 
     ALERT_TYPE_LOW_STOCK = "low_stock"
@@ -2297,14 +2297,12 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
 
 
 class AlertLog(ChangeLoggingMixin, BaseModel):
-    objects = TenantScopingManager()
+    objects = ExplicitScopeManager()
     # Deliberately cross-tenant / unscoped manager for context-independent
-    # dedup/auto-resolve in the alert engine ONLY: the tenant-scoping default
-    # manager fails closed to an empty queryset under a non-superuser context
-    # with no active tenant, which otherwise re-creates a duplicate log on every
-    # evaluation. NOT named ``all_objects`` on purpose — that name carries a
-    # tenant-scoped contract here (the Recycle Bin relies on it); this one spans
-    # all tenants and must never back a tenant-facing view/API.
+    # dedup/auto-resolve in the alert engine ONLY: it spans all tenants, so the
+    # engine does not depend on an active scope. NOT named ``all_objects`` on
+    # purpose (that name carries a tenant-scoped contract; the Recycle Bin relies
+    # on it); this one must never back a tenant-facing view/API.
     unscoped = AllObjectsManager()
 
     STATUS_ACTIVE = "active"
@@ -2517,8 +2515,8 @@ class SavedFilter(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
     only to its ``created_by`` owner otherwise.
     """
 
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     allow_global_tenant = True
 
     name = models.CharField(max_length=255, verbose_name=_("Name"))
