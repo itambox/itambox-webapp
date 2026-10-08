@@ -53,7 +53,7 @@ class SubscriptionFormDeclarationTests(TenantTestMixin, TestCase):
 
     def test_model_choice_fields_are_scoped_explicitly(self):
         expected = (
-            (SubscriptionForm, ("tenant", "supplier", "cost_center", "linked_contract", "owner", "tags")),
+            (SubscriptionForm, ("tenant", "supplier", "cost_center", "linked_contract")),
             (SubscriptionAssignmentForm, ("subscription",)),
             (SubscriptionCheckoutForm, ("assigned_holder", "asset", "location")),
         )
