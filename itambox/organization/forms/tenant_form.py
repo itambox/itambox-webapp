@@ -4,7 +4,7 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 
 from core.context import get_current_tenant
-from core.forms import FilterForm, scope_tenant_group_field
+from core.forms import FilterForm, TenantScopedFormMixin, scope_tenant_group_field
 from extras.models import Tag
 from itambox.middleware import get_current_user
 
@@ -28,7 +28,10 @@ CURRENCY_CHOICES = [
 ]
 
 
-class TenantForm(forms.ModelForm):
+class TenantForm(TenantScopedFormMixin, forms.ModelForm):
+    # The managing-provider picker is a deliberate unscoped (_base_manager) choice.
+    tenant_scoped_choice_exclusions = ("managed_by",)
+
     group = forms.ModelChoiceField(
         queryset=TenantGroup.objects.all(), required=False, widget=forms.Select(attrs={"class": "form-select"})
     )

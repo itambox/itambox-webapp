@@ -2,7 +2,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Layout, Row
 from django import forms
 
-from core.forms import FilterForm, scope_tenant_field
+from core.forms import FilterForm, TenantScopedFormMixin
 from extras.customfields import CustomFieldModelFormMixin
 from extras.models import Tag
 
@@ -11,7 +11,10 @@ from ..models import Contact
 from .helpers import add_standard_buttons
 
 
-class ContactForm(CustomFieldModelFormMixin, forms.ModelForm):
+class ContactForm(TenantScopedFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
+    # A blank tenant makes the contact global/shared, so the tenant stays optional.
+    tenant_autoset_when_single = True
+
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
@@ -35,11 +38,6 @@ class ContactForm(CustomFieldModelFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Scope the owning-tenant picker to the user's accessible tenants and keep
-        # it optional: a blank tenant makes the contact global/shared (visible to
-        # all tenants) — overriding the global BaseForm patch that forces tenant
-        # required (core/apps.py).
-        scope_tenant_field(self)
         if "tenant" in self.fields:
             self.fields["tenant"].required = False
         self.helper = FormHelper(self)

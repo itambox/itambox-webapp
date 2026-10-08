@@ -3,7 +3,7 @@ from crispy_forms.layout import Div, Layout
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
-from core.forms import FilterForm, scope_tenant_field
+from core.forms import FilterForm, TenantScopedFormMixin
 from extras.customfields import CustomFieldModelFormMixin
 from extras.models import Tag
 
@@ -12,7 +12,10 @@ from ..models import Location, Site, Tenant
 from .helpers import add_standard_buttons
 
 
-class LocationForm(CustomFieldModelFormMixin, forms.ModelForm):
+class LocationForm(TenantScopedFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
+    tenant_required = True
+    tenant_autoset_when_single = True
+
     site = forms.ModelChoiceField(
         queryset=Site.objects.all(), required=True, widget=forms.Select(attrs={"class": "form-select"})
     )
@@ -42,7 +45,6 @@ class LocationForm(CustomFieldModelFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        scope_tenant_field(self)
         # Rescope tenant-owned FK querysets per request (import-frozen unscoped):
         # `site` and the self-referential `parent` are both tenant-scoped.
         self.fields["site"].queryset = Site.objects.all()

@@ -11,6 +11,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from core.forms import TenantScopedFormMixin
 from organization.access import (
     accessible_tenant_ids,
     get_ancestor_tenant_group_ids,
@@ -18,7 +19,10 @@ from organization.access import (
 from organization.models import Tenant, TenantGroup, TenantResourceGrant
 
 
-class TenantResourceGrantForm(forms.ModelForm):
+class TenantResourceGrantForm(TenantScopedFormMixin, forms.ModelForm):
+    # Candidate grantees are other tenants, taken from the unscoped base manager.
+    tenant_scoped_choice_exclusions = ("grantee_tenant",)
+
     class Meta:
         model = TenantResourceGrant
         fields = ["grantee_tenant", "grantee_tenant_group", "access_level", "reason", "valid_until"]

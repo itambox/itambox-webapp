@@ -3,7 +3,7 @@ from crispy_forms.layout import Layout
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
-from core.forms import FilterForm, scope_tenant_group_field
+from core.forms import FilterForm, TenantScopedFormMixin, scope_tenant_group_field
 from extras.models import Tag
 
 from ..filters import TenantGroupFilterSet
@@ -11,7 +11,7 @@ from ..models import TenantGroup
 from .helpers import add_standard_buttons
 
 
-class TenantGroupForm(forms.ModelForm):
+class TenantGroupForm(TenantScopedFormMixin, forms.ModelForm):
     parent = forms.ModelChoiceField(
         queryset=TenantGroup.objects.all(), required=False, widget=forms.Select(attrs={"class": "form-select"})
     )
