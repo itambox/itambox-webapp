@@ -1,4 +1,3 @@
-from core.managers import Scope
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.contenttypes.models import ContentType
@@ -12,6 +11,7 @@ from django_tables2 import RequestConfig
 
 from assets.forms.import_forms import AssetHolderBulkImportForm
 from compliance.services import scope_custody_receipts
+from core.managers import Scope
 from itambox.panels import Panel
 from itambox.utils import get_paginate_count
 from itambox.views.generic import (
