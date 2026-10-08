@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "canonical_python": "3.12",
-  "policy_sha256": "bc173cbf1f3504e91c18831387b29df5ca4e2f82f1d40bdb9f7855f6b2cbb92b",
+  "policy_sha256": "15e130269c5b060d00348dbf0769979b337dd90c5903f92fcd3266c2550e77b3",
   "findings": [
     {
       "path": "itambox/assets/api/serializers.py",
@@ -2249,62 +2249,6 @@
       "message": "'_compile_po' is too complex (28)",
       "source": "def _compile_po(po_path: str, mo_path: str) -> None:",
       "context": "Module:body/FunctionDef:_compile_po:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/compile_locales.py",
-      "code": "E741",
-      "message": "ambiguous variable name 'l'",
-      "source": "                l = l.split(\"]\", 1)[1]",
-      "context": "Module:body/FunctionDef:_compile_po:body/For:Tuple(elts=[Name(id='lno', ctx=Store()), Name(id='raw', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='lines', ctx=Load()), Constant(value=1)], keywords=[]):body/If:Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgctxt')], keywords=[]):orelse/If:BoolOp(op=And(), values=[Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgid')], keywords=[]), UnaryOp(op=Not(), operand=Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgid_plural')], keywords=[]))]):orelse/If:Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgid_plural')], keywords=[]):orelse/If:Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgstr')], keywords=[]):body/If:Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgstr[')], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/compile_locales.py",
-      "code": "E741",
-      "message": "ambiguous variable name 'l'",
-      "source": "                l = l[6:]",
-      "context": "Module:body/FunctionDef:_compile_po:body/For:Tuple(elts=[Name(id='lno', ctx=Store()), Name(id='raw', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='lines', ctx=Load()), Constant(value=1)], keywords=[]):body/If:Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgctxt')], keywords=[]):orelse/If:BoolOp(op=And(), values=[Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgid')], keywords=[]), UnaryOp(op=Not(), operand=Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgid_plural')], keywords=[]))]):orelse/If:Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgid_plural')], keywords=[]):orelse/If:Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgstr')], keywords=[]):body/If:Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgstr[')], keywords=[]):orelse",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/compile_locales.py",
-      "code": "E741",
-      "message": "ambiguous variable name 'l'",
-      "source": "            l = l[12:]",
-      "context": "Module:body/FunctionDef:_compile_po:body/For:Tuple(elts=[Name(id='lno', ctx=Store()), Name(id='raw', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='lines', ctx=Load()), Constant(value=1)], keywords=[]):body/If:Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgctxt')], keywords=[]):orelse/If:BoolOp(op=And(), values=[Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgid')], keywords=[]), UnaryOp(op=Not(), operand=Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgid_plural')], keywords=[]))]):orelse/If:Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgid_plural')], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/compile_locales.py",
-      "code": "E741",
-      "message": "ambiguous variable name 'l'",
-      "source": "            l = l[5:]",
-      "context": "Module:body/FunctionDef:_compile_po:body/For:Tuple(elts=[Name(id='lno', ctx=Store()), Name(id='raw', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='lines', ctx=Load()), Constant(value=1)], keywords=[]):body/If:Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgctxt')], keywords=[]):orelse/If:BoolOp(op=And(), values=[Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgid')], keywords=[]), UnaryOp(op=Not(), operand=Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgid_plural')], keywords=[]))]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/compile_locales.py",
-      "code": "E741",
-      "message": "ambiguous variable name 'l'",
-      "source": "            l = l[7:]",
-      "context": "Module:body/FunctionDef:_compile_po:body/For:Tuple(elts=[Name(id='lno', ctx=Store()), Name(id='raw', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='lines', ctx=Load()), Constant(value=1)], keywords=[]):body/If:Call(func=Attribute(value=Name(id='l', ctx=Load()), attr='startswith', ctx=Load()), args=[Constant(value='msgctxt')], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/compile_locales.py",
-      "code": "E741",
-      "message": "ambiguous variable name 'l'",
-      "source": "        l = ast.literal_eval(l)",
-      "context": "Module:body/FunctionDef:_compile_po:body/For:Tuple(elts=[Name(id='lno', ctx=Store()), Name(id='raw', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='lines', ctx=Load()), Constant(value=1)], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/compile_locales.py",
-      "code": "E741",
-      "message": "ambiguous variable name 'l'",
-      "source": "        l = raw.decode(encoding)",
-      "context": "Module:body/FunctionDef:_compile_po:body/For:Tuple(elts=[Name(id='lno', ctx=Store()), Name(id='raw', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='lines', ctx=Load()), Constant(value=1)], keywords=[]):body",
       "count": 1
     },
     {

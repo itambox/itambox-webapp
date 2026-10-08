@@ -71,22 +71,22 @@ def _compile_po(po_path: str, mo_path: str) -> None:
         raise CommandError(f"{po_path} starts with a UTF-8 BOM. Remove it and retry.")
 
     for lno, raw in enumerate(lines, 1):
-        l = raw.decode(encoding)
-        if l[0] == "#" and section == STR:
+        line_text = raw.decode(encoding)
+        if line_text[0] == "#" and section == STR:
             _add(msgctxt, msgid, msgstr, fuzzy)
             section = msgctxt = None
             fuzzy = 0
-        if l[:2] == "#," and "fuzzy" in l:
+        if line_text[:2] == "#," and "fuzzy" in line_text:
             fuzzy = 1
-        if l[0] == "#":
+        if line_text[0] == "#":
             continue
-        if l.startswith("msgctxt"):
+        if line_text.startswith("msgctxt"):
             if section == STR:
                 _add(msgctxt, msgid, msgstr, fuzzy)
             section = CTXT
-            l = l[7:]
+            line_text = line_text[7:]
             msgctxt = b""
-        elif l.startswith("msgid") and not l.startswith("msgid_plural"):
+        elif line_text.startswith("msgid") and not line_text.startswith("msgid_plural"):
             if section == STR:
                 if not msgid:
                     msgstr = b"".join(
@@ -98,39 +98,39 @@ def _compile_po(po_path: str, mo_path: str) -> None:
                 _add(msgctxt, msgid, msgstr, fuzzy)
                 msgctxt = None
             section = ID
-            l = l[5:]
+            line_text = line_text[5:]
             msgid = msgstr = b""
             is_plural = False
-        elif l.startswith("msgid_plural"):
+        elif line_text.startswith("msgid_plural"):
             if section != ID:
                 raise CommandError(f"msgid_plural not preceded by msgid on {po_path}:{lno}")
-            l = l[12:]
+            line_text = line_text[12:]
             msgid += b"\0"
             is_plural = True
-        elif l.startswith("msgstr"):
+        elif line_text.startswith("msgstr"):
             section = STR
-            if l.startswith("msgstr["):
+            if line_text.startswith("msgstr["):
                 if not is_plural:
                     raise CommandError(f"plural without msgid_plural on {po_path}:{lno}")
-                l = l.split("]", 1)[1]
+                line_text = line_text.split("]", 1)[1]
                 if msgstr:
                     msgstr += b"\0"
             else:
                 if is_plural:
                     raise CommandError(f"indexed msgstr required for plural on {po_path}:{lno}")
-                l = l[6:]
-        l = l.strip()
-        if not l:
+                line_text = line_text[6:]
+        line_text = line_text.strip()
+        if not line_text:
             continue
-        l = ast.literal_eval(l)
+        line_text = ast.literal_eval(line_text)
         if section == CTXT:
-            msgctxt += l.encode(encoding)
+            msgctxt += line_text.encode(encoding)
         elif section == ID:
-            msgid += l.encode(encoding)
+            msgid += line_text.encode(encoding)
         elif section == STR:
-            msgstr += l.encode(encoding)
+            msgstr += line_text.encode(encoding)
         else:
-            raise CommandError(f"Syntax error on {po_path}:{lno}: {l!r}")
+            raise CommandError(f"Syntax error on {po_path}:{lno}: {line_text!r}")
 
     if section == STR:
         _add(msgctxt, msgid, msgstr, fuzzy)
