@@ -7,6 +7,7 @@ from django_tables2 import RequestConfig
 
 from assets.forms.import_forms import LocationBulkImportForm
 from assets.tables import AssetTable
+from core.managers import Scope
 from itambox.panels import Panel
 from itambox.quick_add import QuickAddMixin
 from itambox.utils import get_paginate_count
@@ -96,7 +97,7 @@ class LocationDetailView(ObjectDetailView):
         from compliance.models import AuditSession
         from compliance.views_audit import AuditSessionTable
 
-        audits_qs = AuditSession.objects.filter(location=location)
+        audits_qs = AuditSession.objects.for_scope(Scope.current()).filter(location=location)
         audits_table = AuditSessionTable(audits_qs, request=self.request)
         audits_table.configure(self.request)
         context["audits_table"] = audits_table

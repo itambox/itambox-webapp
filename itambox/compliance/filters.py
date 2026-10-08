@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, AssetMaintenance, StatusLabel
 from core.filters import BaseFilterSet
+from core.managers import Scope
 from organization.models import AssetHolder, Location
 
 from .models import AssetAudit, AuditSession, CustodyReceipt
@@ -109,7 +110,7 @@ class AssetAuditFilterSet(BaseFilterSet):
         method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": "Notes..."})
     )
     session = django_filters.ModelChoiceFilter(
-        queryset=AuditSession.objects.all(),
+        queryset=lambda request: AuditSession.objects.for_scope(Scope.current()),
         widget=forms.Select(attrs={"class": "form-select"}),
         label=_("Audit Session"),
     )

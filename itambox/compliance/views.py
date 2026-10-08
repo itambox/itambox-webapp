@@ -21,6 +21,7 @@ from django.views.generic import View
 
 from assets.models import AssetAssignment
 from core.context import get_current_request_id
+from core.managers import Scope
 from core.reports.exporters import PDF_MIME, report_pdf_bytes
 from extras.services.events import dispatch_event
 from itambox.panels import Panel
@@ -899,7 +900,7 @@ class CustodyTemplateDeleteView(ObjectDeleteView):
 @login_required
 @permission_required("compliance.view_custodytemplate", raise_exception=True)
 def custody_template_preview(request, pk):
-    template = get_object_or_404(CustodyTemplate, pk=pk)
+    template = get_object_or_404(CustodyTemplate.objects.for_scope(Scope.current()), pk=pk)
 
     from assets.models import Asset
     from organization.models import AssetHolder

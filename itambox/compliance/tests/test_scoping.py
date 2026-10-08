@@ -1,6 +1,7 @@
 from django.test import TestCase
 
 from compliance.models import CustodyTemplate
+from core.managers import Scope
 from organization.models import Tenant, TenantGroup
 
 
@@ -38,13 +39,23 @@ class CustodyTemplateTenantScopingTests(TestCase):
         set_current_tenant(None)
         set_current_tenant_group(None)
 
+    def test_default_manager_does_not_apply_ambient_scope(self):
+        from core.managers import set_current_tenant, set_current_tenant_group
+
+        set_current_tenant(self.tenant_a)
+        set_current_tenant_group(None)
+        self.assertEqual(CustodyTemplate.objects.count(), 5)
+
+    def test_denied_scope_resolves_to_nothing(self):
+        self.assertFalse(CustodyTemplate.objects.for_scope(Scope(Scope.DENIED)).exists())
+
     def test_tenant_a_scoping(self):
         from core.managers import set_current_tenant, set_current_tenant_group
 
         set_current_tenant(self.tenant_a)
         set_current_tenant_group(None)
 
-        templates = list(CustodyTemplate.objects.all())
+        templates = list(CustodyTemplate.objects.for_scope(Scope.current()))
         # Tenant A should see:
         # - its own template (tpl_tenant_a)
         # - the group template for group X (since Tenant A is in group X)
@@ -64,7 +75,7 @@ class CustodyTemplateTenantScopingTests(TestCase):
         set_current_tenant(None)
         set_current_tenant_group(self.group_x)
 
-        templates = list(CustodyTemplate.objects.all())
+        templates = list(CustodyTemplate.objects.for_scope(Scope.current()))
         # Group X should see:
         # - templates of member tenants (tpl_tenant_a)
         # - the group X template
@@ -84,6 +95,6 @@ class CustodyTemplateTenantScopingTests(TestCase):
         set_current_tenant(None)
         set_current_tenant_group(None)
 
-        templates = list(CustodyTemplate.objects.all())
+        templates = list(CustodyTemplate.objects.for_scope(Scope.current()))
         # With no filters set, all templates should be visible
         self.assertEqual(len(templates), 5)

@@ -11,6 +11,7 @@ from model_bakery import baker
 from assets.models import Asset, StatusLabel
 from compliance.audit_services import classify_session_audits, expected_assets_queryset
 from compliance.models import AssetAudit, AuditSession
+from core.managers import Scope
 from core.tests.mixins import TenantTestMixin, grant
 from organization.models import Location, Tenant
 
@@ -44,20 +45,20 @@ class AuditSessionTenantScopingTests(TenantTestMixin, TestCase):
     def test_session_scoped_to_tenant_a_visible_in_tenant_a_context(self):
         session = self._make_session(tenant=self.tenant_a)
         self.set_active_tenant(self.tenant_a)
-        self.assertIn(session, AuditSession.objects.all())
+        self.assertIn(session, AuditSession.objects.for_scope(Scope.current()))
 
     def test_session_scoped_to_tenant_a_invisible_in_tenant_b_context(self):
         session = self._make_session(tenant=self.tenant_a)
         self.set_active_tenant(self.tenant_b)
-        self.assertNotIn(session, AuditSession.objects.all())
+        self.assertNotIn(session, AuditSession.objects.for_scope(Scope.current()))
 
     def test_global_session_visible_in_any_tenant_context(self):
         """Session with tenant=None is visible from any tenant context."""
         global_session = self._make_session(tenant=None)
         self.set_active_tenant(self.tenant_a)
-        self.assertIn(global_session, AuditSession.objects.all())
+        self.assertIn(global_session, AuditSession.objects.for_scope(Scope.current()))
         self.set_active_tenant(self.tenant_b)
-        self.assertIn(global_session, AuditSession.objects.all())
+        self.assertIn(global_session, AuditSession.objects.for_scope(Scope.current()))
 
     def test_all_objects_finds_deleted_records_within_tenant(self):
         """all_objects includes soft-deleted records within the active tenant scope."""

@@ -5,6 +5,7 @@ from assets.api.nested_serializers import NestedAssetSerializer
 from assets.api.serializers import CategorySerializer, StatusLabelSerializer
 from assets.models import Asset, AssetMaintenance, Category, StatusLabel
 from compliance.models import AssetAudit, AuditSession, CustodyReceipt, CustodyTemplate
+from core.managers import Scope
 from extras.api.serializers import TagSerializer
 from itambox.api.base import BaseModelSerializer
 from organization.api.serializers import (
@@ -219,6 +220,10 @@ class AssetAuditSerializer(serializers.ModelSerializer):
     status = StatusLabelSerializer(read_only=True)
     status_id = serializers.PrimaryKeyRelatedField(queryset=StatusLabel.objects.all(), source="status")
     verification_method_display = serializers.CharField(source="get_verification_method_display", read_only=True)
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["session"].queryset = AuditSession.objects.for_scope(Scope.current())
 
     class Meta:
         model = AssetAudit
