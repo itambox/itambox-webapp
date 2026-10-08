@@ -4,7 +4,8 @@
   "changed_tests": [
     "itambox/inventory/tests/test_form_scoping.py",
     "itambox/licenses/tests/test_form_scoping.py",
-    "itambox/licenses/tests/test_scoping.py"
+    "itambox/licenses/tests/test_scoping.py",
+    "itambox/software/tests/test_form_scoping.py"
   ],
   "baseline_tests": [
     "itambox/assets/api/tests/test_error_boundary_disclosure.py",
@@ -766,6 +767,7 @@
     "itambox/procurement/tests/test_seam_stable_upgrade_preservation.py",
     "itambox/procurement/tests/test_security.py",
     "itambox/software/tests/test_api.py",
+    "itambox/software/tests/test_form_scoping.py",
     "itambox/software/tests/test_graphql.py",
     "itambox/software/tests/test_software_tenant_isolation.py",
     "itambox/subscriptions/tests/test_a5_api_hygiene.py",
