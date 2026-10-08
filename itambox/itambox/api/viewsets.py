@@ -10,12 +10,18 @@ from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from core.managers import get_current_tenant
+from core.managers import Scope, get_current_tenant
 from itambox.api.mixins import BulkDestroyModelMixin, BulkUpdateModelMixin, ETagMixin, ObjectValidationMixin
 from itambox.api.serializers.features import ChangeLogMessageSerializer
 from itambox.api.utils import get_annotations_for_serializer, get_prefetches_for_serializer
 
 logger = logging.getLogger("itambox.api.views")
+
+
+def _scoped_manager(model):
+    """Default manager narrowed to the ambient scope when the model supports it."""
+    manager = model.objects
+    return manager.for_scope(Scope.current()) if hasattr(manager, "for_scope") else manager.all()
 
 
 class BaseViewSet(GenericViewSet):
@@ -311,7 +317,7 @@ class ITAMBoxModelViewSet(
 
         try:
             with transaction.atomic(using=router.db_for_write(model)):
-                locked = model.objects.select_for_update().get(pk=serializer.instance.pk)
+                locked = _scoped_manager(model).select_for_update().get(pk=serializer.instance.pk)
                 self._ensure_unmanaged_definition(locked)
                 self._validate_etag(self.request, locked)
                 instance = serializer.save(**save_kwargs)
@@ -339,7 +345,7 @@ class ITAMBoxModelViewSet(
 
         try:
             with transaction.atomic(using=router.db_for_write(model)):
-                locked = model.objects.select_for_update().get(pk=instance.pk)
+                locked = _scoped_manager(model).select_for_update().get(pk=instance.pk)
                 self._ensure_unmanaged_definition(locked)
                 self._validate_etag(self.request, locked)
                 super().perform_destroy(locked)
