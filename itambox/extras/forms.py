@@ -1,3 +1,4 @@
+import json as _json
 import re
 
 from crispy_forms.helper import FormHelper
@@ -14,17 +15,28 @@ from django.utils.translation import gettext_lazy as _
 from core.data_transfer import policy_for
 from core.forms import ColorFieldFormMixin, FilterForm
 from core.managers import get_current_tenant
+from core.validators import validate_external_url
+from itambox.middleware import get_current_user
 
 from .definition_contract import custom_field_definition_contract_errors
 from .filters import TagFilter
 from .models import (
+    AlertRule,
     CustomField,
     CustomFieldChoiceSet,
     CustomFieldset,
     CustomFieldsetField,
+    Event,
+    EventRule,
+    ExportTemplate,
+    LabelTemplate,
+    NotificationChannel,
     ReportTemplate,
     SavedFilter,
+    ScheduledReport,
     Tag,
+    WebhookEndpoint,
+    alert_rule_channel_scope_errors,
 )
 from .signals import _SIGNAL_SKIP_MODELS
 
@@ -460,23 +472,6 @@ class SavedFilterFilterForm(FilterForm):
 # framework layer.  The old import path (core.forms.XxxForm) has been
 # repointed to extras.forms in every consumer.
 # =============================================================================
-
-import json as _json
-
-from core.validators import validate_external_url
-from itambox.middleware import get_current_user
-
-from .models import (
-    AlertRule,
-    Event,
-    EventRule,
-    ExportTemplate,
-    LabelTemplate,
-    NotificationChannel,
-    ScheduledReport,
-    WebhookEndpoint,
-    alert_rule_channel_scope_errors,
-)
 
 
 def logged_content_types():

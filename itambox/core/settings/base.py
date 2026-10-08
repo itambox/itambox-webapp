@@ -5,6 +5,7 @@ Contains all common settings shared between dev and prod.
 
 import json
 import os
+import sys
 import warnings as py_warnings
 from datetime import timedelta
 from pathlib import Path
@@ -16,6 +17,7 @@ from core.config_contract import (
     parse_api_token_peppers,
     parse_field_encryption_keys,
 )
+from itambox.plugins.utils import load_plugins
 from itambox.release import VERSION
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -495,8 +497,6 @@ Q_CLUSTER = {
     "catch_up": True,
 }
 
-import sys
-
 
 def _is_test_invocation():
     argv_identifies_tests = "test" in sys.argv or any("test" in arg or "pytest" in arg for arg in sys.argv)
@@ -623,7 +623,6 @@ PLUGINS_CONFIG = {
 
 # Load and validate plugins dynamically
 
-from itambox.plugins.utils import load_plugins
 
 load_plugins(sys.modules[__name__])
 

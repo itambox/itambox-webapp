@@ -5,24 +5,36 @@
 import ipaddress
 import logging
 
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import HTML, Column, Fieldset, Layout, Row, Submit
 from django import forms
 from django.conf import settings  # Import settings
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
+from core.forms import BulkEditForm, FilterForm
+from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids
+from organization.forms.helpers import add_standard_buttons
+from organization.models import (
+    Membership,
+    Role,
+    RoleGrant,
+    RoleGrantScope,
+    Tenant,
+    TenantGroup,
+)
 from organization.services.role_grant_validation import validate_role_grant
 
+from .filters import UserFilterSet, UserGroupFilterSet
+
 # Import UserPreference from this app's models
-from .models import UserPreference
+from .models import GroupMembership, UserGroup, UserPreference
 from .services import DEFAULT_WORKSPACE_KEY, workspace_choices
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
-from crispy_forms.helper import FormHelper
-from crispy_forms.layout import HTML, Column, Fieldset, Layout, Row, Submit
-
-from organization.forms.helpers import add_standard_buttons
 
 
 class UserProfileForm(forms.ModelForm):
@@ -395,11 +407,6 @@ class TokenForm(forms.ModelForm):
         return prefixes
 
 
-from core.forms import BulkEditForm, FilterForm
-
-from .filters import UserFilterSet
-
-
 class UserFilterForm(FilterForm):
     filterset_class = UserFilterSet
 
@@ -502,20 +509,6 @@ class UserBulkEditForm(BulkEditForm):
 # --------------------------------------------------------------------------- UserGroup
 # UserGroup is an identity-layer construct (relocated here from organization/):
 # provider-owned groups may be projected into managed tenants through RoleGrant scopes.
-from django.db import transaction
-
-from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids
-from organization.models import (
-    Membership,
-    Role,
-    RoleGrant,
-    RoleGrantScope,
-    Tenant,
-    TenantGroup,
-)
-
-from .filters import UserGroupFilterSet
-from .models import GroupMembership, UserGroup
 
 
 class GroupManagedRoleGrantForm(forms.Form):

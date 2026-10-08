@@ -1,5 +1,6 @@
 from django.test import TestCase
 
+from assets.forms.assettype_form import AssetTypeForm
 from assets.forms.filter_forms import AssetFilterForm
 from assets.models import Asset, AssetType, Category, Manufacturer, StatusLabel, Supplier
 from assets.services import checkout_asset
@@ -126,9 +127,6 @@ class AssetFilterFormTest(TestCase):
             field = form.fields[field_name]
             self.assertIn("data-tom-select", field.widget.attrs)
             self.assertNotIn("data-tom-select-url", field.widget.attrs)
-
-
-from assets.forms.assettype_form import AssetTypeForm
 
 
 class AssetTypeFormTest(TestCase):
