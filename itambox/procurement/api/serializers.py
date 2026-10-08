@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 from assets.api.nested_serializers import NestedAssetSerializer, NestedAssetTypeSerializer, NestedSupplierSerializer
 from assets.models import Asset, AssetType, Supplier
+from core.managers import Scope
 from inventory.api.serializers import (
     NestedAccessorySerializer,
     NestedComponentSerializer,
@@ -187,6 +188,10 @@ class PurchaseOrderLineSerializer(BaseModelSerializer):
     qty_outstanding = serializers.IntegerField(read_only=True)
     total_cost = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     currency = serializers.CharField(read_only=True)
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["purchase_order_id"].queryset = PurchaseOrder.objects.for_scope(Scope.current())
 
     class Meta:
         model = PurchaseOrderLine

@@ -20,6 +20,7 @@ from django.views.generic import View
 from assets.tasks.labels import render_labels_pdf
 from core.csv_utils import csv_safe
 from core.data_transfer import SCOPE_CONTAINER, SCOPE_OWNER, policy_for, required_export_permissions
+from core.managers import Scope
 from extras.forms import ExportTemplateForm, LabelTemplateForm
 from extras.models import ExportTemplate, LabelTemplate
 from extras.tables import ExportTemplateTable, LabelTemplateTable
@@ -63,6 +64,8 @@ def _scoped_export_base(request, model, policy):
     """Rows the requester may see under the model's declared export scope."""
     meta = model._meta
     queryset = model.objects.all()
+    if hasattr(queryset, "for_scope"):
+        queryset = queryset.for_scope(Scope.current())
     if policy.scope == SCOPE_CONTAINER:
         return visible_to_containers(request.user, queryset, f"{meta.app_label}.view_{meta.model_name}")
     if policy.scope == SCOPE_OWNER:

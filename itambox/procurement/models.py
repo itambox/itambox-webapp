@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from core.currency import CurrencyField
-from core.managers import TenantScopingSoftDeleteManager
+from core.managers import ExplicitScopeSoftDeleteManager
 from core.models import BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin
 
 User = get_user_model()
@@ -29,7 +29,7 @@ class PurchaseOrder(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixi
         (STATUS_CANCELLED, _("Cancelled")),
     ]
 
-    objects = TenantScopingSoftDeleteManager()
+    objects = ExplicitScopeSoftDeleteManager()
 
     tenant = models.ForeignKey(
         "organization.Tenant",
@@ -81,7 +81,7 @@ class PurchaseOrder(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixi
 
 
 class PurchaseOrderLine(BaseModel, ChangeLoggingMixin, SoftDeleteMixin):
-    objects = TenantScopingSoftDeleteManager()
+    objects = ExplicitScopeSoftDeleteManager()
 
     tenant = models.ForeignKey(
         "organization.Tenant",
@@ -205,7 +205,7 @@ class ContractBillingCycleChoices(models.TextChoices):
 class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
     """A hardware/software support agreement, SLA, lease, or service contract."""
 
-    objects = TenantScopingSoftDeleteManager()
+    objects = ExplicitScopeSoftDeleteManager()
 
     # --- Identity ---
     tenant = models.ForeignKey(
@@ -363,7 +363,7 @@ class Contract(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin):
 class FulfillmentLink(BaseModel, ChangeLoggingMixin, SoftDeleteMixin):
     """Links an AssetRequest to the PurchaseOrderLine that will supply it."""
 
-    objects = TenantScopingSoftDeleteManager()
+    objects = ExplicitScopeSoftDeleteManager()
 
     tenant = models.ForeignKey(
         "organization.Tenant",
