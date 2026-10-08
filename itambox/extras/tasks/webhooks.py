@@ -32,6 +32,7 @@ from django_q.tasks import async_task
 from core.crypto import encrypt_string, get_fernet
 from core.errors import MAX_RETRY_AFTER_SECONDS
 from core.events import DeliveryDisposition, DeliveryResult, delivery_log_context, delivery_log_message
+from core.managers import Scope
 from extras.models import Event, WebhookDelivery, WebhookEndpoint
 
 logger = logging.getLogger(__name__)
@@ -1225,7 +1226,7 @@ def send_webhook_test(endpoint_pk: int, *, actor_id: int | None = None):
     if actor is not None and _is_platform_actor(actor):
         endpoint = WebhookEndpoint._base_manager.filter(pk=endpoint_pk, deleted_at__isnull=True).first()
     else:
-        endpoint = WebhookEndpoint.objects.filter(pk=endpoint_pk).first()
+        endpoint = WebhookEndpoint.objects.for_scope(Scope.current()).filter(pk=endpoint_pk).first()
     if endpoint is None or (endpoint.tenant_id is None and not _is_platform_actor(actor)):
         raise PermissionDenied("Webhook endpoint not found.")
 

@@ -4,6 +4,7 @@ from django.db.models import Q
 from django.http import QueryDict
 
 from core.forms import JournalEntryForm
+from core.managers import Scope
 from extras.customfields import apply_custom_field_filters
 from extras.models import (
     Bookmark,
@@ -65,8 +66,10 @@ def _watch_context(input: DetailContextInput) -> dict[str, object]:
 
 
 def _visible_saved_filters(input: ListParamsInput) -> list[SavedFilter]:
-    queryset = SavedFilter.objects.filter(content_type=input.content_type, enabled=True).filter(
-        Q(tenant__isnull=True) | Q(shared=True) | Q(created_by=input.request.user)
+    queryset = (
+        SavedFilter.objects.for_scope(Scope.current())
+        .filter(content_type=input.content_type, enabled=True)
+        .filter(Q(tenant__isnull=True) | Q(shared=True) | Q(created_by=input.request.user))
     )
     return list(queryset)
 
@@ -151,7 +154,7 @@ class _ExtrasGenericPresentationProvider:
         active_features = input.active_features
 
         if "journaling" in active_features:
-            journal_entries = JournalEntry.objects.filter(
+            journal_entries = JournalEntry.objects.for_scope(Scope.current()).filter(
                 model=input.content_type,
                 object_id=input.obj.pk,
             )

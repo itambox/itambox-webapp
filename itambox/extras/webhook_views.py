@@ -17,6 +17,7 @@ from django_tables2 import RequestConfig
 
 from core.events import _send_slack_notification, _send_teams_notification
 from core.http import request_pinned, webhook_target_kind
+from core.managers import Scope
 from core.validators import validate_external_url
 from core.worker_status import get_worker_status
 from extras.forms import WebhookEndpointForm
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 def _webhook_deliveries_visible_to(user):
     if user.is_superuser or user.has_perm("extras.view_webhookdelivery"):
         return WebhookDelivery._base_manager
-    return WebhookDelivery.objects
+    return WebhookDelivery.objects.for_scope(Scope.current())
 
 
 class WorkerStatusContextMixin:
@@ -89,7 +90,7 @@ class WebhookEndpointTestView(LoginRequiredMixin, View):
     http_method_names = ["post"]
 
     def post(self, request, *args, **kwargs):
-        endpoint = get_object_or_404(WebhookEndpoint.objects.all(), pk=kwargs["pk"])
+        endpoint = get_object_or_404(WebhookEndpoint.objects.for_scope(Scope.current()).all(), pk=kwargs["pk"])
         if not request.user.has_perm("extras.change_webhookendpoint", obj=endpoint):
             raise PermissionDenied
 

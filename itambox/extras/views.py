@@ -26,7 +26,7 @@ from django_tables2 import RequestConfig
 from assets.services.specification_consumers.contracts import FieldReference, parse_filter_document
 from assets.services.specification_consumers.exporting import machine_csv_bytes
 from assets.tables import AssetTable  # Import AssetTable
-from core.managers import get_current_tenant
+from core.managers import Scope, get_current_tenant
 from core.reports.rendering import render_report_csv, render_report_html
 from core.schedules import (
     SCHEDULED_REPORT_FIRE_KWARG,
@@ -616,7 +616,9 @@ class _BulkAlertActionView(LoginRequiredMixin, PermissionRequiredMixin, View):
         except (TypeError, ValueError):
             unique_pks = set()
         with transaction.atomic():
-            locked_qs = AlertLog.objects.select_for_update().filter(pk__in=unique_pks).order_by("pk")
+            locked_qs = (
+                AlertLog.objects.for_scope(Scope.current()).select_for_update().filter(pk__in=unique_pks).order_by("pk")
+            )
             # A null-tenant row marked unresolved is never safe to mutate,
             # including for superusers: reconciliation has not established an
             # owner, so bulk actions must fail closed rather than guess.
@@ -875,7 +877,7 @@ class ScheduledReportListView(CapabilityRequiredMixin, ObjectListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = _("Scheduled Reports")
-        context["templates"] = ReportTemplate.objects.all()
+        context["templates"] = ReportTemplate.objects.for_scope(Scope.current()).all()
         return context
 
 
@@ -1006,7 +1008,8 @@ class ScheduledReportUpdateView(CapabilityRequiredMixin, ObjectEditView):
         # changes (frequency, cron expression, start time) or a fresh
         # registration re-anchor; everything else keeps the live next run.
         previous = (
-            ScheduledReport.objects.filter(pk=self.object.pk)
+            ScheduledReport.objects.for_scope(Scope.current())
+            .filter(pk=self.object.pk)
             .values("frequency", "cron_expression", "start_time", "is_active", "schedule_id")
             .first()
             or {}
@@ -1048,10 +1051,14 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
     template_name = "core/reports/report_schedule_scope_approval.html"
 
     def get_queryset(self):
-        return ScheduledReport.objects.select_related("report").prefetch_related(
-            "filter_tenants",
-            "scope_authorization__authorized_by",
-            "scope_authorization__revoked_by",
+        return (
+            ScheduledReport.objects.for_scope(Scope.current())
+            .select_related("report")
+            .prefetch_related(
+                "filter_tenants",
+                "scope_authorization__authorized_by",
+                "scope_authorization__revoked_by",
+            )
         )
 
     def get_object(self):
@@ -1522,7 +1529,7 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
 
     def get(self, request, pk, *args, **kwargs):
         # objects automatically handles tenant scoping!
-        template = get_object_or_404(ReportTemplate.objects.all(), pk=pk)
+        template = get_object_or_404(ReportTemplate.objects.for_scope(Scope.current()).all(), pk=pk)
 
         # Enforce multi-tenant thread-local active tenant binding
         from core.managers import get_current_tenant

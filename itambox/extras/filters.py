@@ -6,6 +6,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from core.filters import BaseFilterSet
+from core.managers import Scope
 
 from .models import (
     AlertLog,
@@ -122,7 +123,7 @@ class WebhookEndpointFilterSet(django_filters.FilterSet):
 
 class WebhookDeliveryFilterSet(django_filters.FilterSet):
     endpoint = django_filters.ModelChoiceFilter(
-        queryset=WebhookEndpoint.objects.all(),
+        queryset=lambda request: WebhookEndpoint.objects.for_scope(Scope.current()),
         label=_("Endpoint"),
     )
     status = django_filters.ChoiceFilter(
@@ -179,7 +180,7 @@ class AlertLogFilterSet(BaseFilterSet):
         widget=forms.SelectMultiple(attrs={"class": "form-select"}),
     )
     rule = django_filters.ModelChoiceFilter(
-        queryset=AlertRule.objects.all(),
+        queryset=lambda request: AlertRule.objects.for_scope(Scope.current()),
         label=_("Rule"),
         widget=forms.Select(attrs={"class": "form-select"}),
     )
