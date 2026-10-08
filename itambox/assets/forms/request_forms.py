@@ -3,10 +3,11 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, AssetRequest, AssetType
+from core.forms import TenantScopedFormMixin
 from core.managers import Scope
 
 
-class AssetRequestForm(forms.ModelForm):
+class AssetRequestForm(TenantScopedFormMixin, forms.ModelForm):
     CATEGORY_CHOICES = [
         ("asset_type", _("Asset Type (General Model)")),
         ("asset", _("Specific Asset (by Tag)")),

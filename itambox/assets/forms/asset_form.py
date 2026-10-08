@@ -10,7 +10,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from assets.customfields import resolve_asset_custom_fields, resolve_asset_type_custom_fields
-from core.forms import CrispyFormMixin, scope_tenant_field
+from core.forms import CrispyFormMixin, TenantScopedFormMixin
 from core.managers import Scope
 from core.mixins import suppress_custom_field_data_validation
 from extras.customfields import (
@@ -68,7 +68,10 @@ QUICK_ADD_LABEL_FORMAT = (
 )
 
 
-class AssetForm(CrispyFormMixin, forms.ModelForm):
+class AssetForm(TenantScopedFormMixin, CrispyFormMixin, forms.ModelForm):
+    tenant_required = True
+    tenant_autoset_when_single = True
+
     asset_type = forms.ModelChoiceField(
         queryset=AssetType.objects.select_related("manufacturer").all(),
         label=_("Asset Type"),
@@ -276,7 +279,6 @@ class AssetForm(CrispyFormMixin, forms.ModelForm):
         self.request = request
         explicit_initial = kwargs.get("initial") or {}
         super().__init__(*args, **kwargs)
-        scope_tenant_field(self)
         self.fields["warranty_supplier"].queryset = Supplier.objects.for_scope(Scope.current()).filter(is_active=True)
         self.fields["cost_center"].label_from_instance = lambda cost_center: (
             f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
