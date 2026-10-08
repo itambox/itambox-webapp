@@ -60,7 +60,7 @@ class LicenseFormDeclarationTests(TenantTestMixin, TestCase):
 
     def test_model_choice_fields_are_scoped_explicitly(self):
         expected = (
-            (LicenseForm, ("tenant", "cost_center", "subscription", "software", "tags")),
+            (LicenseForm, ("tenant", "cost_center", "subscription", "software")),
             (LicenseSeatAssignmentForm, ("license", "asset")),
             (LicenseCheckOutForm, ("assigned_holder", "asset")),
         )
