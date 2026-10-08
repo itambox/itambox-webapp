@@ -6,7 +6,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, Supplier
-from core.forms import CrispyFormMixin, FilterForm, scope_tenant_field
+from core.forms import CrispyFormMixin, FilterForm, TenantScopedFormMixin
 from core.managers import Scope
 from extras.customfields import CustomFieldModelFormMixin
 from extras.models import Tag
@@ -17,8 +17,11 @@ from .filters import LicenseFilterSet
 from .models import License, LicenseSeatAssignment
 
 
-class LicenseForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
+class LicenseForm(TenantScopedFormMixin, CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
     """Form for creating and updating License entitlements."""
+
+    tenant_required = True
+    tenant_autoset_when_single = True
 
     software = forms.ModelChoiceField(
         queryset=Software.objects.all(),
@@ -86,15 +89,10 @@ class LicenseForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        scope_tenant_field(self)
         self.fields["supplier"].queryset = Supplier.objects.for_scope(Scope.current()).filter(is_active=True)
-        # Rescope the tenant-owned `cost_center`/`subscription` FK pickers per
-        # request (import-frozen unscoped). `software` is validated same-tenant in
+        # `cost_center` / `subscription` (and the other model choices) are scoped by
+        # TenantScopedFormMixin. `software` is validated same-tenant in
         # License.clean(); `supplier` is a global catalogue model.
-        for fk_name in ("cost_center", "subscription"):
-            field = self.fields.get(fk_name)
-            if field is not None and getattr(field, "queryset", None) is not None:
-                field.queryset = field.queryset.model._default_manager.all()
         self.fields["cost_center"].label_from_instance = lambda cost_center: (
             f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
         )
@@ -178,7 +176,7 @@ class LicenseFilterForm(FilterForm):
     filterset_class = LicenseFilterSet
 
 
-class LicenseSeatAssignmentForm(forms.ModelForm):
+class LicenseSeatAssignmentForm(TenantScopedFormMixin, forms.ModelForm):
     """Assign a license seat to an asset (asset-scoped quick-add)."""
 
     class Meta:
@@ -230,7 +228,7 @@ class LicenseSeatAssignmentForm(forms.ModelForm):
         return cleaned
 
 
-class LicenseCheckOutForm(forms.Form):
+class LicenseCheckOutForm(TenantScopedFormMixin, forms.Form):
     TARGET_CHOICES = [
         ("holder", _("Asset Holder")),
         ("asset", _("Hardware Asset")),
