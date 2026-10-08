@@ -1,6 +1,12 @@
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.db import transaction
+from django.http import HttpResponseRedirect
+from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.views import View
+from django.views.generic.base import TemplateResponseMixin
 
 from assets.choices import RequestStatusChoices
 from extras.services.events import dispatch_event
@@ -140,11 +146,3 @@ class AssetRequestDeleteView(ObjectDeleteView):
     model = AssetRequest
     template_name = "generic/object_confirm_delete.html"
     success_url = reverse_lazy("assets:assetrequest_list")
-
-
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.db import transaction
-from django.http import HttpResponseRedirect
-from django.shortcuts import redirect
-from django.views import View
-from django.views.generic.base import TemplateResponseMixin

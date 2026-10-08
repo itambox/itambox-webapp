@@ -156,7 +156,7 @@ inline-style-check:
 
 # Idempotent: import sort runs before formatting, and re-running produces no
 # further diff. Ruff owns formatting/import order, E501 at 132 characters, and
-# the migrated phase-2/3 rules in pyproject.toml; Flake8 retains the remaining
+# the migrated semantic rules in pyproject.toml; Flake8 retains the remaining
 # not-yet-migrated rules.
 format:
 	$(UV_DEV) ruff check --select I --fix $(FORMAT_TARGETS)

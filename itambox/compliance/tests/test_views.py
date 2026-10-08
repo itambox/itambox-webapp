@@ -3,13 +3,16 @@ from datetime import date, timedelta
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from model_bakery import baker
 
 from assets.models import Asset, AssetAssignment, AssetMaintenance, AssetTagSequence, Supplier
 from assets.services import checkout_asset
+from compliance.providers import BaseSignatureProvider
+from compliance.registry import signature_providers
 from organization.models import AssetHolder, Tenant
 
-from ..models import CustodyReceipt
+from ..models import CustodyReceipt, CustodyTemplate
 
 User = get_user_model()
 
@@ -417,12 +420,6 @@ class CustodyReceiptViewTests(TestCase):
         initiate_signature.assert_not_called()
 
 
-from compliance.providers import BaseSignatureProvider
-from compliance.registry import signature_providers
-
-from ..models import CustodyTemplate
-
-
 class MockSignatureProvider(BaseSignatureProvider):
     name = "mock_esign"
     verbose_name = "Mock E-Sign Integration"
@@ -525,9 +522,6 @@ class SignatureRegistryTests(TestCase):
         provider = signature_providers.get("mock_esign")
         self.assertIsNotNone(provider)
         self.assertEqual(provider.name, "mock_esign")
-
-
-from django.utils import timezone
 
 
 class CustodyTemplateCheckoutTests(TestCase):

@@ -7,7 +7,23 @@ from assets.api.nested_serializers import (
     NestedAssetTypeSerializer,
     NestedManufacturerSerializer,
 )
+from assets.models import Asset, Category
+from extras.api.serializers import TagSerializer
+from inventory.models import (
+    Accessory,
+    AccessoryAssignment,
+    AccessoryStock,
+    Component,
+    ComponentAllocation,
+    ComponentStock,
+    Consumable,
+    ConsumableAssignment,
+    ConsumableStock,
+    Kit,
+    KitItem,
+)
 from itambox.api.base import BaseModelSerializer
+from organization.api.serializers import AssetHolderSerializer, NestedLocationSerializer, NestedTenantSerializer
 
 
 class _AssignmentAvailabilityMixin:
@@ -86,24 +102,6 @@ class _AssignmentAvailabilityMixin:
                     validated_data[self.item_source_field] = locked
                 return super().update(instance, validated_data)
         return super().update(instance, validated_data)
-
-
-from assets.models import Asset, Category
-from extras.api.serializers import TagSerializer
-from inventory.models import (
-    Accessory,
-    AccessoryAssignment,
-    AccessoryStock,
-    Component,
-    ComponentAllocation,
-    ComponentStock,
-    Consumable,
-    ConsumableAssignment,
-    ConsumableStock,
-    Kit,
-    KitItem,
-)
-from organization.api.serializers import AssetHolderSerializer, NestedLocationSerializer, NestedTenantSerializer
 
 
 def _accessory_category_queryset() -> models.QuerySet[Category]:

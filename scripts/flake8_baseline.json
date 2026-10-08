@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "canonical_python": "3.12",
-  "policy_sha256": "15e130269c5b060d00348dbf0769979b337dd90c5903f92fcd3266c2550e77b3",
+  "policy_sha256": "b53f58233b86247d9fad07e2a6822442d4a0cb39b3fcc03dd9ec38e96a2abb9e",
   "findings": [
     {
       "path": "itambox/assets/api/serializers.py",
@@ -293,14 +293,6 @@
     },
     {
       "path": "itambox/assets/forms/checkout_forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from inventory.forms import AccessoryCheckoutForm, BaseCheckoutForm, ConsumableCheckoutForm, KitCheckoutForm",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/checkout_forms.py",
       "code": "F401",
       "message": "'crispy_forms.layout.HTML' imported but unused",
       "source": "from crispy_forms.layout import HTML, Layout",
@@ -377,14 +369,6 @@
       "message": "'AssetRequestForm.clean' is too complex (20)",
       "source": "    def clean(self):",
       "context": "Module:body/ClassDef:AssetRequestForm:body/FunctionDef:clean:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/forms/request_forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.forms import formset_factory",
-      "context": "Module:body",
       "count": 1
     },
     {
@@ -525,25 +509,9 @@
     },
     {
       "path": "itambox/assets/tables.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from extras.tables import CustomFieldsetTable, CustomFieldTable",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from inventory.tables import AccessoryTable, ComponentAllocationTable, ConsumableTable, KitTable",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tables.py",
       "code": "F401",
       "message": "'extras.tables.CustomFieldTable' imported but unused",
-      "source": "from extras.tables import CustomFieldsetTable, CustomFieldTable",
+      "source": "from extras.tables import (",
       "context": "Module:body",
       "count": 1
     },
@@ -551,7 +519,7 @@
       "path": "itambox/assets/tables.py",
       "code": "F401",
       "message": "'extras.tables.CustomFieldsetTable' imported but unused",
-      "source": "from extras.tables import CustomFieldsetTable, CustomFieldTable",
+      "source": "from extras.tables import (",
       "context": "Module:body",
       "count": 1
     },
@@ -624,14 +592,6 @@
       "code": "F401",
       "message": "'inventory.models.ConsumableAssignment' imported but unused",
       "source": "from inventory.models import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_filter_forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from assets.forms.assettype_form import AssetTypeForm",
       "context": "Module:body",
       "count": 1
     },
@@ -752,14 +712,6 @@
       "code": "F401",
       "message": "'assets.models.AssetAssignment' imported but unused",
       "source": "from assets.models import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/urls.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .urls_audits import urlpatterns as audit_urls",
       "context": "Module:body",
       "count": 1
     },
@@ -1477,54 +1429,6 @@
     },
     {
       "path": "itambox/assets/views/asset_request_views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_request_views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.db import transaction",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_request_views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.http import HttpResponseRedirect",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_request_views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.shortcuts import redirect",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_request_views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.views import View",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_request_views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.views.generic.base import TemplateResponseMixin",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/views/asset_request_views.py",
       "code": "F401",
       "message": "'django.contrib.auth.mixins.LoginRequiredMixin' imported but unused",
       "source": "from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin",
@@ -1724,38 +1628,6 @@
       "count": 1
     },
     {
-      "path": "itambox/compliance/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .models import CustodyTemplate",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from compliance.registry import signature_providers",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from extras.models import Tag",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from organization.models import Tenant, TenantGroup",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/compliance/forms_audit.py",
       "code": "B907",
       "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -1816,38 +1688,6 @@
       "code": "F401",
       "message": "'organization.models.Tenant' imported but unused",
       "source": "from organization.models import Location, Tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/tests/test_views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from ..models import CustodyTemplate",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/tests/test_views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from compliance.providers import BaseSignatureProvider",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/tests/test_views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from compliance.registry import signature_providers",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/tests/test_views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.utils import timezone",
       "context": "Module:body",
       "count": 1
     },
@@ -2597,22 +2437,6 @@
     },
     {
       "path": "itambox/core/search_backends.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .search import SEARCH_INDEXES",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/search_backends.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from itambox.utils import get_content_type_by_natural_key",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/search_backends.py",
       "code": "F401",
       "message": "'django.contrib.contenttypes.models.ContentType' imported but unused",
       "source": "from django.contrib.contenttypes.models import ContentType",
@@ -2692,30 +2516,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/settings/base.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from itambox.plugins.utils import load_plugins",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/settings/base.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "import sys",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/settings/dev.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "import os as _os",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/settings/dev.py",
       "code": "F403",
       "message": "'from .base import *' used; unable to detect undefined names",
@@ -2753,14 +2553,6 @@
       "message": "'MIDDLEWARE' may be undefined, or defined from star imports: .base",
       "source": "if \"debug_toolbar.middleware.DebugToolbarMiddleware\" not in MIDDLEWARE:",
       "context": "Module:body/If:Compare(left=Constant(value='debug_toolbar.middleware.DebugToolbarMiddleware'), ops=[NotIn()], comparators=[Name(id='MIDDLEWARE', ctx=Load())]):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/settings/prod.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from core.crypto import is_using_derived_encryption_key",
-      "context": "Module:body",
       "count": 1
     },
     {
@@ -3229,62 +3021,6 @@
     },
     {
       "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from assets.models import Asset, StatusLabel",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from compliance.models import CustodyReceipt",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.test import TestCase",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from extras.models import ReportTemplate",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from model_bakery import baker",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from organization.models import AssetHolder, Tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "import pytest",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
       "code": "F401",
       "message": "'assets.models.Asset' imported but unused",
       "source": "from assets.models import Asset, StatusLabel",
@@ -3469,22 +3205,6 @@
     },
     {
       "path": "itambox/core/urls.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from core.auth.oidc import TenantOIDCAuthorizeView, TenantOIDCCallbackView",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/urls.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from core.views.mfa import MFASetupView",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/urls.py",
       "code": "F401",
       "message": "'assets.views as asset_views' imported but unused",
       "source": "from assets import views as asset_views  # Import the assets views",
@@ -3633,38 +3353,6 @@
       "message": "'NotificationChannelForm.clean' is too complex (13)",
       "source": "    def clean(self):",
       "context": "Module:body/ClassDef:NotificationChannelForm:body/FunctionDef:clean:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .models import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from core.validators import validate_external_url",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from itambox.middleware import get_current_user",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "import json as _json",
-      "context": "Module:body",
       "count": 1
     },
     {
@@ -3861,70 +3549,6 @@
     },
     {
       "path": "itambox/extras/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .filters import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .forms import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .models import AlertLog, AlertRule, NotificationChannel, ReportTemplate, ScheduledReport",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .tables import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.utils import timezone",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.utils.decorators import method_decorator",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from itambox.views.generic.service_views import SimplePostView",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "import logging",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/views.py",
       "code": "F401",
       "message": "'django.views.generic.CreateView' imported but unused",
       "source": "from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView, View",
@@ -3984,38 +3608,6 @@
       "code": "F401",
       "message": "'users.models.UserPreference' imported but unused",
       "source": "from users.models import UserPreference  # Import UserPreference",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/api/serializers.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from assets.models import Asset, Category",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/api/serializers.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from extras.api.serializers import TagSerializer",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/api/serializers.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from inventory.models import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/inventory/api/serializers.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from organization.api.serializers import AssetHolderSerializer, NestedLocationSerializer, NestedTenantSerializer",
       "context": "Module:body",
       "count": 1
     },
@@ -4813,14 +4405,6 @@
     },
     {
       "path": "itambox/itambox/api/serializers/__init__.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from drf_spectacular.utils import extend_schema_field",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/serializers/__init__.py",
       "code": "F401",
       "message": "'drf_spectacular.utils.extend_schema_field' imported but unused",
       "source": "from drf_spectacular.utils import extend_schema_field",
@@ -5136,14 +4720,6 @@
       "code": "F401",
       "message": "'crispy_forms.layout.Row' imported but unused",
       "source": "from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/models.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from core.managers import AllObjectsManager, TenantScopingSoftDeleteManager, TenantScopingSoftDeleteQuerySet",
       "context": "Module:body",
       "count": 1
     },
@@ -5569,38 +5145,6 @@
       "message": "'RoleGrantScope.clean' is too complex (12)",
       "source": "    def clean(self):",
       "context": "Module:body/ClassDef:RoleGrantScope:body/FunctionDef:clean:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/models.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from core.managers import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/models.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from core.mfa import role_is_privileged",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/models.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from core.mixins import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/organization/models.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, StandardModel, VaultModel",
-      "context": "Module:body",
       "count": 1
     },
     {
@@ -6700,22 +6244,6 @@
       "count": 1
     },
     {
-      "path": "itambox/procurement/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.contrib.auth.mixins import PermissionRequiredMixin",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.views import View",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/software/filters.py",
       "code": "F401",
       "message": "'extras.filters.TagFilter' imported but unused",
@@ -6876,22 +6404,6 @@
       "count": 1
     },
     {
-      "path": "itambox/subscriptions/tests/test_views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from datetime import date",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/tests/test_views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from organization.models import AssetHolder",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/subscriptions/views.py",
       "code": "F401",
       "message": "'django_tables2.RequestConfig' imported but unused",
@@ -6977,86 +6489,6 @@
       "message": "'UserPreferencesForm.__init__' is too complex (11)",
       "source": "    def __init__(self, user, *args, **kwargs):",
       "context": "Module:body/ClassDef:UserPreferencesForm:body/FunctionDef:__init__:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .filters import UserFilterSet",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .filters import UserGroupFilterSet",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .models import GroupMembership, UserGroup",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from core.forms import BulkEditForm, FilterForm",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from crispy_forms.helper import FormHelper",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from crispy_forms.layout import HTML, Column, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.db import transaction",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from organization.forms.helpers import add_standard_buttons",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/forms.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from organization.models import (",
-      "context": "Module:body",
       "count": 1
     },
     {
@@ -7181,113 +6613,9 @@
     },
     {
       "path": "itambox/users/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .filters import UserFilterSet",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .filters import UserGroupFilterSet",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .forms import UserBulkEditForm, UserFilterForm, UserForm",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .forms import UserGroupAssignUsersForm, UserGroupFilterForm, UserGroupForm",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .models import GroupMembership, UserGroup",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .tables import UserGroupTable",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from .tables import UserTable",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.contrib.auth.mixins import UserPassesTestMixin",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.db import transaction",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.db.models import Count, Prefetch",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from django.http import HttpResponseRedirect",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from itambox.views.generic import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "E402",
-      "message": "module level import not at top of file",
-      "source": "from itambox.views.generic import ObjectBulkDeleteView",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
       "code": "F401",
       "message": "'.models.UserPreference' imported but unused",
-      "source": "from .models import UserPreference",
+      "source": "from .models import GroupMembership, UserGroup, UserPreference",
       "context": "Module:body",
       "count": 1
     },

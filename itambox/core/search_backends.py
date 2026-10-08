@@ -7,11 +7,12 @@ from django.core.exceptions import EmptyResultSet, FieldError
 from django.db.models import F, Q, Value
 
 from core.managers import Scope
-
-logger = logging.getLogger(__name__)
 from itambox.utils import get_content_type_by_natural_key
 
 from .search import SEARCH_INDEXES
+
+logger = logging.getLogger(__name__)
+
 
 MAX_SEARCH_RESULTS_PER_MODEL = getattr(settings, "MAX_SEARCH_RESULTS_PER_MODEL", 1000)
 MAX_SEARCH_COUNT_PER_MODEL = getattr(settings, "MAX_SEARCH_COUNT_PER_MODEL", 10000)

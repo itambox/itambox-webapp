@@ -11,13 +11,6 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from core.choices import ObjectChangeActionChoices
-from core.tenant_scope import get_descendant_tenant_group_ids
-
-
-def _default_currency():
-    return getattr(settings, "ITAMBOX_DEFAULT_CURRENCY", "EUR")
-
-
 from core.managers import (
     AllObjectsManager,
     SoftDeleteManager,
@@ -41,6 +34,12 @@ from core.mixins import (
     TaggableMixin,
 )
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, StandardModel, VaultModel
+from core.tenant_scope import get_descendant_tenant_group_ids
+
+
+def _default_currency():
+    return getattr(settings, "ITAMBOX_DEFAULT_CURRENCY", "EUR")
+
 
 # Create your models here.
 

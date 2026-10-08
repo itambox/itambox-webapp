@@ -1,5 +1,6 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from django.forms import formset_factory
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, AssetRequest, AssetType
@@ -467,7 +468,5 @@ class BaseAssetReceiveFormSet(forms.BaseFormSet):
                     form.add_error("serial_number", "Duplicate serial number in this batch.")
                 serials.add(serial)
 
-
-from django.forms import formset_factory
 
 AssetReceiveFormSet = formset_factory(AssetReceiveForm, formset=BaseAssetReceiveFormSet, extra=0)

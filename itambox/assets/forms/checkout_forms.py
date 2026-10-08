@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, StatusLabel
+from inventory.forms import AccessoryCheckoutForm, BaseCheckoutForm, ConsumableCheckoutForm, KitCheckoutForm
 from organization.models import AssetHolder, Location
 
 
@@ -157,6 +158,3 @@ class AssetCheckInForm(forms.Form):
             "checkin_date",
             "notes",
         )
-
-
-from inventory.forms import AccessoryCheckoutForm, BaseCheckoutForm, ConsumableCheckoutForm, KitCheckoutForm

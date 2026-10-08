@@ -2,6 +2,7 @@ from django.urls import include, path
 from django.views.generic import RedirectView
 
 from . import views
+from .urls_audits import urlpatterns as audit_urls
 from .views import library_views, request_views
 from .views.disposal_views import AssetDisposalCancelView
 
@@ -119,7 +120,6 @@ urlpatterns = [
     path("", include("assets.urls_requests")),
 ]
 
-from .urls_audits import urlpatterns as audit_urls
 
 urlpatterns += audit_urls
 

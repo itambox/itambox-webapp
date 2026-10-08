@@ -3,6 +3,8 @@ Development settings override.
 To use: set DJANGO_SETTINGS_MODULE=core.settings.dev or ITAMBOX_ENV=dev
 """
 
+import os as _os
+
 from .base import *
 from .base import DATABASES  # explicit: the password fallback must resolve without new star-import F405 identities
 
@@ -12,7 +14,6 @@ ALLOWED_HOSTS = ["localhost", "127.0.0.1", "192.168.50.54"]
 # Local/CI Postgres instances typically lack TLS. Override the base default
 # ('require') so that dev and test runs connect without a certificate.
 # Production keeps 'require' (or overrides via ITAMBOX_DB_SSLMODE env var).
-import os as _os
 
 if not _os.environ.get("ITAMBOX_DB_SSLMODE"):
     DATABASES["default"]["OPTIONS"]["sslmode"] = "disable"
