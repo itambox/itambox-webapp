@@ -309,6 +309,25 @@ python manage.py list_failed_tasks --limit 5
 
 ---
 
+### `operational_health`
+
+Report worker, scheduler, queue, cache, job and failure health. See [Operational health](operational-health.md).
+
+| | |
+|---|---|
+| **Usage** | `python manage.py operational_health [--json] [--check]` |
+| **Production-safe** | Yes (read-only, bounded probes) |
+| **When to use** | Cron, systemd timers or monitoring that must notice a stopped worker, a stalled scheduler, an unreachable cache or a stuck queue. `/health/` covers database readiness only. |
+
+**Options**
+
+| Option | Default | Purpose |
+|---|---|---|
+| `--json` | off | Emit machine-readable JSON with stable keys. |
+| `--check` | off | Exit non-zero when any signal is degraded. |
+
+---
+
 ### `purge_deleted`
 
 Permanently hard-delete soft-deleted rows that are older than the specified retention period. This is the irreversible counterpart to the soft-delete mechanism.
