@@ -1,7 +1,7 @@
 {
   "schema_version": 3,
   "canonical_python": "3.12",
-  "policy_sha256": "009b2c50b977bc7c23e38f442947ed0a03fce3204977363386d6bf4393d598d1",
+  "policy_sha256": "bc173cbf1f3504e91c18831387b29df5ca4e2f82f1d40bdb9f7855f6b2cbb92b",
   "findings": [
     {
       "path": "itambox/assets/api/serializers.py",
@@ -721,22 +721,6 @@
       "message": "'organization.models.Membership' imported but unused",
       "source": "from organization.models import Membership, Role, Tenant",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_scanning.py",
-      "code": "F541",
-      "message": "f-string is missing placeholders",
-      "source": "        resp = self.client.get(self.url, {\"code\": f\"itambox:SCAN-001\"})",
-      "context": "Module:body/ClassDef:ScanResolveViewTests:body/FunctionDef:test_found_by_itambox_scheme:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/tests/test_scanning.py",
-      "code": "F541",
-      "message": "f-string is missing placeholders",
-      "source": "        url = f\"http://localhost:8000/assets/ITM-00001/\"",
-      "context": "Module:body/ClassDef:ResolveScannedCodeTests:body/FunctionDef:test_url_with_tag_segment:body",
       "count": 1
     },
     {
@@ -1917,26 +1901,10 @@
     },
     {
       "path": "itambox/core/filters.py",
-      "code": "B007",
-      "message": "Loop control variable 'field_name' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "        for field_name, filter_obj in self.filters.items():",
-      "context": "Module:body/ClassDef:BaseFilterSet:body/FunctionDef:__init__:body/For:Tuple(elts=[Name(id='field_name', ctx=Store()), Name(id='filter_obj', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='filters', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[]):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/filters.py",
       "code": "C901",
       "message": "'BaseFilterSet.__init__' is too complex (13)",
       "source": "    def __init__(self, *args, **kwargs):",
       "context": "Module:body/ClassDef:BaseFilterSet:body/FunctionDef:__init__:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/mixins.py",
-      "code": "B007",
-      "message": "Loop control variable 'filter_field' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "        for name, filter_field in self.filterset.filters.items():",
-      "context": "Module:body/ClassDef:FilterForm:body/FunctionDef:applied_filters:body/For:Tuple(elts=[Name(id='name', ctx=Store()), Name(id='filter_field', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='filterset', ctx=Load()), attr='filters', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[]):self",
       "count": 1
     },
     {
@@ -2157,14 +2125,6 @@
     },
     {
       "path": "itambox/core/management/commands/_seed/assets.py",
-      "code": "B007",
-      "message": "Loop control variable 'tenant' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "        for slug, tenant in self._tenants.items():",
-      "context": "Module:body/ClassDef:SeedAssetsMixin:body/FunctionDef:_seed_assets:body/For:Tuple(elts=[Name(id='slug', ctx=Store()), Name(id='tenant', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='_tenants', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[])#3:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/assets.py",
       "code": "C901",
       "message": "'SeedAssetsMixin._seed_assets' is too complex (60)",
       "source": "    def _seed_assets(self):",
@@ -2197,26 +2157,10 @@
     },
     {
       "path": "itambox/core/management/commands/_seed/compliance.py",
-      "code": "B007",
-      "message": "Loop control variable 'tenant' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "        for slug, tenant in self._tenants.items():",
-      "context": "Module:body/ClassDef:SeedComplianceMixin:body/FunctionDef:_seed_compliance:body/For:Tuple(elts=[Name(id='slug', ctx=Store()), Name(id='tenant', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='_tenants', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[])#2:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/compliance.py",
       "code": "C901",
       "message": "'SeedComplianceMixin._seed_compliance' is too complex (24)",
       "source": "    def _seed_compliance(self):",
       "context": "Module:body/ClassDef:SeedComplianceMixin:body/FunctionDef:_seed_compliance:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/compliance.py",
-      "code": "E741",
-      "message": "ambiguous variable name 'l'",
-      "source": "                    loc_candidates = [l for l in locs if any(a.location_id == l.pk for a in tenant_assets)]",
-      "context": "Module:body/ClassDef:SeedComplianceMixin:body/FunctionDef:_seed_compliance:body/For:Tuple(elts=[Name(id='slug', ctx=Store()), Name(id='tenant', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Attribute(value=Name(id='self', ctx=Load()), attr='_tenants', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[])#1:body/For:Tuple(elts=[Name(id='idx', ctx=Store()), Name(id='audit_date', ctx=Store())], ctx=Store()):Call(func=Name(id='enumerate', ctx=Load()), args=[Name(id='session_dates', ctx=Load())], keywords=[]):body/If:BoolOp(op=And(), values=[Name(id='locs', ctx=Load()), Compare(left=Call(func=Attribute(value=Name(id='random', ctx=Load()), attr='random', ctx=Load()), args=[], keywords=[]), ops=[Lt()], comparators=[Constant(value=0.4)])]):body",
       "count": 1
     },
     {
@@ -2257,22 +2201,6 @@
       "message": "'SeedLicensingMixin._seed_licensing' is too complex (11)",
       "source": "    def _seed_licensing(self):",
       "context": "Module:body/ClassDef:SeedLicensingMixin:body/FunctionDef:_seed_licensing:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/lifecycle.py",
-      "code": "B007",
-      "message": "Loop control variable 'i' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "            for i in range(n_res):",
-      "context": "Module:body/ClassDef:SeedLifecycleMixin:body/FunctionDef:_seed_lifecycle:body/For:Tuple(elts=[Name(id='slug', ctx=Store()), Name(id='tenant', ctx=Store())], ctx=Store()):Call(func=Attribute(value=BoolOp(op=Or(), values=[Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='self', ctx=Load()), Constant(value='_tenants'), Constant(value=None)], keywords=[]), Dict(keys=[], values=[])]), attr='items', ctx=Load()), args=[], keywords=[]):body/For:Name(id='i', ctx=Store()):Call(func=Name(id='range', ctx=Load()), args=[Name(id='n_res', ctx=Load())], keywords=[]):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/lifecycle.py",
-      "code": "B007",
-      "message": "Loop control variable 'tenant' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "        for slug, tenant in (getattr(self, \"_tenants\", None) or {}).items():",
-      "context": "Module:body/ClassDef:SeedLifecycleMixin:body/FunctionDef:_seed_lifecycle:body/For:Tuple(elts=[Name(id='slug', ctx=Store()), Name(id='tenant', ctx=Store())], ctx=Store()):Call(func=Attribute(value=BoolOp(op=Or(), values=[Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='self', ctx=Load()), Constant(value='_tenants'), Constant(value=None)], keywords=[]), Dict(keys=[], values=[])]), attr='items', ctx=Load()), args=[], keywords=[]):self",
       "count": 1
     },
     {
@@ -2493,14 +2421,6 @@
     },
     {
       "path": "itambox/core/management/commands/sync_tenant_ldap.py",
-      "code": "B007",
-      "message": "Loop control variable 'dn' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "                    for dn, entry in result_data:",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:_run_sync:body/Try#3:body/While:Constant(value=True):body/If:Compare(left=Name(id='result_type', ctx=Load()), ops=[Eq()], comparators=[Attribute(value=Name(id='ldap', ctx=Load()), attr='RES_SEARCH_ENTRY', ctx=Load())]):body/For:Tuple(elts=[Name(id='dn', ctx=Store()), Name(id='entry', ctx=Store())], ctx=Store()):Name(id='result_data', ctx=Load()):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/sync_tenant_ldap.py",
       "code": "B907",
       "message": "'tenant.slug' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "self.stdout.write(\n                self.style.SUCCESS(\n                    f\"LDAP sync complete for tenant '{tenant.slug}'. Created: {created_count}, Updated: {updated_count}\"\n                )\n            )",
@@ -2597,26 +2517,10 @@
     },
     {
       "path": "itambox/core/navigation/menu.py",
-      "code": "B010",
-      "message": "Do not call setattr with a constant attribute value, it is not any safer than normal property access.",
-      "source": "        setattr(user, \"_msp_layer_active_cache\", cached)",
-      "context": "Module:body/FunctionDef:_msp_layer_active:body/If:Compare(left=Name(id='cached', ctx=Load()), ops=[Is()], comparators=[Constant(value=None)]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/navigation/menu.py",
       "code": "C901",
       "message": "'get_menus' is too complex (16)",
       "source": "def get_menus():",
       "context": "Module:body/FunctionDef:get_menus:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/paginator.py",
-      "code": "B905",
-      "message": "`zip()` without an explicit `strict=` parameter.",
-      "source": "        skip_pages = [x[1] for x in zip(page_list[:-1], page_list[1:]) if (x[1] - x[0] != 1)]",
-      "context": "Module:body/ClassDef:EnhancedPage:body/FunctionDef:smart_pages:body",
       "count": 1
     },
     {
@@ -2740,22 +2644,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/schema.py",
-      "code": "B009",
-      "message": "Do not call getattr with a constant attribute value, it is not any safer than normal property access.",
-      "source": "                mutation_bases.append(getattr(schema_module, \"Mutation\"))",
-      "context": "Module:body/For:Name(id='plugin_name', ctx=Store()):Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='settings', ctx=Load()), Constant(value='PLUGINS'), List(elts=[], ctx=Load())], keywords=[]):body/Try:body/If:Name(id='graphql_schema_path', ctx=Load()):body/If:Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='schema_module', ctx=Load()), Constant(value='Mutation')], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/schema.py",
-      "code": "B009",
-      "message": "Do not call getattr with a constant attribute value, it is not any safer than normal property access.",
-      "source": "                query_bases.append(getattr(schema_module, \"Query\"))",
-      "context": "Module:body/For:Name(id='plugin_name', ctx=Store()):Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='settings', ctx=Load()), Constant(value='PLUGINS'), List(elts=[], ctx=Load())], keywords=[]):body/Try:body/If:Name(id='graphql_schema_path', ctx=Load()):body/If:Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='schema_module', ctx=Load()), Constant(value='Query')], keywords=[]):body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/search_backends.py",
       "code": "C901",
       "message": "'DatabaseBackend.search' is too complex (18)",
@@ -2857,14 +2745,6 @@
       "message": "'from .prod import *' used; unable to detect undefined names",
       "source": "    from .prod import *",
       "context": "Module:body/If:Compare(left=Name(id='ENV', ctx=Load()), ops=[Eq()], comparators=[Constant(value='prod')]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/settings/base.py",
-      "code": "B028",
-      "message": "No explicit stacklevel argument found. The warn method from the warnings module uses a stacklevel of 1 by default. This will only show a stack trace for the line on which the warn method is called. It is therefore recommended to use a stacklevel of 2 or greater to provide more information to the user.",
-      "source": "    warnings.warn(",
-      "context": "Module:body/If:UnaryOp(op=Not(), operand=Name(id='SECRET_KEY', ctx=Load())):body",
       "count": 1
     },
     {
@@ -3085,14 +2965,6 @@
     },
     {
       "path": "itambox/core/tables/columns.py",
-      "code": "B009",
-      "message": "Do not call getattr with a constant attribute value, it is not any safer than normal property access.",
-      "source": "                    assigned_to_ids_by_ct[ct_id].append((parent_id, getattr(a, \"assigned_to_object_id\")))",
-      "context": "Module:body/ClassDef:AssigneeColumn:body/FunctionDef:_build_cache:body/If:Compare(left=Name(id='fk_field', ctx=Load()), ops=[IsNot()], comparators=[Constant(value=None)]):body/If:BoolOp(op=And(), values=[Call(func=Name(id='hasattr', ctx=Load()), args=[Name(id='AssignmentModel', ctx=Load()), Constant(value='assigned_to_content_type')], keywords=[]), UnaryOp(op=Not(), operand=Name(id='select_rels', ctx=Load()))]):body/For:Name(id='a', ctx=Store()):Name(id='assignments', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/columns.py",
       "code": "B907",
       "message": "\"attrs['title']\" is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "button = (\n                    f'<a class=\"btn btn-sm {ghost_class}\" href=\"{url}\" type=\"button\" '\n                    f'title=\"{attrs[\"title\"]}\" aria-label=\"{attrs[\"title\"]}\">{icon}</a>'\n                )",
@@ -3204,14 +3076,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tables/object_change.py",
-      "code": "B007",
-      "message": "Loop control variable 'label' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "        for val, label, c in ObjectChangeActionChoices.CHOICES:",
-      "context": "Module:body/ClassDef:ObjectChangeTable:body/FunctionDef:render_action:body/For:Tuple(elts=[Name(id='val', ctx=Store()), Name(id='label', ctx=Store()), Name(id='c', ctx=Store())], ctx=Store()):Attribute(value=Name(id='ObjectChangeActionChoices', ctx=Load()), attr='CHOICES', ctx=Load()):self",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tasks/__init__.py",
       "code": "F401",
       "message": "'.csv_import.import_csv_task' imported but unused",
@@ -3245,14 +3109,6 @@
     },
     {
       "path": "itambox/core/templatetags/helpers.py",
-      "code": "B007",
-      "message": "Loop control variable 'label' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "    for value, label, color in ObjectChangeActionChoices.CHOICES:",
-      "context": "Module:body/FunctionDef:get_action_color:body/For:Tuple(elts=[Name(id='value', ctx=Store()), Name(id='label', ctx=Store()), Name(id='color', ctx=Store())], ctx=Store()):Attribute(value=Name(id='ObjectChangeActionChoices', ctx=Load()), attr='CHOICES', ctx=Load()):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/templatetags/helpers.py",
       "code": "F401",
       "message": "'django.contrib.contenttypes.models.ContentType' imported but unused",
       "source": "from django.contrib.contenttypes.models import ContentType",
@@ -3281,14 +3137,6 @@
       "message": "'urllib.parse.urlencode' imported but unused",
       "source": "from urllib.parse import urlencode",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_clone.py",
-      "code": "F541",
-      "message": "f-string is missing placeholders",
-      "source": "        self.assertIn(f\"/clone/\", html)",
-      "context": "Module:body/ClassDef:ActionsColumnCloneButtonTests:body/FunctionDef:test_clone_button_rendered_for_cloneable_model:body",
       "count": 1
     },
     {
@@ -3557,14 +3405,6 @@
     },
     {
       "path": "itambox/core/tests/test_security_finish.py",
-      "code": "B007",
-      "message": "Loop control variable 'model' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "        for model, data in results.items():",
-      "context": "Module:body/ClassDef:SearchTenantScopingTests:body/FunctionDef:test_search_does_not_leak_cross_tenant_data:body/For:Tuple(elts=[Name(id='model', ctx=Store()), Name(id='data', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Name(id='results', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[]):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_security_finish.py",
       "code": "F401",
       "message": "'django.contrib.contenttypes.models.ContentType' imported but unused",
       "source": "from django.contrib.contenttypes.models import ContentType",
@@ -3585,14 +3425,6 @@
       "message": "'organization.models.Membership' imported but unused",
       "source": "from organization.models import Membership, Role, Site, Tenant",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_tables.py",
-      "code": "B007",
-      "message": "Loop control variable 'row' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "        for row in table.data:",
-      "context": "Module:body/ClassDef:CoreTablesTestCase:body/FunctionDef:test_table_optimizations:body/For:Name(id='row', ctx=Store()):Attribute(value=Name(id='table', ctx=Load()), attr='data', ctx=Load()):self",
       "count": 1
     },
     {
@@ -3761,14 +3593,6 @@
       "message": "'extras.dashboard.widgets.get_registered_widgets' imported but unused",
       "source": "from extras.dashboard.widgets import get_registered_widgets, get_widget",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/dashboard/widgets.py",
-      "code": "B007",
-      "message": "Loop control variable 't_id' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "        for t_id, entry in tenants.items():",
-      "context": "Module:body/ClassDef:TenantSpendWidget:body/FunctionDef:get_context:body/For:Tuple(elts=[Name(id='t_id', ctx=Store()), Name(id='entry', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Name(id='tenants', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[]):self",
       "count": 1
     },
     {
@@ -5041,14 +4865,6 @@
       "message": "'rest_framework.permissions.DjangoObjectPermissions' imported but unused",
       "source": "from rest_framework.permissions import SAFE_METHODS, BasePermission, DjangoObjectPermissions",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/itambox/api/routers.py",
-      "code": "B007",
-      "message": "Loop control variable 'viewset' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "        for prefix, viewset, basename in sorted(self.registry, key=lambda x: x[0]):",
-      "context": "Module:body/ClassDef:ITAMBoxRouter:body/FunctionDef:get_api_root_view:body/For:Tuple(elts=[Name(id='prefix', ctx=Store()), Name(id='viewset', ctx=Store()), Name(id='basename', ctx=Store())], ctx=Store()):Call(func=Name(id='sorted', ctx=Load()), args=[Attribute(value=Name(id='self', ctx=Load()), attr='registry', ctx=Load())], keywords=[keyword(arg='key', value=Lambda(args=arguments(posonlyargs=[], args=[arg(arg='x')], kwonlyargs=[], kw_defaults=[], defaults=[]), body=Subscript(value=Name(id='x', ctx=Load()), slice=Constant(value=0), ctx=Load())))]):self",
       "count": 1
     },
     {
@@ -6836,14 +6652,6 @@
       "count": 1
     },
     {
-      "path": "itambox/organization/views/role_views.py",
-      "code": "B007",
-      "message": "Loop control variable 'key' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "        for key, info in MATRIX_MODELS.items():",
-      "context": "Module:body/ClassDef:RoleDetailView:body/FunctionDef:get_context_data:body/For:Tuple(elts=[Name(id='key', ctx=Store()), Name(id='info', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Name(id='MATRIX_MODELS', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[]):self",
-      "count": 1
-    },
-    {
       "path": "itambox/organization/views/site_views.py",
       "code": "F401",
       "message": "'django.shortcuts.get_object_or_404' imported but unused",
@@ -6937,46 +6745,6 @@
       "message": "'itambox.views.generic.ObjectBulkEditView' imported but unused",
       "source": "from itambox.views.generic import (",
       "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/forms.py",
-      "code": "B007",
-      "message": "Loop control variable 'cat' not used within the loop body. If this is intended, start the name with an underscore.",
-      "source": "        for cat, field_name in fields_map.items():",
-      "context": "Module:body/ClassDef:PurchaseOrderLineForm:body/FunctionDef:clean:body/For:Tuple(elts=[Name(id='cat', ctx=Store()), Name(id='field_name', ctx=Store())], ctx=Store()):Call(func=Attribute(value=Name(id='fields_map', ctx=Load()), attr='items', ctx=Load()), args=[], keywords=[]):self",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/views.py",
-      "code": "B905",
-      "message": "`zip()` without an explicit `strict=` parameter.",
-      "source": "                    context[\"lines_info\"] = list(zip(lines_info, step2_formset))",
-      "context": "Module:body/ClassDef:PurchaseOrderReceiveFormView:body/FunctionDef:post:body/If:Compare(left=Name(id='step', ctx=Load()), ops=[Eq()], comparators=[Constant(value='2')]):orelse/If:Call(func=Attribute(value=Name(id='formset', ctx=Load()), attr='is_valid', ctx=Load()), args=[], keywords=[]):body/If:Name(id='has_assets', ctx=Load()):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/views.py",
-      "code": "B905",
-      "message": "`zip()` without an explicit `strict=` parameter.",
-      "source": "                context[\"lines_and_forms\"] = list(zip(outstanding_lines, formset))",
-      "context": "Module:body/ClassDef:PurchaseOrderReceiveFormView:body/FunctionDef:post:body/If:Compare(left=Name(id='step', ctx=Load()), ops=[Eq()], comparators=[Constant(value='2')]):orelse/If:Call(func=Attribute(value=Name(id='formset', ctx=Load()), attr='is_valid', ctx=Load()), args=[], keywords=[]):orelse",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/views.py",
-      "code": "B905",
-      "message": "`zip()` without an explicit `strict=` parameter.",
-      "source": "                context[\"lines_info\"] = list(zip(lines_info, formset))",
-      "context": "Module:body/ClassDef:PurchaseOrderReceiveFormView:body/FunctionDef:post:body/If:Compare(left=Name(id='step', ctx=Load()), ops=[Eq()], comparators=[Constant(value='2')]):body/If:Call(func=Attribute(value=Name(id='formset', ctx=Load()), attr='is_valid', ctx=Load()), args=[], keywords=[]):orelse",
-      "count": 1
-    },
-    {
-      "path": "itambox/procurement/views.py",
-      "code": "B905",
-      "message": "`zip()` without an explicit `strict=` parameter.",
-      "source": "        context[\"lines_and_forms\"] = list(zip(outstanding_lines, formset))",
-      "context": "Module:body/ClassDef:PurchaseOrderReceiveFormView:body/FunctionDef:get_context_data:body",
       "count": 1
     },
     {

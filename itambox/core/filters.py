@@ -20,7 +20,7 @@ class BaseFilterSet(django_filters.FilterSet):
         if not current_tenant:
             return
 
-        for field_name, filter_obj in self.filters.items():
+        for _field_name, filter_obj in self.filters.items():
             if isinstance(filter_obj, (django_filters.ModelChoiceFilter, django_filters.ModelMultipleChoiceFilter)):
                 queryset = filter_obj.extra.get("queryset")
                 # A callable queryset (a request-time resolver, e.g. a user picker) has

@@ -85,7 +85,7 @@ class ActionsColumnCloneButtonTests(TestCase):
 
         self.assertIn("mdi-content-copy", html)
         self.assertIn("btn-action", html)
-        self.assertIn(f"/clone/", html)
+        self.assertIn("/clone/", html)
 
     def test_clone_button_omitted_for_non_cloneable_model(self):
         from core.tables.columns import ActionsColumn

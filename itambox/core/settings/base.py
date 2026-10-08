@@ -67,6 +67,7 @@ if not SECRET_KEY:
         "ITAMBOX_SECRET_KEY environment variable is not set. Using insecure default key. "
         "Do NOT use this configuration in production!",
         UserWarning,
+        stacklevel=2,
     )
 
 INSTALLED_APPS = [
