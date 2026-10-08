@@ -5,6 +5,7 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, AssetDisposal
+from core.managers import Scope
 
 from .fields import selectable_repair_maintenances
 
@@ -62,7 +63,7 @@ class AssetDisposalForm(forms.ModelForm):
         # the tenant-scoping manager restricts choices to the active tenant. The
         # disposal views additionally re-fetch the asset through Asset.objects
         # before disposing as defence-in-depth.
-        self.fields["asset"].queryset = Asset.objects.all()
+        self.fields["asset"].queryset = Asset.objects.for_scope(Scope.current()).all()
 
         # A linked (soft-deleted) repair maintenance stays selectable, so amending
         # the record never silently drops the link to the repair it closes out.

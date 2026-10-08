@@ -8,6 +8,7 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.models import Category, Manufacturer, Supplier
 from core.forms import FilterForm, SlugModelForm, scope_tenant_field
+from core.managers import Scope
 from extras.customfields import CustomFieldModelFormMixin
 from extras.models import Tag
 from organization.models import Location
@@ -72,7 +73,7 @@ class AccessoryForm(CustomFieldModelFormMixin, SlugModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         scope_tenant_field(self)
-        self.fields["supplier"].queryset = Supplier.objects.filter(is_active=True)
+        self.fields["supplier"].queryset = Supplier.objects.for_scope(Scope.current()).filter(is_active=True)
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
         self.helper.form_tag = True

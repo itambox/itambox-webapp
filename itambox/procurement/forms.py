@@ -5,7 +5,8 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Supplier
-from core.forms import FilterForm, scope_tenant_field
+from core.forms import FilterForm, TenantScopedFormMixin
+from core.managers import Scope
 
 from .filters import ContractFilterSet, PurchaseOrderFilterSet
 from .models import Contract, PurchaseOrder, PurchaseOrderLine
@@ -29,7 +30,10 @@ class ContractFilterForm(FilterForm):
     filterset_class = ContractFilterSet
 
 
-class PurchaseOrderForm(forms.ModelForm):
+class PurchaseOrderForm(TenantScopedFormMixin, forms.ModelForm):
+    tenant_required = True
+    tenant_autoset_when_single = True
+
     class Meta:
         model = PurchaseOrder
         fields = [
@@ -53,8 +57,7 @@ class PurchaseOrderForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["supplier"].queryset = Supplier.objects.filter(is_active=True)
-        scope_tenant_field(self)
+        self.fields["supplier"].queryset = Supplier.objects.for_scope(Scope.current()).filter(is_active=True)
         self.helper = FormHelper()
         self.helper.layout = Layout(
             Row(
@@ -81,7 +84,7 @@ class PurchaseOrderForm(forms.ModelForm):
         )
 
 
-class PurchaseOrderLineForm(forms.ModelForm):
+class PurchaseOrderLineForm(TenantScopedFormMixin, forms.ModelForm):
     item_category = forms.ChoiceField(
         choices=[
             ("", "---------"),
@@ -196,7 +199,10 @@ class PurchaseOrderLineForm(forms.ModelForm):
         return cleaned_data
 
 
-class ContractForm(forms.ModelForm):
+class ContractForm(TenantScopedFormMixin, forms.ModelForm):
+    tenant_required = True
+    tenant_autoset_when_single = True
+
     class Meta:
         model = Contract
         fields = [
@@ -242,8 +248,7 @@ class ContractForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["supplier"].queryset = Supplier.objects.filter(is_active=True)
-        scope_tenant_field(self)
+        self.fields["supplier"].queryset = Supplier.objects.for_scope(Scope.current()).filter(is_active=True)
         self.fields["cost_center"].label_from_instance = lambda cost_center: (
             f"{cost_center.code}: {cost_center.name}" if cost_center.code else cost_center.name
         )
@@ -374,7 +379,7 @@ class BaseAssetProvisionFormSet(forms.BaseFormSet):
                     form.add_error("asset_tag", _("Duplicate asset tag in this batch."))
                 tags.add(tag)
                 # Check DB for duplicate tag
-                if Asset.objects.filter(asset_tag=tag).exists():
+                if Asset.objects.for_scope(Scope.current()).filter(asset_tag=tag).exists():
                     form.add_error("asset_tag", _("An asset with tag '%(tag)s' already exists.") % {"tag": tag})
 
             if serial:
@@ -383,7 +388,7 @@ class BaseAssetProvisionFormSet(forms.BaseFormSet):
                     form.add_error("serial_number", _("Duplicate serial number in this batch."))
                 serials.add(serial)
                 # Check DB for duplicate serial
-                if Asset.objects.filter(serial_number=serial).exists():
+                if Asset.objects.for_scope(Scope.current()).filter(serial_number=serial).exists():
                     form.add_error(
                         "serial_number",
                         _("An asset with serial number '%(serial)s' already exists.") % {"serial": serial},

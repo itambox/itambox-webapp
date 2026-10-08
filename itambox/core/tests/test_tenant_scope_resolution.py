@@ -27,6 +27,7 @@ from django.utils import timezone, translation
 
 import organization.rbac as rbac
 from core.managers import (
+    Scope,
     get_current_all_accessible,
     get_current_membership,
     get_current_tenant,
@@ -112,7 +113,7 @@ class GroupScopeResolutionPerfTests(TestCase):
             wraps=rbac.resolve_accessible_tenant_ids_with_expiry,
         ) as spy:
             for _ in range(8):
-                list(Asset.objects.all())
+                list(Asset.objects.for_scope(Scope.current()))
         self.assertEqual(
             spy.call_count,
             1,
@@ -323,7 +324,7 @@ class AllAccessibleScopeTests(TestCase):
         set_current_tenant(None)
         set_current_tenant_group(None)
         set_current_all_accessible(True)
-        visible = set(Asset.objects.values_list("pk", flat=True))
+        visible = set(Asset.objects.for_scope(Scope.current()).values_list("pk", flat=True))
         self.assertEqual(visible, {asset_a.pk, asset_b.pk})
         self.assertNotIn(asset_d.pk, visible)
 

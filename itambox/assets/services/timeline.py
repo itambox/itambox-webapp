@@ -24,6 +24,7 @@ from django.utils.translation import gettext as _
 
 from assets.models import AssetAssignment, AssetMaintenance, AssetReservation, StatusLabel
 from assets.models.lifecycle import AssetDisposal
+from core.managers import Scope
 from core.models import ObjectChange
 
 # Which lifecycle action kinds exist, their icon/colour for the template, and the
@@ -154,7 +155,7 @@ def _sorted_events(events: list[TimelineEvent]) -> list[TimelineEvent]:
 
 def _collect_asset_events(asset) -> list[TimelineEvent]:
     events: list[TimelineEvent] = []
-    for maintenance in AssetMaintenance.objects.filter(asset=asset).select_related("asset"):
+    for maintenance in AssetMaintenance.objects.for_scope(Scope.current()).filter(asset=asset).select_related("asset"):
         events.append(_maintenance_event(maintenance))
     for warranty in asset.warranties.all():
         events.append(_warranty_event(warranty))
@@ -174,8 +175,10 @@ def _collect_linked_events(maintenances: list[AssetMaintenance], asset) -> list[
     events: list[TimelineEvent] = []
     for maintenance in maintenances:
         events.append(_maintenance_event(maintenance, page_asset=asset))
-    linked_assignments = AssetAssignment.objects.filter(maintenance__in=maintenances).select_related(
-        "asset", "assigned_user", "assigned_location", "assigned_asset"
+    linked_assignments = (
+        AssetAssignment.objects.for_scope(Scope.current())
+        .filter(maintenance__in=maintenances)
+        .select_related("asset", "assigned_user", "assigned_location", "assigned_asset")
     )
     for assignment in linked_assignments:
         events.append(_assignment_event(assignment, page_asset=asset))
@@ -188,7 +191,11 @@ def _collect_linked_events(maintenances: list[AssetMaintenance], asset) -> list[
 
 def _substitute_assets(maintenance: AssetMaintenance) -> list:
     """The units that stood in for the repaired asset (the repair's loans)."""
-    loans = AssetAssignment.objects.filter(maintenance=maintenance, is_loan=True).select_related("asset")
+    loans = (
+        AssetAssignment.objects.for_scope(Scope.current())
+        .filter(maintenance=maintenance, is_loan=True)
+        .select_related("asset")
+    )
     return [assignment.asset for assignment in loans]
 
 
@@ -351,7 +358,8 @@ def _maintenances_for_asset(asset) -> list[AssetMaintenance]:
     chronological list.
     """
     return list(
-        AssetMaintenance.objects.filter(Q(asset=asset) | Q(assignments__asset=asset))
+        AssetMaintenance.objects.for_scope(Scope.current())
+        .filter(Q(asset=asset) | Q(assignments__asset=asset))
         .filter(maintenance_type=AssetMaintenance.MAINTENANCE_TYPE_REPAIR)
         .distinct()
         .select_related("asset")

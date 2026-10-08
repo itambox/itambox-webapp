@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from assets.choices import RequestStatusChoices
-from core.managers import TenantScopingAllObjectsManager, TenantScopingSoftDeleteManager
+from core.managers import ExplicitScopeAllObjectsManager, ExplicitScopeSoftDeleteManager, Scope
 from core.mixins import JournalingMixin, SoftDeleteMixin, TaggableMixin
 from core.models import BaseModel, ChangeLoggingMixin
 
@@ -26,9 +26,9 @@ def reject_disposed_request(asset) -> None:
 
 
 class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
-    objects = TenantScopingSoftDeleteManager()
+    objects = ExplicitScopeSoftDeleteManager()
 
-    all_objects = TenantScopingAllObjectsManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     tenant = models.ForeignKey(
         "organization.Tenant",
@@ -287,7 +287,7 @@ class AssetRequest(JournalingMixin, TaggableMixin, ChangeLoggingMixin, BaseModel
             # Check for duplicate pending, approved or procurement requests by the same requester
 
             if self.requester_id and not getattr(self, "_skip_duplicate_check", False):
-                duplicate_qs = AssetRequest.objects.filter(
+                duplicate_qs = AssetRequest.objects.for_scope(Scope.current()).filter(
                     requester_id=self.requester_id,
                     status__in=[
                         RequestStatusChoices.PENDING,

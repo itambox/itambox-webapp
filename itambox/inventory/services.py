@@ -10,7 +10,7 @@ from django.utils.translation import gettext_lazy as _
 from assets.choices import StatusTypeChoices
 from assets.models import Asset, AssetAssignment
 from core.context import get_current_user
-from core.managers import get_current_tenant
+from core.managers import Scope, get_current_tenant
 from licenses.models import License
 from organization.access import authorize_tenant_operation, resolve_stock_access, resolved_shared_stock_ids
 from organization.models import Location, Tenant, TenantResourceGrant
@@ -608,14 +608,16 @@ def _asset_pools(items, tenant):
     type_ids = _item_ids(items, "asset_type_id")
     if not type_ids:
         return {}
-    assigned_ids = AssetAssignment.objects.filter(is_active=True).values("asset_id")
+    assigned_ids = AssetAssignment.objects.for_scope(Scope.current()).filter(is_active=True).values("asset_id")
     rows = (
         # Reuse the canonical helper. A raw
         # ``.exclude(disposals__cancelled_at__isnull=True)`` renders as a LEFT OUTER JOIN
         # inside a NOT EXISTS subquery and would drop every device that has no disposal
         # record at all (the joined NULL row satisfies ``cancelled_at IS NULL``).
         Asset.exclude_disposed(
-            Asset.objects.filter(tenant=tenant, asset_type_id__in=type_ids, status__type=StatusTypeChoices.DEPLOYABLE)
+            Asset.objects.for_scope(Scope.current()).filter(
+                tenant=tenant, asset_type_id__in=type_ids, status__type=StatusTypeChoices.DEPLOYABLE
+            )
         )
         .exclude(pk__in=assigned_ids)
         .values("asset_type_id")

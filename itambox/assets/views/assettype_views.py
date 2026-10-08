@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
 
 from assets.customfields import resolve_asset_type_custom_fields
+from core.managers import Scope
 from itambox.panels import Panel
 from itambox.quick_add import QuickAddMixin
 from itambox.utils import get_paginate_count
@@ -70,7 +71,11 @@ class AssetTypeDetailView(ObjectDetailView):
         # Requests
         from ..models import AssetRequest
 
-        req_qs = AssetRequest.objects.filter(asset_type=assettype).select_related("requester", "asset", "asset_type")
+        req_qs = (
+            AssetRequest.objects.for_scope(Scope.current())
+            .filter(asset_type=assettype)
+            .select_related("requester", "asset", "asset_type")
+        )
         requests_table = tables.AssetRequestTable(req_qs, request=self.request)
         RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(requests_table)
         context["requests_table"] = requests_table

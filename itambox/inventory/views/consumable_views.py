@@ -3,7 +3,7 @@ from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
-from core.managers import get_current_tenant
+from core.managers import Scope, get_current_tenant
 from inventory.services import (
     checkout_inventory_item,
     recipient_assignment_union,
@@ -51,7 +51,7 @@ class ConsumableListView(ObjectListView):
 
             context["asset_holders"] = AssetHolder.objects.all().order_by("last_name", "first_name")
             context["locations"] = Location.objects.all().order_by("name")
-            context["assets"] = Asset.objects.all().order_by("asset_tag")
+            context["assets"] = Asset.objects.for_scope(Scope.current()).all().order_by("asset_tag")
         return context
 
 
@@ -203,7 +203,7 @@ class ConsumableStockListView(ObjectListView):
 
             context["asset_holders"] = AssetHolder.objects.all().order_by("last_name", "first_name")
             context["locations"] = Location.objects.all().order_by("name")
-            context["assets"] = Asset.objects.all().order_by("asset_tag")
+            context["assets"] = Asset.objects.for_scope(Scope.current()).all().order_by("asset_tag")
         return context
 
 

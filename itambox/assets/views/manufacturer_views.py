@@ -5,6 +5,7 @@ from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
 
+from core.managers import Scope
 from itambox.panels import Panel
 from itambox.utils import get_paginate_count
 from itambox.views.generic import (
@@ -45,8 +46,10 @@ class ManufacturerDetailView(ObjectDetailView):
             asset_types_table
         )
 
-        manufacturer_assets = Asset.objects.filter(asset_type__manufacturer=manufacturer).select_related(
-            "asset_role", "asset_type", "location"
+        manufacturer_assets = (
+            Asset.objects.for_scope(Scope.current())
+            .filter(asset_type__manufacturer=manufacturer)
+            .select_related("asset_role", "asset_type", "location")
         )
         assets_table = tables.AssetTable(manufacturer_assets, request=self.request)
         RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(assets_table)

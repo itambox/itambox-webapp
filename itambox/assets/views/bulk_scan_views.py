@@ -27,6 +27,7 @@ from django.utils.translation import ngettext
 from django.views import View
 from django.views.generic import TemplateView
 
+from core.managers import Scope
 from core.models import Job
 from core.tenant_scope import accessible_tenant_ids
 from itambox.views.generic.utils import safe_return_url
@@ -168,7 +169,7 @@ class _BaseBulkScanView(LoginRequiredMixin, PermissionRequiredMixin, TemplateVie
         pks = [p for p in self.request.GET.getlist("pk") if p.isdigit()]
         if not pks:
             return []
-        assets = Asset.objects.filter(pk__in=pks).select_related("status", "location")
+        assets = Asset.objects.for_scope(Scope.current()).filter(pk__in=pks).select_related("status", "location")
         return [asset_action_payload(a, self.mode) for a in assets]
 
     def get_context_data(self, **kwargs):

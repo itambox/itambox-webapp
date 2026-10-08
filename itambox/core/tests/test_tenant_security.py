@@ -6,7 +6,7 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
-from core.managers import set_current_membership, set_current_tenant
+from core.managers import Scope, set_current_membership, set_current_tenant
 from core.tests.mixins import grant
 from organization.models import (
     Location,
@@ -206,7 +206,7 @@ class RecycleBinTenantScopingTestCase(TestCase):
 
         set_current_tenant(self.tenant_a)
         try:
-            visible = set(Asset.all_objects.values_list("pk", flat=True))
+            visible = set(Asset.all_objects.for_scope(Scope.current()).values_list("pk", flat=True))
             self.assertIn(self.asset_a.pk, visible)
             self.assertNotIn(
                 self.asset_b.pk,
@@ -476,7 +476,7 @@ class CrossTenantAttackTestCase(TestCase):
         set_current_tenant(self.tenant_b)
         set_current_membership(self.membership_b)
         try:
-            pks = list(Asset.objects.values_list("pk", flat=True))
+            pks = list(Asset.objects.for_scope(Scope.current()).values_list("pk", flat=True))
             self.assertNotIn(
                 self.asset_a.pk, pks, "TenantScopingSoftDeleteManager leaked Tenant A's asset into Tenant B context"
             )

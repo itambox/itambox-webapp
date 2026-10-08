@@ -6,14 +6,14 @@ from django.db import models
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
-from core.managers import TenantScopingAllObjectsManager, TenantScopingSoftDeleteManager
+from core.managers import ExplicitScopeAllObjectsManager, ExplicitScopeSoftDeleteManager
 from core.mixins import SoftDeleteMixin
 from core.models import BaseModel, ChangeLoggingMixin
 
 
 class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
     allow_global_tenant = True
 
     tenant = models.ForeignKey(

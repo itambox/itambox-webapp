@@ -19,7 +19,7 @@ from django.utils.translation import ngettext
 from assets.choices import StatusTypeChoices
 from assets.model_book_value import compute_book_value
 from core.currency import CurrencyField
-from core.managers import TenantScopingAllObjectsManager, TenantScopingSoftDeleteManager
+from core.managers import ExplicitScopeAllObjectsManager, ExplicitScopeSoftDeleteManager
 from core.mixins import BookmarkableMixin, CustomFieldDataMixin, SubscribableMixin
 from core.models import DeletableVaultModel
 
@@ -58,8 +58,8 @@ class AssetStateMachine:
 
 
 class Asset(CustomFieldDataMixin, BookmarkableMixin, SubscribableMixin, DeletableVaultModel):
-    objects = TenantScopingSoftDeleteManager()
-    all_objects = TenantScopingAllObjectsManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     # Changing the Asset Type changes the effective fieldsets, field
     # definitions, required fields, and Choice Set validity, so a field-limited

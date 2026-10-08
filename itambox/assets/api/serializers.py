@@ -45,6 +45,7 @@ from assets.services.specifications.contracts import (
     ResourceRevision,
     SpecificationPatchDTO,
 )
+from core.managers import Scope
 from core.mixins import suppress_custom_field_data_validation
 from extras.api.serializers import TagSerializer
 from itambox.api.base import BaseModelSerializer, reject_unknown_or_writableless
@@ -920,7 +921,7 @@ class AssetCheckOutAPISerializer(serializers.Serializer[object]):
                 raise serializers.ValidationError({"location_id": _("Specified location does not exist.")}) from None
         elif asset_target_id:
             try:
-                data["asset_target"] = Asset.objects.get(pk=asset_target_id)
+                data["asset_target"] = Asset.objects.for_scope(Scope.current()).get(pk=asset_target_id)
             except Asset.DoesNotExist:
                 raise serializers.ValidationError(
                     {"asset_target_id": _("Specified target asset does not exist.")}

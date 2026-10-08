@@ -4,6 +4,7 @@ from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django_tables2 import RequestConfig
 
+from core.managers import Scope
 from itambox.panels import Panel
 from itambox.utils import get_paginate_count
 from itambox.views.generic import (
@@ -57,7 +58,11 @@ class SupplierDetailView(ObjectDetailView):
         context = super().get_context_data(**kwargs)
         supplier = self.get_object()
 
-        supplier_assets = Asset.objects.filter(supplier=supplier).select_related("asset_role", "asset_type", "location")
+        supplier_assets = (
+            Asset.objects.for_scope(Scope.current())
+            .filter(supplier=supplier)
+            .select_related("asset_role", "asset_type", "location")
+        )
         assets_table = tables.AssetTable(supplier_assets, request=self.request)
         RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(assets_table)
         context["assets_table"] = assets_table
@@ -81,7 +86,11 @@ class SupplierDetailView(ObjectDetailView):
         from assets.models import AssetMaintenance
         from assets.tables import AssetMaintenanceTable
 
-        maintenance_qs = AssetMaintenance.objects.filter(supplier=supplier).select_related("asset", "supplier")
+        maintenance_qs = (
+            AssetMaintenance.objects.for_scope(Scope.current())
+            .filter(supplier=supplier)
+            .select_related("asset", "supplier")
+        )
         maintenances_table = AssetMaintenanceTable(maintenance_qs, request=self.request)
         RequestConfig(self.request, paginate={"per_page": get_paginate_count(self.request)}).configure(
             maintenances_table

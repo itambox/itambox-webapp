@@ -119,7 +119,7 @@ class SubscriptionSerializer(BaseModelSerializer):
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
-        self.fields["supplier_id"].queryset = Supplier.objects.filter(is_active=True)
+        self.fields["supplier_id"].queryset = Supplier.objects.for_scope(Scope.current()).filter(is_active=True)
         self.fields["linked_contract_id"].queryset = Contract.objects.for_scope(Scope.current())
         if "owner_id" in self.fields:
             self.fields["owner_id"].queryset = _tenant_member_user_queryset()

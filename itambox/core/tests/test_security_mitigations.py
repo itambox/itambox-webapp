@@ -11,7 +11,7 @@ from django.test import TestCase
 from model_bakery import baker
 
 from core.http import request_pinned
-from core.managers import set_current_tenant
+from core.managers import Scope, set_current_tenant
 from core.models import ObjectChange
 from core.validators import validate_external_url
 from organization.models import Tenant
@@ -195,11 +195,11 @@ class AssignmentTenantScopingTests(TestCase):
         asgn_b = baker.make(AssetAssignment, asset=asset_b, is_active=False)
 
         set_current_tenant(self.ta)
-        pks = set(AssetAssignment.objects.values_list("pk", flat=True))
+        pks = set(AssetAssignment.objects.for_scope(Scope.current()).values_list("pk", flat=True))
         self.assertIn(asgn_a.pk, pks)
         self.assertNotIn(asgn_b.pk, pks, "Tenant A must not list Tenant B's assignments")
         with self.assertRaises(AssetAssignment.DoesNotExist):
-            AssetAssignment.objects.get(pk=asgn_b.pk)
+            AssetAssignment.objects.for_scope(Scope.current()).get(pk=asgn_b.pk)
 
     def test_assignment_tenant_property_resolves_parent(self):
         from assets.models import Asset, AssetAssignment

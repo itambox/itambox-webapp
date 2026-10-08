@@ -14,6 +14,7 @@ from assets.services import (
     issue_repair_loaner,
 )
 from core.forms import FilterForm, scope_tenant_field, scope_tenant_group_field
+from core.managers import Scope
 
 
 class AssetMaintenanceFilterForm(FilterForm):
@@ -106,7 +107,7 @@ class AssetMaintenanceForm(forms.ModelForm):
         # Rescope the tenant-owned `asset` FK per request — its queryset is frozen
         # unscoped at import, so a maintenance record could otherwise reference (and
         # expose in the dropdown) another tenant's asset.
-        self.fields["asset"].queryset = Asset.objects.all()
+        self.fields["asset"].queryset = Asset.objects.for_scope(Scope.current()).all()
         self.fields["loaner_asset"].queryset = self._selectable_loaners()
         self.fields["disposal_method"].choices = [
             ("", _("Unset")),

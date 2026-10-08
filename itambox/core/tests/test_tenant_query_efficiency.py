@@ -8,7 +8,7 @@ from django.urls import reverse
 from model_bakery import baker
 
 from assets.models import Asset, AssetRole, AssetType, Category, Depreciation, Manufacturer, StatusLabel, Supplier
-from core.managers import _descendant_group_ids_cache, set_current_tenant_group
+from core.managers import Scope, _descendant_group_ids_cache, set_current_tenant_group
 from core.tests.mixins import grant
 from licenses.models import License
 from organization.models import Location, Role, Site, Tenant, TenantGroup
@@ -98,7 +98,7 @@ class MitigationsPhase3Tests(TestCase):
         self.assertIsNone(_descendant_group_ids_cache.get())
 
         # Trigger filter execution (runs DB query once for descendant list)
-        list(Asset.objects.all())
+        list(Asset.objects.for_scope(Scope.current()))
 
         # Cache must contain group details now
         cache = _descendant_group_ids_cache.get()
@@ -108,8 +108,8 @@ class MitigationsPhase3Tests(TestCase):
 
         # Subsequent evaluations should execute 0 tenantgroup queries
         with self.assertNumQueries(2):  # exactly 2 queries: 1 to assets, 1 to assets (again)
-            list(Asset.objects.all())
-            list(Asset.objects.all())
+            list(Asset.objects.for_scope(Scope.current()))
+            list(Asset.objects.for_scope(Scope.current()))
 
     def test_graphql_assets_select_related(self):
         # Request all relation fields: asset_type, asset_role, status, location, tenant, supplier

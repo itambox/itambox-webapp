@@ -21,6 +21,7 @@ from django.core.exceptions import FieldError
 from django.db.models import Q
 
 from assets.models import Asset, AssetType
+from core.managers import Scope
 from core.tenant_scope import accessible_tenant_ids
 from itambox.scanning import strip_itambox_prefix
 
@@ -40,7 +41,7 @@ def _accessible_model_queryset(model, user, tenant=None):
     if tenant is not None:
         qs = model._base_manager.filter(tenant_id=tenant.pk)
     elif user is None:
-        return model.objects
+        return model.objects.for_scope(Scope.current())
     elif user.is_superuser:
         qs = model._base_manager.all()
     else:
