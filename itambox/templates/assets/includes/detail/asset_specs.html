@@ -45,10 +45,10 @@
     <div class="row g-3">
       {% for allocation in object.component_allocations.all %}
         <div class="col-md-6 col-lg-4">
-          <div class="d-flex align-items-center p-2 rounded-2 bg-light border border-dashed border-teal-subtle">
+          <div class="d-flex align-items-center p-2 rounded-2 bg-surface-secondary border border-dashed border-teal-subtle">
             <span class="avatar avatar-sm bg-teal-lt text-teal rounded me-3 shadow-sm"><i class="mdi mdi-chip"></i></span>
             <div class="flex-fill min-width-0">
-              <div class="font-weight-medium text-truncate text-dark small"
+              <div class="font-weight-medium text-truncate text-body small"
                    title="{{ allocation.component }}">
                 {{ allocation.component.manufacturer.name }} {{ allocation.component.name }}
               </div>

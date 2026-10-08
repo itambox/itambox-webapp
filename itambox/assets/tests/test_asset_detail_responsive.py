@@ -3,12 +3,15 @@
 Regression coverage for removing the assignment-status and software-inventory
 stat banners while preserving the underlying asset data and tab navigation.
 
-Every assertion runs against the real view + template render path.
+The detail-view regressions use the real view + template path; the theme
+contract renders the affected include directly.
 """
 
 from html.parser import HTMLParser
+from types import SimpleNamespace
 
-from django.test import TestCase
+from django.template.loader import render_to_string
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
 from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
@@ -86,6 +89,11 @@ def _asset_fixtures(tenant, suffix=""):
         status=status,
         tenant=tenant,
     )
+
+
+class _RelatedAllocations(list):
+    def all(self):
+        return self
 
 
 class AssetScanMarkupTests(TenantTestMixin, TestCase):
@@ -192,6 +200,25 @@ class AssetDetailBannerRemovalTests(TenantTestMixin, TestCase):
         self.assertIn('aria-label="Edit"', body)
         self.assertIn('title="Edit"', body)
         self.assertIn("detail-edit-action__label", body)
+
+
+class AssetHardwareModificationsThemeRenderTests(SimpleTestCase):
+    def test_card_uses_theme_aware_colors(self):
+        component = SimpleNamespace(manufacturer=SimpleNamespace(name="Dell"), name="16GB DDR5 Module")
+        allocation = SimpleNamespace(component=component, qty=1)
+        asset = SimpleNamespace(component_allocations=_RelatedAllocations([allocation]))
+
+        html = render_to_string(
+            "assets/includes/detail/asset_specs.html",
+            {"object": asset, "asset_type_specification_fields": []},
+        )
+
+        self.assertIn("Active Hardware Modifications &amp; Upgrades", html)
+        self.assertIn("Dell 16GB DDR5 Module", html)
+        self.assertIn("rounded-2 bg-surface-secondary border border-dashed border-teal-subtle", html)
+        self.assertIn("text-truncate text-body small", html)
+        self.assertNotIn("bg-light", html)
+        self.assertNotIn("text-dark", html)
 
 
 class AssetListMobileSelectionTests(TenantTestMixin, TestCase):

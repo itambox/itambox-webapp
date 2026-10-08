@@ -30,7 +30,7 @@
     {% elif object.status == 'cancelled' %}
       <span class="badge bg-secondary text-secondary-fg">{% translate "Cancelled" %}</span>
     {% else %}
-      <span class="badge bg-light text-dark">{{ object.get_status_display }}</span>
+      <span class="badge bg-surface-secondary text-body">{{ object.get_status_display }}</span>
     {% endif %}
   </dd>
   <dt class="col-sm-4">{% translate "Request Date:" %}</dt>
