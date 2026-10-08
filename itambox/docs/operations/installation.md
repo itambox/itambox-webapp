@@ -242,6 +242,11 @@ Set to `0` to keep records forever. See [data-retention.md](data-retention.md) f
 | `ITAMBOX_NOTIFICATION_RETENTION_DAYS` | Optional | `90` | Days to retain notification history. |
 | `ITAMBOX_EVENT_RETENTION_DAYS` | Optional | `0` (retain indefinitely) | Days to retain event-stream rows (`extras.Event`). The event stream is **not** pruned by default; pruning starts only when a positive value is configured. |
 | `ITAMBOX_QTASK_FAILED_RETENTION_DAYS` | Optional | `90` | Days to retain failed background task records. |
+| `ITAMBOX_HEALTH_SCHEDULE_GRACE_SECONDS` | Optional | `900` | Seconds a registered schedule may be overdue before `operational_health` flags it. See [Operational health](operational-health.md). |
+| `ITAMBOX_HEALTH_QUEUE_BACKLOG_MAX` | Optional | `1000` | Queued task count above which (together with the age threshold) the queue is reported as backed up. See [Operational health](operational-health.md). |
+| `ITAMBOX_HEALTH_QUEUE_AGE_SECONDS` | Optional | `1800` | Age in seconds of the oldest pending queued task above which (together with the backlog threshold) the queue is reported as backed up. See [Operational health](operational-health.md). |
+| `ITAMBOX_HEALTH_JOB_STUCK_SECONDS` | Optional | `3600` | Seconds a first-party `Job` may stay pending or running before it is reported as stuck. See [Operational health](operational-health.md). |
+| `ITAMBOX_HEALTH_FAILURES_24H_MAX` | Optional | `10` | Failed background tasks in the last 24 hours above which failures are reported as degraded. See [Operational health](operational-health.md). |
 
 ---
 

@@ -557,6 +557,17 @@ ITAMBOX_EVENT_RETENTION_DAYS = int(os.environ.get("ITAMBOX_EVENT_RETENTION_DAYS"
 # success=False). See the `save_limit` comment on Q_CLUSTER above.
 ITAMBOX_QTASK_FAILED_RETENTION_DAYS = int(os.environ.get("ITAMBOX_QTASK_FAILED_RETENTION_DAYS", "90"))
 
+# ------------------------------------------------------------------------------
+# Operational health thresholds (`manage.py operational_health`)
+# ------------------------------------------------------------------------------
+# Read-only diagnostics for the worker, scheduler, queue and failure state; see
+# docs/operations/operational-health.md. `/health/` is unaffected by these.
+ITAMBOX_HEALTH_SCHEDULE_GRACE_SECONDS = int(os.environ.get("ITAMBOX_HEALTH_SCHEDULE_GRACE_SECONDS", "900"))
+ITAMBOX_HEALTH_QUEUE_BACKLOG_MAX = int(os.environ.get("ITAMBOX_HEALTH_QUEUE_BACKLOG_MAX", "1000"))
+ITAMBOX_HEALTH_QUEUE_AGE_SECONDS = int(os.environ.get("ITAMBOX_HEALTH_QUEUE_AGE_SECONDS", "1800"))
+ITAMBOX_HEALTH_JOB_STUCK_SECONDS = int(os.environ.get("ITAMBOX_HEALTH_JOB_STUCK_SECONDS", "3600"))
+ITAMBOX_HEALTH_FAILURES_24H_MAX = int(os.environ.get("ITAMBOX_HEALTH_FAILURES_24H_MAX", "10"))
+
 ALLOW_GLOBAL_CUSTODY_TEMPLATES = os.environ.get("ITAMBOX_ALLOW_GLOBAL_CUSTODY_TEMPLATES", "True") == "True"
 REQUIRE_CUSTODY_SIGNIN = os.environ.get("ITAMBOX_REQUIRE_CUSTODY_SIGNIN", "True") == "True"
 CUSTODY_SIGNING_SESSION_TTL = timedelta(minutes=30)

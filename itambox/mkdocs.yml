@@ -68,6 +68,7 @@ nav:
       - Resource Grant Expiry: 'operations/resource-grant-expiry.md'
       - Plugin Removal and Recovery: 'operations/plugin-runbook.md'
       - Management Commands: 'operations/management-commands.md'
+      - Operational Health: 'operations/operational-health.md'
   - Usage:
       - Dashboard: 'dashboard.md'
       - Guides:

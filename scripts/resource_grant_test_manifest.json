@@ -47,6 +47,7 @@
     "itambox/core/tests/test_management_commands.py",
     "itambox/core/tests/test_migration_baseline_preflight.py",
     "itambox/core/tests/test_navigation_tenancy.py",
+    "itambox/core/tests/test_operational_health.py",
     "itambox/core/tests/test_plugins.py",
     "itambox/core/tests/test_security_boundaries.py",
     "itambox/core/tests/test_security_finish.py",
@@ -69,6 +70,7 @@
     "itambox/subscriptions/tests/test_api_money.py",
     "itambox/subscriptions/tests/test_graphql.py",
     "scripts/tests/test_architecture_policy.py",
+    "scripts/tests/test_documentation_policy.py",
     "scripts/tests/test_migration_audit.py",
     "scripts/tests/test_typing_policy.py"
   ],
@@ -570,6 +572,7 @@
     "itambox/core/tests/test_navigation_tenancy.py",
     "itambox/core/tests/test_notification_security.py",
     "itambox/core/tests/test_oidc_identity_binding.py",
+    "itambox/core/tests/test_operational_health.py",
     "itambox/core/tests/test_pdf_renderer.py",
     "itambox/core/tests/test_plugins.py",
     "itambox/core/tests/test_prod_settings.py",
