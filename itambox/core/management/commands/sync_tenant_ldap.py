@@ -145,7 +145,7 @@ class Command(SystemTaskCommand):
                 if not result_data:
                     break
                 if result_type == ldap.RES_SEARCH_ENTRY:
-                    for dn, entry in result_data:
+                    for _dn, entry in result_data:
                         uid_vals = entry.get("uid", [])
                         mail_vals = entry.get("mail", [])
                         cn_vals = entry.get("cn", [])

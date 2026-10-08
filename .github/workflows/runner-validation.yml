@@ -58,8 +58,8 @@ jobs:
           uv lock --check
           uv sync --locked --only-group dev
 
-      - name: Check import order and 132-character lines (Ruff)
-        run: uv run --locked --no-sync ruff check --select I,E501 itambox scripts
+      - name: Check configured Ruff lint rules
+        run: uv run --locked --no-sync ruff check itambox scripts
 
       - name: Check formatting (Ruff)
         run: uv run --locked --no-sync ruff format --check itambox scripts

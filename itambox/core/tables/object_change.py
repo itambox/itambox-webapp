@@ -34,7 +34,7 @@ class ObjectChangeTable(BaseTable):
         from core.choices import ObjectChangeActionChoices
 
         color = "secondary"
-        for val, label, c in ObjectChangeActionChoices.CHOICES:
+        for val, _label, c in ObjectChangeActionChoices.CHOICES:
             if val == value:
                 color = c
                 break

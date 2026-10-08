@@ -12,14 +12,15 @@ repos:
 
   # Canonical formatter and import sorter. Keep this revision synchronized with
   # the exact Ruff version in pyproject.toml/uv.lock so local hooks match CI.
-  # Import sorting runs before formatting; Ruff also enforces E501 at 132.
-  # The Flake8 identity baseline retains every other rule until later phases.
+  # Import sorting runs before formatting; Ruff reads E501 and phase-2 rules
+  # from pyproject.toml. The Flake8 identity baseline retains only rules not yet
+  # migrated.
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.20
     hooks:
       - id: ruff-check
-        name: ruff (imports + E501)
-        args: [--select, "I,E501", --fix]
+        name: ruff (configured rules)
+        args: [--fix]
       - id: ruff-format
 
   # Managed, pinned environment so missing Bugbear or diagnostic dependency

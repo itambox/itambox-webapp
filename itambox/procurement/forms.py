@@ -189,7 +189,7 @@ class PurchaseOrderLineForm(forms.ModelForm):
             raise ValidationError({target_field: _("Please select a %(label)s.") % {"label": field_label}})
 
         # Clear all other fields to prevent multiple fields from being saved
-        for cat, field_name in fields_map.items():
+        for _cat, field_name in fields_map.items():
             if field_name != target_field:
                 cleaned_data[field_name] = None
 

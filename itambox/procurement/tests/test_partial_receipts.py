@@ -583,6 +583,44 @@ class PartialReceiptSemanticsTests(PartialReceiptFixture):
         self.assertEqual(line.qty_received, 6)
         self.assertEqual(ComponentStock.objects.get(component=component, location=self.location).qty, 6)
 
+    def test_web_receive_form_invalid_step_one_keeps_lines_paired_with_forms(self):
+        component = self._component("Invalid Step One RAM", "invalid-step-one-ram")
+        purchase_order = self._draft_purchase_order("PO-WEB-INVALID-STEP1-001")
+        line = PurchaseOrderLine.objects.create(
+            tenant=self.tenant,
+            purchase_order=purchase_order,
+            component=component,
+            qty_ordered=10,
+            unit_price="5.00",
+        )
+        self._open(purchase_order)
+
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["active_tenant_id"] = self.tenant.pk
+        session.save()
+
+        url = reverse("procurement:purchaseorder_receive_form", kwargs={"pk": purchase_order.pk})
+        first_get = self.client.get(url)
+        self.assertEqual(first_get.status_code, 200)
+
+        payload = {
+            "step": "1",
+            "expected_received": self._form_receipt_state(first_get),
+            "form-TOTAL_FORMS": "1",
+            "form-INITIAL_FORMS": "1",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-line_id": str(line.pk),
+            "form-0-qty_to_receive": "not-an-integer",
+        }
+        response = self.client.post(url, payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "procurement/purchaseorder_receive.html")
+        self.assertEqual(response.context["lines_and_forms"][0][0].pk, line.pk)
+        self.assertFalse(response.context["formset"].is_valid())
+
     def test_web_receive_form_snapshot_survives_renders_of_other_orders(self):
         """Rendering another order's form neither invalidates nor revalidates this submission."""
         component = self._component("Cross Form RAM", "cross-form-ram")

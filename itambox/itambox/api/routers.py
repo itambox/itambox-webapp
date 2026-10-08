@@ -41,7 +41,7 @@ class ITAMBoxRouter(DefaultRouter):
     def get_api_root_view(self, api_urls=None):
         api_root_dict = {}
         list_name = self.routes[0].name
-        for prefix, viewset, basename in sorted(self.registry, key=lambda x: x[0]):
+        for prefix, _viewset, basename in sorted(self.registry, key=lambda x: x[0]):
             api_root_dict[prefix] = list_name.format(basename=basename)
 
         root_view_cls = self.APIRootView

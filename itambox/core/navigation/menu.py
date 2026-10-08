@@ -20,7 +20,7 @@ def _msp_layer_active(user):
             is_provider=True,
             deleted_at__isnull=True,
         ).exists()
-        setattr(user, "_msp_layer_active_cache", cached)
+        user._msp_layer_active_cache = cached
     return cached
 
 

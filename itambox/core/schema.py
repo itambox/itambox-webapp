@@ -44,9 +44,9 @@ for plugin_name in getattr(settings, "PLUGINS", []):
         if graphql_schema_path:
             schema_module = importlib.import_module(graphql_schema_path)
             if hasattr(schema_module, "Query"):
-                query_bases.append(getattr(schema_module, "Query"))
+                query_bases.append(schema_module.Query)
             if hasattr(schema_module, "Mutation"):
-                mutation_bases.append(getattr(schema_module, "Mutation"))
+                mutation_bases.append(schema_module.Mutation)
     except Exception as exc:  # broad except: boundary-isolation: one plugin schema must not abort core schema startup
         record_plugin_failure(plugin_name, exc, stage="graphql")
         logger.warning("GraphQL contribution disabled for plugin %s (%s)", plugin_name, type(exc).__name__)

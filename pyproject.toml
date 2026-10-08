@@ -210,9 +210,9 @@ extend-exclude = [
 line-ending = "lf"
 
 [tool.ruff.lint]
-# Import ordering and E501 only. Other Flake8 rules stay on the identity
-# baseline (scripts/flake8_baseline.json) until later rollout phases.
-select = ["I", "E501"]
+# Ruff owns import ordering, E501, and the phase-2 B007/B009/B010/B028/B905/F541
+# group. The Flake8 bridge retains the rules not yet migrated in setup.cfg.
+select = ["B007", "B009", "B010", "B028", "B905", "E501", "F541", "I"]
 
 [tool.ruff.lint.pycodestyle]
 # B950's 10% grace over Flake8 max-line-length=120 was exactly 132 characters.

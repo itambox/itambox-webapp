@@ -444,7 +444,7 @@ class AssigneeColumn(tables.Column):
                     if ct_id not in assigned_to_ids_by_ct:
                         assigned_to_ids_by_ct[ct_id] = []
                     parent_id = getattr(a, f"{fk_field.name}_id")
-                    assigned_to_ids_by_ct[ct_id].append((parent_id, getattr(a, "assigned_to_object_id")))
+                    assigned_to_ids_by_ct[ct_id].append((parent_id, a.assigned_to_object_id))
 
                 ct_map = {}
                 for ct_id in assigned_to_ids_by_ct:
