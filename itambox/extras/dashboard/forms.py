@@ -1,10 +1,11 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
+from core.forms import TenantScopedFormMixin
 from extras.dashboard.widgets import WidgetConfigForm, get_registered_widgets, get_widget
 
 
-class DashboardWidgetAddForm(forms.Form):
+class DashboardWidgetAddForm(TenantScopedFormMixin, forms.Form):
     widget = forms.ChoiceField(label=_("Widget"), choices=[], widget=forms.Select(attrs={"class": "form-select"}))
     title = forms.CharField(
         label=_("Title"),
@@ -21,7 +22,7 @@ class DashboardWidgetAddForm(forms.Form):
         ]
 
 
-class DashboardWidgetConfigForm(forms.Form):
+class DashboardWidgetConfigForm(TenantScopedFormMixin, forms.Form):
     title = forms.CharField(
         label=_("Title"), max_length=100, required=False, widget=forms.TextInput(attrs={"class": "form-control"})
     )
