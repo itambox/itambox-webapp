@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
-from core.forms import FilterForm, scope_tenant_field
+from core.forms import FilterForm, TenantScopedFormMixin
 from extras.customfields import CustomFieldModelFormMixin
 from extras.models import Tag
 
@@ -15,7 +15,10 @@ from ..filters import AssetHolderFilterSet
 from ..models import AssetHolder, Tenant
 
 
-class AssetHolderForm(CustomFieldModelFormMixin, forms.ModelForm):
+class AssetHolderForm(TenantScopedFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
+    tenant_required = True
+    tenant_autoset_when_single = True
+
     tenant = forms.ModelChoiceField(
         queryset=Tenant.objects.all(), required=False, widget=forms.Select(attrs={"class": "form-select"})
     )
@@ -61,7 +64,6 @@ class AssetHolderForm(CustomFieldModelFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        scope_tenant_field(self)
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
         self.helper.form_tag = True
