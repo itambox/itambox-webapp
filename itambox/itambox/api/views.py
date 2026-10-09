@@ -74,6 +74,7 @@ class StatusView(APIView):
 
 
 class ObjectChangeViewSet(ITAMBoxReadOnlyModelViewSet):
+    # Scoped per request: BaseViewSet.get_queryset applies filter_by_tenant().
     queryset = ObjectChange.objects.select_related("user", "changed_object_type").all()
     serializer_class = ObjectChangeSerializer
     filterset_fields = ["user_id", "action", "changed_object_type_id", "changed_object_id"]

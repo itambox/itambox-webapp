@@ -21,6 +21,7 @@ from django.views.generic.base import TemplateResponseMixin
 from django_tables2 import RequestConfig, SingleTableView
 
 from core.context import get_current_all_accessible, get_current_tenant, get_current_tenant_group
+from core.managers import Scope
 from core.models import ObjectChange
 from core.tables import ObjectChangeTable
 from itambox.utils import get_paginate_count
@@ -86,7 +87,7 @@ class UserProfileView(LoginRequiredMixin, BaseHTMXView, UpdateView):
                 "role_grants__scopes",
             )
         )
-        activity_qs = ObjectChange.objects.filter(user=self.request.user)[:15]
+        activity_qs = ObjectChange.objects.for_scope(Scope.current()).filter(user=self.request.user)[:15]
         activity_table = ObjectChangeTable(activity_qs, request=self.request)
         activity_table.configure(self.request, paginate=False)
         context["activity_table"] = activity_table

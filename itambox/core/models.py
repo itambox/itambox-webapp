@@ -30,9 +30,9 @@ from core.context import (
 )
 from core.managers import (
     AllObjectsManager,
+    ExplicitScopeManager,
     SoftDeleteManager,
     TenantScopingAllObjectsManager,
-    TenantScopingManager,
     TenantScopingSoftDeleteManager,
 )
 from core.mixins import (
@@ -173,7 +173,8 @@ class ObjectChange(models.Model):
     # tenant=None are system/global changes (global catalogue / system config);
     # allow_global_tenant below makes those — and only those — visible to every
     # tenant, mirroring how the global objects themselves are shared.
-    objects = TenantScopingManager()
+    # Explicit scope: readers call ``ObjectChange.objects.for_scope(Scope.current())``.
+    objects = ExplicitScopeManager()
     allow_global_tenant = True
 
     tenant = models.ForeignKey(

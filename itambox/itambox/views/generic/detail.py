@@ -11,6 +11,7 @@ from django.utils.translation import override
 from django.views.generic import DetailView
 from django_tables2 import RequestConfig
 
+from core.managers import Scope
 from core.models import ObjectChange
 from core.tables import BaseTable, ObjectChangeTable
 from itambox.registry import registry
@@ -167,10 +168,14 @@ class ObjectDetailView(
                 + urlencode({"changed_object_type": content_type.pk, "changed_object_id": obj.pk})
             )
         if object_change_type_exists:
-            queryset = ObjectChange.objects.filter(
-                changed_object_type=content_type,
-                changed_object_id=obj.pk,
-            ).order_by("-time")[:50]
+            queryset = (
+                ObjectChange.objects.for_scope(Scope.current())
+                .filter(
+                    changed_object_type=content_type,
+                    changed_object_id=obj.pk,
+                )
+                .order_by("-time")[:50]
+            )
             table = ObjectChangeTable(list(queryset))
             RequestConfig(self.request, paginate={"per_page": 10}).configure(table)
             context["changelog_table"] = table

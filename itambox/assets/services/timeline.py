@@ -306,12 +306,16 @@ def _disposal_event(disposal: AssetDisposal, page_asset=None) -> TimelineEvent:
 def _status_events(asset) -> list[TimelineEvent]:
     """Status transitions from the changelog (including the in-repair labels)."""
     content_type = ContentType.objects.get_for_model(type(asset))
-    rows = ObjectChange.objects.filter(
-        changed_object_type=content_type,
-        changed_object_id=asset.pk,
-        action=_STATUS_CHANGE_ACTION,
-        postchange_data__has_key="status",
-    ).order_by("-time")[:_STATUS_SCAN_LIMIT]
+    rows = (
+        ObjectChange.objects.for_scope(Scope.current())
+        .filter(
+            changed_object_type=content_type,
+            changed_object_id=asset.pk,
+            action=_STATUS_CHANGE_ACTION,
+            postchange_data__has_key="status",
+        )
+        .order_by("-time")[:_STATUS_SCAN_LIMIT]
+    )
     transitions = []
     label_ids = set()
     for row in rows:
