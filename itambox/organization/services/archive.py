@@ -33,17 +33,20 @@ semantics belongs to the ``SoftDeleteMixin`` shrinkage step of #619.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
 
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.utils.translation import ngettext
 
 from compliance.models import CustodyReceipt
-from core.archive_handlers import AggregateArchiveBlocked
+from core.archive_handlers import (
+    ArchiveBlocked,
+    ArchiveOperation,
+    ArchiveResult,
+    lock_aggregate_root,
+)
 from core.choices import ObjectChangeActionChoices
 from core.managers import Scope
 from subscriptions.models import SubscriptionAssignment
@@ -71,48 +74,9 @@ BLOCKING_OBLIGATION_KINDS = frozenset(
 )
 
 
-@dataclass(frozen=True)
-class ArchiveResult:
-    """What one archive operation moved.
-
-    :param archived: aggregate-root rows archived (0 or 1 for this pilot).
-    :param detached: live rows detached from the holder: the user link and every
-        subscription assignment that covered the holder.
-    :param kept: evidence rows deliberately left referencing the holder.
-    """
-
-    archived: int = 0
-    detached: int = 0
-    kept: int = 0
-
-
-class ArchiveBlocked(AggregateArchiveBlocked):
-    """The holder cannot be archived, or cannot be restored, yet.
-
-    Carries the blocking obligations so a caller can link them instead of
-    parsing the message; ``messages`` is what a view or the REST API renders.
-    """
-
-    def __init__(self, headline: str, *, blockers: Sequence[ObligationItem] = ()) -> None:
-        self.headline = str(headline)
-        self.blockers: tuple[ObligationItem, ...] = tuple(blockers)
-        super().__init__(self.headline)
-
-
 def _lock_holder(holder: AssetHolder) -> AssetHolder:
-    """Lock the holder row under the ambient scope, or fail closed.
-
-    Re-resolving instead of trusting the caller's instance is the tenant
-    boundary: a handler can be reached from any caller, and a row outside the
-    acting scope must not be archivable through it.
-    """
-    # unscoped: the row may already be archived, so it has to come from the
-    # including-deleted manager; the ambient scope is re-applied explicitly and
-    # a row outside it fails closed below.
-    locked = AssetHolder.all_objects.for_scope(Scope.current()).select_for_update().filter(pk=holder.pk).first()
-    if locked is None:
-        raise PermissionDenied("The asset holder is not available in the active scope.")
-    return locked
+    """Lock the holder row under the ambient scope, or fail closed."""
+    return lock_aggregate_root(holder, noun="asset holder")
 
 
 def _blocking_obligations(holder: AssetHolder) -> list[ObligationItem]:
@@ -144,7 +108,7 @@ def _detach_user_link(holder: AssetHolder) -> int:
     return 1
 
 
-def _end_subscription_assignments(holder: AssetHolder) -> int:
+def _end_subscription_assignments(holder: AssetHolder, operation: ArchiveOperation) -> int:
     """End the subscriptions covering this holder.
 
     A subscription assignment is a generic relation with no leaf ``deleted_at``
@@ -159,7 +123,7 @@ def _end_subscription_assignments(holder: AssetHolder) -> int:
     )
     ended = 0
     for assignment in assignments:
-        assignment._changelog_message = f"Detached from {holder._meta.label} {holder.pk}"
+        assignment._changelog_message = operation.detach_message()
         assignment.delete()
         ended += 1
     return ended
@@ -190,6 +154,7 @@ def archive_holder(holder: AssetHolder, *, actor=None, request=None) -> ArchiveR
         locked = _lock_holder(holder)
         if locked.deleted_at is not None:
             return ArchiveResult()
+        operation = ArchiveOperation.begin(locked)
 
         blockers = _blocking_obligations(locked)
         if blockers:
@@ -197,14 +162,14 @@ def archive_holder(holder: AssetHolder, *, actor=None, request=None) -> ArchiveR
 
         user_link_detached = _detach_user_link(locked)
         update_fields = ["deleted_at", "user"] if user_link_detached else ["deleted_at"]
-        detached = user_link_detached + _end_subscription_assignments(locked)
+        detached = user_link_detached + _end_subscription_assignments(locked, operation)
         kept = _kept_evidence_count(locked)
 
         locked.deleted_at = timezone.now()
         locked._changelog_action = ObjectChangeActionChoices.ACTION_DELETE
         locked.save(update_fields=update_fields)
 
-    return ArchiveResult(archived=1, detached=detached, kept=kept)
+    return ArchiveResult(archived=1, detached=detached, kept=kept, operation_id=operation.id)
 
 
 def restore_holder(holder: AssetHolder, *, actor=None, request=None) -> None:
