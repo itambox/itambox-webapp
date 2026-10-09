@@ -9,7 +9,8 @@
     "itambox/organization/tests/test_form_scoping.py",
     "itambox/organization/tests/test_scoping.py",
     "itambox/software/tests/test_form_scoping.py",
-    "itambox/subscriptions/tests/test_form_scoping.py"
+    "itambox/subscriptions/tests/test_form_scoping.py",
+    "itambox/users/tests/test_form_scoping.py"
   ],
   "baseline_tests": [
     "itambox/assets/api/tests/test_error_boundary_disclosure.py",
@@ -799,6 +800,7 @@
     "itambox/tests/journeys/test_identity.py",
     "itambox/tests/journeys/test_reservation.py",
     "itambox/tests/test_accessibility.py",
+    "itambox/users/tests/test_form_scoping.py",
     "itambox/users/tests/test_i18n.py",
     "itambox/users/tests/test_identity_provider_memberships.py",
     "itambox/users/tests/test_provider_scim.py",

@@ -14,7 +14,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
-from core.forms import BulkEditForm, FilterForm
+from core.forms import BulkEditForm, FilterForm, TenantScopedFormMixin
 from organization.access import accessible_tenant_ids, get_descendant_tenant_group_ids
 from organization.forms.helpers import add_standard_buttons
 from organization.models import (
@@ -147,7 +147,7 @@ class UserForm(forms.ModelForm):
         return user
 
 
-class UserPreferencesForm(forms.Form):
+class UserPreferencesForm(TenantScopedFormMixin, forms.Form):
     # Define fields explicitly
     pagination_per_page = forms.ChoiceField(
         choices=settings.PAGINATE_COUNT_CHOICES,
@@ -511,8 +511,11 @@ class UserBulkEditForm(BulkEditForm):
 # provider-owned groups may be projected into managed tenants through RoleGrant scopes.
 
 
-class GroupManagedRoleGrantForm(forms.Form):
+class GroupManagedRoleGrantForm(TenantScopedFormMixin, forms.Form):
     """One additive managed-scope segment of a group RoleGrant."""
+
+    # Deliberate base-manager pickers, narrowed to the owner's managed graph.
+    tenant_scoped_choice_exclusions = ("role", "scope_group", "assigned_tenants")
 
     SCOPE_EXPLICIT = "explicit"
     id = forms.IntegerField(required=False, widget=forms.HiddenInput)
@@ -673,7 +676,7 @@ GroupManagedRoleGrantFormSet = forms.formset_factory(
 GROUP_MANAGED_FORMSET_PREFIX = "managed"
 
 
-class UserGroupForm(forms.ModelForm):
+class UserGroupForm(TenantScopedFormMixin, forms.ModelForm):
     """Edit a tenant-owned group through canonical RBAC aggregates.
 
     The role picker authors own-tenant scopes; the managed formset adds explicit,
@@ -681,6 +684,10 @@ class UserGroupForm(forms.ModelForm):
     tenant Membership rows, never global users. Manual group memberships are
     reconciled here while directory-managed rows remain owned by their source.
     """
+
+    # Owner, role and tenant pickers are deliberate base-manager querysets
+    # narrowed by the requesting user's authority; ``tenant`` stays required.
+    tenant_scoped_choice_exclusions = ("tenant", "roles")
 
     name = forms.CharField(
         max_length=100,
@@ -1076,7 +1083,7 @@ class UserGroupFilterForm(FilterForm):
     filterset_class = UserGroupFilterSet
 
 
-class UserGroupAssignUsersForm(forms.Form):
+class UserGroupAssignUsersForm(TenantScopedFormMixin, forms.Form):
     """Pick active members of the group's owning tenant."""
 
     memberships = forms.ModelMultipleChoiceField(
