@@ -15,7 +15,8 @@ from core.config_contract import (
 )
 from core.crypto import is_using_derived_encryption_key
 
-from .base import *
+# Production settings inherit the full base namespace, then override selected values.
+from .base import *  # noqa: F403, F401
 
 # The production configuration contract reads the tri-state parse results from
 # ``base``. They are re-imported explicitly so flake8 can resolve them instead
@@ -23,8 +24,11 @@ from .base import *
 from .base import (
     API_TOKEN_PEPPERS_ERROR,
     API_TOKEN_PEPPERS_STATE,
+    CACHE_BACKEND,
     FIELD_ENCRYPTION_KEYS_ERROR,
     FIELD_ENCRYPTION_KEYS_STATE,
+    MIDDLEWARE,
+    REST_FRAMEWORK,
     SECRET_KEY,
 )
 

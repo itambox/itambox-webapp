@@ -31,8 +31,11 @@ if ENV is None:
         ENV = "prod"
 
 if ENV == "prod":
-    from .prod import *
+    # Django consumes the selected module's public names as settings.
+    from .prod import *  # noqa: F403, F401
 elif ENV == "dev":
-    from .dev import *
+    # Django consumes the selected module's public names as settings.
+    from .dev import *  # noqa: F403, F401
 else:
-    from .base import *
+    # The fallback also exposes the base settings namespace.
+    from .base import *  # noqa: F403, F401

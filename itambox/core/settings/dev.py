@@ -5,8 +5,9 @@ To use: set DJANGO_SETTINGS_MODULE=core.settings.dev or ITAMBOX_ENV=dev
 
 import os as _os
 
-from .base import *
-from .base import DATABASES  # explicit: the password fallback must resolve without new star-import F405 identities
+# Development settings inherit the full base namespace, then override selected values.
+from .base import *  # noqa: F403, F401
+from .base import DATABASES, INSTALLED_APPS, MIDDLEWARE
 
 DEBUG = True
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "192.168.50.54"]
