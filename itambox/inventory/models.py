@@ -9,7 +9,6 @@ from core.context import _deletion_cascade_allows
 from core.managers import (
     AllObjectsManager,
     ExplicitScopeAllObjectsManager,
-    ExplicitScopeManager,
     ExplicitScopeSoftDeleteManager,
     Scope,
     SoftDeleteManager,
@@ -429,7 +428,8 @@ class ComponentStock(AbstractStock):
     # tenant is a REAL field derived from location.tenant (AbstractStock);
     # scoping runs on it directly — the catalogue item's tenant is irrelevant
     # to pool ownership.
-    objects = ExplicitScopeManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     component = models.ForeignKey(
         Component, on_delete=models.PROTECT, related_name="stocks", verbose_name=_("Component"), db_index=True
@@ -445,7 +445,13 @@ class ComponentStock(AbstractStock):
     class Meta(AbstractStock.Meta):
         verbose_name = _("Component Stock")
         verbose_name_plural = _("Component Stocks")
-        constraints = [models.UniqueConstraint(fields=["component", "location"], name="unique_component_location")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["component", "location"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="unique_component_location",
+            )
+        ]
 
     def __str__(self):
         return f"{self.component.name} @ {self.location.name}: {self.qty}"
@@ -456,7 +462,8 @@ class ComponentStock(AbstractStock):
 
 class AccessoryStock(AbstractStock):
     # See ComponentStock — tenant derives from location.tenant.
-    objects = ExplicitScopeManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     accessory = models.ForeignKey(
         Accessory, on_delete=models.PROTECT, related_name="stocks", verbose_name=_("Accessory"), db_index=True
@@ -467,7 +474,9 @@ class AccessoryStock(AbstractStock):
         verbose_name_plural = _("Accessory Stocks")
         constraints = [
             models.UniqueConstraint(
-                fields=["accessory", "location"], name="inventory_accessorystock_unique_accessory_location"
+                fields=["accessory", "location"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="inventory_accessorystock_unique_accessory_location",
             )
         ]
 
@@ -480,7 +489,8 @@ class AccessoryStock(AbstractStock):
 
 class ConsumableStock(AbstractStock):
     # See ComponentStock — tenant derives from location.tenant.
-    objects = ExplicitScopeManager()
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     consumable = models.ForeignKey(
         Consumable, on_delete=models.PROTECT, related_name="stocks", verbose_name=_("Consumable"), db_index=True
@@ -491,7 +501,9 @@ class ConsumableStock(AbstractStock):
         verbose_name_plural = _("Consumable Stocks")
         constraints = [
             models.UniqueConstraint(
-                fields=["consumable", "location"], name="inventory_consumablestock_unique_consumable_location"
+                fields=["consumable", "location"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="inventory_consumablestock_unique_consumable_location",
             )
         ]
 

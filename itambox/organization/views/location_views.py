@@ -1,8 +1,10 @@
 from django.contrib import messages
 from django.db.models import Count, Q
+from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from django_tables2 import RequestConfig
 
 from assets.forms.import_forms import LocationBulkImportForm
@@ -21,6 +23,7 @@ from itambox.views.generic import (
     ObjectImportView,
     ObjectListView,
 )
+from organization.services.location_archive import ArchiveBlocked, archive_location
 
 from ..filters import LocationFilterSet
 from ..forms import LocationFilterForm, LocationForm
@@ -192,23 +195,35 @@ class LocationDeleteView(ObjectDeleteView):
     template_name = "generic/object_confirm_delete.html"
     success_url = reverse_lazy("organization:location_list")
 
-    def post(self, request, *args, **kwargs):
-        location = self.get_object()
-        asset_count = location.assets.count()
+    def form_valid(self, form):
+        """Archive the location through the per-aggregate service.
 
-        if asset_count > 0:
-            messages.error(
-                request,
-                _("Cannot delete location '%(name)s': It is associated with %(count)d asset%(plural)s.")
-                % {
-                    "name": location.name,
-                    "count": asset_count,
-                    "plural": "s" if asset_count != 1 else "",
-                },
+        The service refuses while assets, open checkouts, stock, child
+        locations or open purchase orders still depend on the location; the
+        refusal replaces the former asset-only view guard and is reported here.
+        """
+        obj_repr = self.get_object_display()
+        try:
+            result = archive_location(self.object, actor=self.request.user, request=self.request)
+        except ArchiveBlocked as exc:
+            messages.error(self.request, exc.headline)
+            return redirect(self.object.get_absolute_url())
+
+        messages.success(
+            self.request,
+            _("Deleted %(model)s %(object)s.") % {"model": self.object._meta.verbose_name, "object": obj_repr},
+        )
+        if result.detached:
+            messages.info(
+                self.request,
+                ngettext(
+                    "Detached %(count)s linked record that referenced the location.",
+                    "Detached %(count)s linked records that referenced the location.",
+                    result.detached,
+                )
+                % {"count": result.detached},
             )
-            return redirect(location.get_absolute_url())
-
-        return super().post(request, *args, **kwargs)
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class LocationBulkEditView(ObjectBulkEditView):

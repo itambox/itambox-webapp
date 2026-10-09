@@ -232,6 +232,12 @@ def _revoke_grants_for_deleted_resource(sender, instance, **kwargs):
         grant.delete()
 
 
+def _revoke_grants_for_tombstoned_resource(sender, instance, **kwargs):
+    """Soft-deleting a shared pool revokes its grants like a hard delete does."""
+    if getattr(instance, "deleted_at", None) is not None:
+        _revoke_grants_for_deleted_resource(sender, instance, **kwargs)
+
+
 def _connect_resource_grant_cleanup():
     for label in TenantResourceGrant.APPROVED_RESOURCE_MODELS:
         app_label, model_name = label.split(".")
@@ -240,6 +246,11 @@ def _connect_resource_grant_cleanup():
             _revoke_grants_for_deleted_resource,
             sender=model,
             dispatch_uid=f"trg_orphan_cleanup_{model_name}",
+        )
+        post_save.connect(
+            _revoke_grants_for_tombstoned_resource,
+            sender=model,
+            dispatch_uid=f"trg_tombstone_cleanup_{model_name}",
         )
 
 
