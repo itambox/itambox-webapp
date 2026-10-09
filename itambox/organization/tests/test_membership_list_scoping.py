@@ -19,7 +19,7 @@ from core.managers import (
     set_current_tenant_group,
 )
 from core.tests.mixins import grant
-from organization.models import Membership, Role, RoleGrantScope, Tenant, TenantGroup
+from organization.models import Role, RoleGrantScope, Tenant, TenantGroup
 
 User = get_user_model()
 

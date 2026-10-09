@@ -8,7 +8,7 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_tables2.utils import A
 
-from assets.models import Asset, AssetAssignment
+from assets.models import AssetAssignment
 from core.html_styles import status_color_class
 from core.tables import ActionsColumn, BaseTable, CountLinkColumn, ToggleColumn
 from core.tables.constants import TABLE_EMPTY_VALUE

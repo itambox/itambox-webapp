@@ -12,8 +12,10 @@ from core import context as core_context
 from core import tenant_scope as _tenant_scope
 from core.authorization_cache import synchronize_authorization_cache
 from core.context import SystemAuthorizationContext, get_current_request_id
-from core.tenant_scope import _descendant_group_ids_cache  # noqa: F401 -- re-exported for established importers
 from organization import rbac as _rbac
+
+# Re-exported for established importers.
+_descendant_group_ids_cache = _tenant_scope._descendant_group_ids_cache
 
 
 def get_descendant_tenant_group_ids(group_id: int | None, live_only: bool = False) -> set[int]:

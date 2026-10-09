@@ -5,7 +5,7 @@ from django.test import TestCase
 
 from core.tests.mixins import grant
 from organization.forms.membership_form import MembershipForm
-from organization.models import Membership, Role, RoleGrantScope, Tenant
+from organization.models import Role, RoleGrantScope, Tenant
 from organization.tests._membership_form_helpers import membership_post_data
 
 User = get_user_model()
