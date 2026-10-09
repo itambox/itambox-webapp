@@ -165,14 +165,14 @@ class ChangelogTenantScopingTests(TestCase):
 
     def test_changelog_scoped_to_active_tenant(self):
         set_current_tenant(self.ta)
-        pks = set(ObjectChange.objects.values_list("pk", flat=True))
+        pks = set(ObjectChange.objects.for_scope(Scope.current()).values_list("pk", flat=True))
         self.assertIn(self.change_a.pk, pks)
         self.assertNotIn(self.change_b.pk, pks, "Tenant A must not see Tenant B's change history")
 
     def test_other_tenant_change_not_retrievable(self):
         set_current_tenant(self.ta)
         with self.assertRaises(ObjectChange.DoesNotExist):
-            ObjectChange.objects.get(pk=self.change_b.pk)
+            ObjectChange.objects.for_scope(Scope.current()).get(pk=self.change_b.pk)
 
 
 class AssignmentTenantScopingTests(TestCase):
