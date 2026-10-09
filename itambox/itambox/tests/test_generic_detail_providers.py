@@ -11,6 +11,7 @@ from django.urls import resolve, reverse
 
 from assets.models import Asset, AssetType, Manufacturer, StatusLabel, Supplier
 from core.forms import JournalEntryForm
+from core.managers import Scope
 from core.models import Job, ObjectChange
 from core.tests.mixins import TenantTestMixin
 from extras.feature_views import EXTRAS_GENERIC_PRESENTATION_PROVIDER
@@ -249,9 +250,13 @@ class GenericDetailProviderContextTests(TenantTestMixin, TestCase):
         view.object = self.asset
         view._cached_object = self.asset
 
+        scoped_changelog_cls = type(ObjectChange.objects.for_scope(Scope(Scope.SYSTEM)))
+
         with (
             patch.object(ContentType.objects, "get_for_model", return_value=self.content_type) as get_for_model,
-            patch.object(ObjectChange.objects, "filter", wraps=ObjectChange.objects.filter) as changelog_filter,
+            patch.object(
+                scoped_changelog_cls, "filter", autospec=True, side_effect=scoped_changelog_cls.filter
+            ) as changelog_filter,
             patch.object(
                 EXTRAS_GENERIC_PRESENTATION_PROVIDER,
                 "build_detail_context",
@@ -276,7 +281,9 @@ class GenericDetailProviderContextTests(TenantTestMixin, TestCase):
         # ``ChangeLoggingMixin.get_changelog_url`` (the restored object hook
         # precedence). No provider re-resolves the ContentType.
         self.assertEqual(get_for_model.call_count, 2)
-        self.assertIs(changelog_filter.call_args.kwargs["changed_object_type"], self.content_type)
+        object_calls = [c for c in changelog_filter.call_args_list if "changed_object_type" in c.kwargs]
+        self.assertEqual(len(object_calls), 1)
+        self.assertIs(object_calls[0].kwargs["changed_object_type"], self.content_type)
         self.assertIs(extras_detail.call_args.args[0].content_type, self.content_type)
         self.assertIs(subscriptions_detail.call_args.args[0].content_type, self.content_type)
         self.assertEqual(context["journal_entries_count"], 1)

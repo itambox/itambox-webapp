@@ -247,6 +247,7 @@ class SCIMUserSerializer(serializers.ModelSerializer[models.Model]):
 
     def _get_last_modified(self, obj: _SCIMUserResource) -> str | None:
         # inline import: app-registry: avoid AppRegistryNotReady at module-load time
+        from core.managers import Scope
         from core.models import ObjectChange
 
         user_ct = ContentType.objects.get_for_model(obj)
@@ -258,7 +259,11 @@ class SCIMUserSerializer(serializers.ModelSerializer[models.Model]):
                 membership_ct = ContentType.objects.get_for_model(Membership)
                 change_filter |= Q(changed_object_type=membership_ct, changed_object_id=membership.pk)
         last_change = (
-            ObjectChange.objects.filter(change_filter).order_by("-time").values_list("time", flat=True).first()
+            ObjectChange.objects.for_scope(Scope.current())
+            .filter(change_filter)
+            .order_by("-time")
+            .values_list("time", flat=True)
+            .first()
         )
         return last_change.isoformat() if last_change else None
 
