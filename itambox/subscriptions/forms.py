@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, Supplier
-from core.forms import BulkEditForm, CrispyFormMixin, FilterForm, scope_tenant_field
+from core.forms import BulkEditForm, CrispyFormMixin, FilterForm, TenantScopedFormMixin
 from core.importers.bulk_forms import BulkImportForm, register_import_form
 from core.managers import Scope
 from extras.customfields import CustomFieldModelFormMixin
@@ -87,7 +87,12 @@ class SubscriptionBulkEditForm(BulkEditForm):
         ]
 
 
-class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
+class SubscriptionForm(TenantScopedFormMixin, CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelForm):
+    # The tenant stays selectable once a tenant exists; a user with a single
+    # accessible tenant gets it preset.
+    tenant_required = True
+    tenant_autoset_when_single = True
+
     tenant = forms.ModelChoiceField(
         queryset=Tenant.objects.all(),
         required=False,
@@ -155,7 +160,6 @@ class SubscriptionForm(CrispyFormMixin, CustomFieldModelFormMixin, forms.ModelFo
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        scope_tenant_field(self)
         # Rescope the tenant-owned `cost_center` FK per request (import-frozen
         # unscoped — would expose/permit another tenant's cost center).
         self.fields["cost_center"].queryset = CostCenter.objects.all()
@@ -240,7 +244,7 @@ class SubscriptionFilterForm(FilterForm):
     filterset_class = SubscriptionFilterSet
 
 
-class SubscriptionAssignmentForm(forms.ModelForm):
+class SubscriptionAssignmentForm(TenantScopedFormMixin, forms.ModelForm):
     subscription = forms.ModelChoiceField(
         queryset=Subscription.objects.all(),
         widget=forms.Select(attrs={"class": "form-select"}),
@@ -379,7 +383,7 @@ class SubscriptionCancelForm(forms.Form):
         )
 
 
-class SubscriptionCheckoutForm(forms.Form):
+class SubscriptionCheckoutForm(TenantScopedFormMixin, forms.Form):
     TARGET_CHOICES = [
         ("holder", _("Employee / Asset Holder")),
         ("asset", _("Hardware Asset")),
