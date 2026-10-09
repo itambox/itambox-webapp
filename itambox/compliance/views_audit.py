@@ -36,6 +36,7 @@ from compliance.forms_audit import AssetAuditForm, AuditBarcodeScanForm, AuditSe
 from compliance.forms_filter import AuditSessionFilterForm
 from compliance.models import AssetAudit, AuditSession
 from core.csv_utils import csv_safe
+from core.forms.base import TenantScopedFormMixin
 from core.managers import Scope
 from core.tables import ActionsColumn, BaseTable, ToggleColumn
 from itambox.views.generic import ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
@@ -354,7 +355,7 @@ class AuditSessionCommitView(LoginRequiredMixin, PermissionRequiredMixin, View):
         return render(request, "compliance/audits/audit_session_detail.html", ctx)
 
 
-class AuditSessionCloseForm(forms.Form):
+class AuditSessionCloseForm(TenantScopedFormMixin, forms.Form):
     def __init__(self, *args, **kwargs):
         kwargs.pop("instance", None)
         super().__init__(*args, **kwargs)
@@ -431,7 +432,7 @@ class AuditSessionReportCsvView(LoginRequiredMixin, PermissionRequiredMixin, Vie
         return response
 
 
-class AuditSessionFlagMissingForm(forms.Form):
+class AuditSessionFlagMissingForm(TenantScopedFormMixin, forms.Form):
     """Empty confirmation form — submit confirms the bulk flag action."""
 
     pass

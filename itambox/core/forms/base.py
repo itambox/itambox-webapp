@@ -1,10 +1,9 @@
 """Explicit form behaviours that replace the global ``BaseForm`` patch (#584, WP2).
 
-``CoreConfig.ready()`` currently patches ``BaseForm.__init__`` to (a) mark a
+``CoreConfig.ready()`` used to patch ``BaseForm.__init__`` to (a) mark a
 ``tenant`` field required and (b) add ``data-tom-select`` to select widgets,
-deciding the exclusions by class-name substring. This module provides the same
-behaviour as explicit, per-form declarations. It is unused by domain forms until
-WP3 and the global patch stays installed until WP5.
+deciding the exclusions by class-name substring. That patch was removed in WP5;
+this module provides the behaviour as explicit, per-form declarations.
 
 * ``apply_tom_select`` is the single place that knows which widgets get the
   TomSelect attribute.

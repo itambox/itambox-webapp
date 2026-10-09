@@ -134,7 +134,7 @@ class AssetDisposalForm(TenantScopedFormMixin, forms.ModelForm):
         )
 
 
-class AssetDisposalCancelForm(forms.Form):
+class AssetDisposalCancelForm(TenantScopedFormMixin, forms.Form):
     """Cancellation form: the reason is mandatory (issue #496).
 
     Only the reason is collected; cancellation state itself is owned by

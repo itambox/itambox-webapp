@@ -4,10 +4,12 @@ from django import forms
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
+from core.forms.base import TenantScopedFormMixin
+
 from ..models import Depreciation
 
 
-class DepreciationForm(forms.ModelForm):
+class DepreciationForm(TenantScopedFormMixin, forms.ModelForm):
     class Meta:
         model = Depreciation
         fields = ["name", "months", "method", "convention", "immediate_expense_threshold", "description"]

@@ -73,4 +73,4 @@ def scope_tenant_group_field(form, field_name="tenant_group"):
     field = form.fields.get(field_name)
     if field is None or getattr(field, "queryset", None) is None:
         return
-    field.queryset = field.queryset.model._default_manager.all()
+    field.queryset = field.queryset.model._default_manager.for_scope(Scope.current())

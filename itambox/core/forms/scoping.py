@@ -1,9 +1,8 @@
 """Explicit, read-time tenant scoping for model-choice form fields (#584, WP2).
 
 This module is the explicit replacement for the global
-``ModelChoiceField.queryset`` patch installed by ``CoreConfig.ready()``. It is
-not used by any domain form yet (WP3 migrates them); the global patch stays
-installed until WP5, so nothing here changes runtime behaviour.
+``ModelChoiceField.queryset`` patch that ``CoreConfig.ready()`` used to install
+(removed in WP5 of #584).
 
 The mechanism
 =============
@@ -21,7 +20,7 @@ Consequences worth knowing:
 * Form construction deep-copies each field through the scoped getter, so the
   stored queryset of a form instance is already narrowed to the scope that was
   active at construction. Later reads intersect that snapshot with the then
-  ambient scope. This is the same behaviour the global patch has today.
+  ambient scope. This is the behaviour the removed global patch had.
 * A queryset whose class has no ``filter_by_tenant`` (for example the user
   model) is returned untouched.
 
