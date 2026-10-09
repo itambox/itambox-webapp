@@ -287,7 +287,7 @@ class RepairTimelineTests(TestCase):
 class RepairEpisodeSurfaceTests(TestCase):
     def test_the_model_is_gone(self):
         with self.assertRaises(ImportError):
-            from assets.models import RepairEpisode  # noqa: F401
+            from assets.models import RepairEpisode  # noqa: F401  # expected ImportError asserts removal
 
     def test_the_routes_are_gone(self):
         for name in (

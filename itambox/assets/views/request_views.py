@@ -1,10 +1,9 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import redirect, render
-from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
@@ -33,7 +32,6 @@ from core.managers import Scope
 from inventory.services import checkout_inventory_item
 from itambox.panels import Panel
 from itambox.views.generic import (
-    ObjectDeleteView,
     ObjectDetailView,
     ObjectEditView,
     ObjectListView,

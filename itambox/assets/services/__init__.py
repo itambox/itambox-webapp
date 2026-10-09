@@ -17,13 +17,9 @@ if TYPE_CHECKING:
 
 from decimal import Decimal
 
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
-from django.db.models import Sum
-from django.shortcuts import get_object_or_404
-from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 

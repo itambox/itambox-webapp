@@ -4,13 +4,13 @@ import json
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import RequestFactory, TestCase
+from django.test import TestCase
 from django.urls import reverse
 
 from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
 from assets.scanning import resolve_scanned_asset, resolve_scanned_code
 from core.tests.mixins import TenantTestMixin
-from organization.models import Membership, Role, Tenant
+from organization.models import Role, Tenant
 
 User = get_user_model()
 
@@ -505,7 +505,7 @@ class ScanResolveViewTests(TenantTestMixin, TestCase):
 
     def test_member_with_view_asset_sees_own_tenant_not_other(self):
         """Member with view_asset resolves own-tenant asset and gets 404 for other tenant's tag."""
-        from assets.models import AssetRole, AssetType, Manufacturer, StatusLabel
+        from assets.models import AssetRole, AssetType, StatusLabel
 
         # Give tenant_user the view_asset permission.
         self.tenant_role.permissions = ["assets.view_asset"]

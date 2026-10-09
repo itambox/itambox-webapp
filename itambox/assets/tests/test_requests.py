@@ -6,7 +6,6 @@ from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from django.urls import reverse
-from django.utils import timezone
 
 from assets.choices import RequestStatusChoices
 from assets.models import (
@@ -22,7 +21,7 @@ from assets.models import (
 )
 from assets.services import checkout_asset
 from assets.views.request_views import approve_asset_request, deny_asset_request
-from core.managers import set_current_membership, set_current_tenant
+from core.managers import set_current_tenant
 from core.models import ObjectChange
 from core.tasks.context import TaskContext
 from core.tests.mixins import grant

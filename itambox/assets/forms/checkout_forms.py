@@ -1,15 +1,20 @@
 import datetime
 
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import HTML, Layout
+from crispy_forms.layout import Layout
 from django import forms
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+import inventory.forms as _inventory_forms
 from assets.models import Asset, StatusLabel
 from core.forms.base import TenantScopedFormMixin
-from inventory.forms import AccessoryCheckoutForm, BaseCheckoutForm, ConsumableCheckoutForm, KitCheckoutForm
 from organization.models import AssetHolder, Location
+
+AccessoryCheckoutForm = _inventory_forms.AccessoryCheckoutForm
+BaseCheckoutForm = _inventory_forms.BaseCheckoutForm
+ConsumableCheckoutForm = _inventory_forms.ConsumableCheckoutForm
+KitCheckoutForm = _inventory_forms.KitCheckoutForm
 
 
 class AssetCheckOutForm(TenantScopedFormMixin, forms.Form):

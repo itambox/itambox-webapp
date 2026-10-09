@@ -201,7 +201,6 @@ class AssetFilterSet(SpecificationFilterMixin, BaseFilterSet):
         if value is None:
             return queryset
 
-        from django.db.models import Case, DurationField, ExpressionWrapper, F, When
         from django.utils import timezone
 
         today = timezone.now()
