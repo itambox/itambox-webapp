@@ -5942,12 +5942,10 @@ msgid "Checkout Log"
 msgstr "Herausgabeprotokoll"
 
 #, python-format
-msgid ""
-"Cannot delete location '%(name)s': It is associated with %(count)d "
-"asset%(plural)s."
-msgstr ""
-"Lagerort '%(name)s' kann nicht gelöscht werden: Er ist mit %(count)d "
-"Asset%(plural)s verknüpft."
+msgid "Detached %(count)s linked record that referenced the location."
+msgid_plural "Detached %(count)s linked records that referenced the location."
+msgstr[0] "%(count)s verknüpfter Datensatz vom Lagerort gelöst."
+msgstr[1] "%(count)s verknüpfte Datensätze vom Lagerort gelöst."
 
 msgid "Region Details"
 msgstr "Regions-Details"
@@ -15672,3 +15670,30 @@ msgstr "Archiv des letzten Laufs"
 #: itambox/extras/models.py
 msgid "Output archive retained by the newest completed run. Retry delivery re-sends exactly this archive; a run that retained none clears the reference, so an older archived report is never redelivered in its place."
 msgstr "Die im neuesten abgeschlossenen Lauf aufbewahrte Ausgabe. Die erneute Zustellung sendet genau dieses Archiv erneut; ein Lauf ohne aufbewahrtes Archiv löscht die Referenz, sodass ein älterer archivierter Bericht niemals an dessen Stelle erneut zugestellt wird."
+
+msgid "assets"
+msgstr "Assets"
+
+msgid "active asset assignments"
+msgstr "aktive Asset-Zuweisungen"
+
+msgid "child locations"
+msgstr "untergeordnete Lagerorte"
+
+msgid "open purchase orders"
+msgstr "offene Bestellungen"
+
+msgid "stock rows with remaining quantity"
+msgstr "Bestandszeilen mit Restmenge"
+
+msgid "open inventory checkouts"
+msgstr "offene Bestandsausgaben"
+
+msgid "Cannot restore %(object)s: its parent location is archived or unavailable."
+msgstr "%(object)s kann nicht wiederhergestellt werden: Der übergeordnete Lagerort ist archiviert oder nicht verfügbar."
+
+#, python-format
+msgid "Cannot delete %(object)s: %(count)s dependent record must be resolved first (%(detail)s)."
+msgid_plural "Cannot delete %(object)s: %(count)s dependent records must be resolved first (%(detail)s)."
+msgstr[0] "%(object)s kann nicht gelöscht werden: %(count)s abhängiger Datensatz muss zuerst aufgelöst werden (%(detail)s)."
+msgstr[1] "%(object)s kann nicht gelöscht werden: %(count)s abhängige Datensätze müssen zuerst aufgelöst werden (%(detail)s)."

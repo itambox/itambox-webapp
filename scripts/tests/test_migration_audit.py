@@ -548,7 +548,7 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 57)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 58)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
@@ -596,6 +596,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "extras.0127_retire_report_designer_legacy",
                 "inventory.0101_alter_accessoryassignment_options_and_more",
                 "inventory.0102_kititem_leaf_deleted_at",
+                "inventory.0103_stock_leaf_deleted_at",
                 "organization.0101_membership_external_id_and_more",
                 "organization.0102_alter_tenantresourcegrant_options",
                 "organization.0103_tenant_resource_grant_expiry",

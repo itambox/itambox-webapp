@@ -96,7 +96,7 @@ class AbstractInventoryItem(
         return f"{self.manufacturer.name} {self.name}"
 
 
-class AbstractStock(ChangeLoggingMixin, BaseModel):
+class AbstractStock(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     location = models.ForeignKey(
         "organization.Location",
         on_delete=models.PROTECT,
@@ -122,6 +122,11 @@ class AbstractStock(ChangeLoggingMixin, BaseModel):
     # restores symmetrically instead of materialising phantom stock. Non-over-
     # allocatable items are guarded against going negative in adjust_inventory_stock.
     qty = models.IntegerField(default=0, verbose_name=_("Quantity"))
+
+    #: Correlates the leaf row with the aggregate archive operation that moved it
+    #: (#619). A stock row is archived with its location only while empty; a row
+    #: deleted on its own has no marker and stays deleted on restore.
+    archive_operation_id = models.UUIDField(null=True, blank=True, editable=False, verbose_name=_("Archive Operation"))
 
     class Meta:
         abstract = True
