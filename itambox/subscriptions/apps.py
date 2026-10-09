@@ -32,6 +32,32 @@ class SubscriptionsConfig(AppConfig):
         self._register_generic_presentation(SUBSCRIPTIONS_GENERIC_PRESENTATION_PROVIDER)
         post_migrate.connect(self._register_subscription_tasks, sender=self)
 
+        # inline imports: app-registry: the archive registry is populated once models are loaded.
+        from core.archive_handlers import ArchiveBehaviour, ArchiveRelation, register_archive_handler
+        from subscriptions.archive_services import archive_subscription, restore_subscription
+        from subscriptions.models import Subscription
+
+        register_archive_handler(
+            Subscription._meta.label_lower,
+            archive=archive_subscription,
+            restore=restore_subscription,
+            relations=(
+                ArchiveRelation(
+                    "licenses.license.subscription",
+                    ArchiveBehaviour.DETACH,
+                    "every funding license is unlinked with its own audit entry; restore does not re-attach",
+                ),
+                ArchiveRelation(
+                    "subscriptions.subscriptionassignment.subscription",
+                    ArchiveBehaviour.ARCHIVE,
+                    "archived with the subscription through their own save(); restore brings them back",
+                ),
+                ArchiveRelation("file_attachments", ArchiveBehaviour.KEEP, "attachments stay as evidence"),
+                ArchiveRelation("image_attachments", ArchiveBehaviour.KEEP, "attachments stay as evidence"),
+                ArchiveRelation("journal_entries", ArchiveBehaviour.KEEP, "journal entries stay as evidence"),
+            ),
+        )
+
     def _register_capabilities(self):
         capability_registry.register_all(self._capabilities())
 

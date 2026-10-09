@@ -1,5 +1,5 @@
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.shortcuts import render
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
@@ -26,7 +26,12 @@ from ..services import kit_availability, kit_availability_tenant
 
 
 class KitListView(ObjectListView):
-    queryset = Kit.objects.select_related("tenant").annotate(item_count=Count("items"))
+    # Kit items are leaf rows with their own `deleted_at`, so the row counter must
+    # count LIVE items only: a bare Count("items") joins the raw table and would
+    # report archived items (mirrors LicenseQuerySet.with_counts).
+    queryset = Kit.objects.select_related("tenant").annotate(
+        item_count=Count("items", filter=Q(items__deleted_at__isnull=True))
+    )
     filterset = filters.KitFilterSet
     filterset_form = forms.KitFilterForm
     table = tables.KitTable

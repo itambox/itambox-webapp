@@ -700,7 +700,11 @@ class SubscriptionAssignmentModelTests(TestCase):
             object_id=self.asset.pk,
         )
 
-        self.asset.delete()
+        # Soft-deleting the target also archives the assignment that covers it
+        # (the generic relation is a CASCADE child), which is a change-logged
+        # write: run it inside the audit context, like every other write path.
+        with TaskContext(tenant_id=self.tenant.pk, user_id=None):
+            self.asset.delete()
 
         self.assertIsNone(assignment.tenant_safe_assigned_object)
         self.assertIn("unlinked", str(assignment))

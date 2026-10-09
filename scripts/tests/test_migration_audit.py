@@ -548,7 +548,7 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 55)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 57)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
@@ -595,6 +595,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "extras.0126_scheduledreport_last_run_archive",
                 "extras.0127_retire_report_designer_legacy",
                 "inventory.0101_alter_accessoryassignment_options_and_more",
+                "inventory.0102_kititem_leaf_deleted_at",
                 "organization.0101_membership_external_id_and_more",
                 "organization.0102_alter_tenantresourcegrant_options",
                 "organization.0103_tenant_resource_grant_expiry",
@@ -604,6 +605,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "subscriptions.0101_remove_subscription_auto_renewal_and_more",
                 "subscriptions.0102_commercial_vendor_and_terms",
                 "subscriptions.0103_unified_vendor_cutover",
+                "subscriptions.0104_subscriptionassignment_leaf_deleted_at",
                 "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",
                 "users.0102_token_updated_at",
                 "users.0103_oidcidentity",
@@ -638,7 +640,7 @@ class MigrationAuditTests(unittest.TestCase):
         )
         self.assertEqual(
             len(inventory["special_users_bootstrap"]["swappable_dependents"]),
-            7,
+            8,
         )
         self.assertEqual(
             inventory["reviewed_semantics"]["required_fresh"],
