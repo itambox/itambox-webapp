@@ -28,7 +28,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from assets.choices import RequestStatusChoices
-from assets.models import AssetRequest, AssetType, Manufacturer, Supplier
+from assets.models import AssetRequest, Manufacturer, Supplier
 from core.archive_handlers import ArchiveBlocked
 from core.models import ObjectChange
 from core.tests.mixins import TenantTestMixin

@@ -214,6 +214,8 @@ def _kept_evidence_count(aggregate: InventoryItemAggregate, item) -> int:
     closed_requests = (
         _scoped(AssetRequest).exclude(status__in=_OPEN_REQUEST_STATUSES).filter(**_item_field(aggregate, item)).count()
     )
+    # unscoped: consumed assignments are soft-deleted tombstones the scoped default
+    # manager hides by design; the scope is applied explicitly.
     consumed_assignments = (
         aggregate.assignment_model.all_objects.for_scope(Scope.current())
         .filter(**_item_field(aggregate, item), deleted_at__isnull=False)
@@ -237,6 +239,8 @@ def _restore_stock(aggregate: InventoryItemAggregate, item) -> int:
     carries a different ``deleted_at`` instant and no marker of this operation,
     so it is never resurrected here.
     """
+    # unscoped: a restore has to see the stock the archive soft-deleted, which the
+    # scoped default manager hides by design; the scope is applied explicitly.
     rows = (
         aggregate.stock_model.all_objects.for_scope(Scope.current())
         .select_for_update()
