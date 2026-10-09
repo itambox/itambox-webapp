@@ -6,10 +6,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
-from django_tables2 import RequestConfig
 
 from itambox.panels import Panel
-from itambox.utils import get_paginate_count
 from itambox.views.generic import (
     ObjectBulkDeleteView,
     ObjectBulkEditView,

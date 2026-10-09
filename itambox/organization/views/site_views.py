@@ -1,15 +1,13 @@
 from django.contrib import messages
 from django.db.models import Count
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
-from django_tables2 import RequestConfig
 
 from assets.models import Asset
 from assets.tables import AssetTable
 from core.managers import Scope
 from itambox.panels import Panel
-from itambox.utils import get_paginate_count
 from itambox.views.generic import (
     ObjectBulkDeleteView,
     ObjectBulkEditView,

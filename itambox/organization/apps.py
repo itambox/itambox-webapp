@@ -20,7 +20,7 @@ class OrganizationConfig(AppConfig):
     def ready(self):
         # Import search indexes to register them
         import organization.search
-        import organization.signals
+        import organization.signals  # noqa: F401 -- side-effect import registers organization signal receivers
 
         # inline imports: app-registry: domain modules load only after the app registry is ready.
         from core.archive_handlers import ArchiveBehaviour, ArchiveRelation, register_archive_handler
