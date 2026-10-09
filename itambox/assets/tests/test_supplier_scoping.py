@@ -168,10 +168,12 @@ class SupplierScopingTests(TenantTestMixin, TestCase):
         _current_user.set(self.tenant_user)
         try:
             visible = set(
-                ObjectChange.objects.filter(
+                ObjectChange.objects.for_scope(Scope.current())
+                .filter(
                     changed_object_type=ContentType.objects.get_for_model(Supplier),
                     changed_object_id=self.group_supplier.pk,
-                ).values_list("tenant_id", flat=True)
+                )
+                .values_list("tenant_id", flat=True)
             )
         finally:
             set_current_tenant(None)
@@ -181,10 +183,14 @@ class SupplierScopingTests(TenantTestMixin, TestCase):
         set_current_tenant(self.other_tenant)
         _current_user.set(self.tenant_user)
         try:
-            leaked = ObjectChange.objects.filter(
-                changed_object_type=ContentType.objects.get_for_model(Supplier),
-                changed_object_id=self.group_supplier.pk,
-            ).exists()
+            leaked = (
+                ObjectChange.objects.for_scope(Scope.current())
+                .filter(
+                    changed_object_type=ContentType.objects.get_for_model(Supplier),
+                    changed_object_id=self.group_supplier.pk,
+                )
+                .exists()
+            )
         finally:
             set_current_tenant(None)
             _current_user.set(None)
