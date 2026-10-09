@@ -27,10 +27,11 @@ from django_otp import match_token
 from django_otp.plugins.otp_static.models import StaticDevice, StaticToken
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
+from core.forms.base import TenantScopedFormMixin
 from itambox.views.generic.utils import safe_return_url
 
 
-class MFACodeForm(forms.Form):
+class MFACodeForm(TenantScopedFormMixin, forms.Form):
     """One-time code (TOTP digits or a backup code) plus a carried ``next``."""
 
     code = forms.CharField(

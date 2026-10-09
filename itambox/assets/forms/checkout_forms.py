@@ -7,11 +7,12 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, StatusLabel
+from core.forms.base import TenantScopedFormMixin
 from inventory.forms import AccessoryCheckoutForm, BaseCheckoutForm, ConsumableCheckoutForm, KitCheckoutForm
 from organization.models import AssetHolder, Location
 
 
-class AssetCheckOutForm(forms.Form):
+class AssetCheckOutForm(TenantScopedFormMixin, forms.Form):
     TARGET_CHOICES = [
         ("holder", _("Asset Holder")),
         ("location", _("Location")),
@@ -107,7 +108,7 @@ class AssetCheckOutForm(forms.Form):
         )
 
 
-class AssetCheckInForm(forms.Form):
+class AssetCheckInForm(TenantScopedFormMixin, forms.Form):
     status = forms.ModelChoiceField(
         queryset=StatusLabel.objects.exclude(type="deployed").order_by("name"),
         required=False,

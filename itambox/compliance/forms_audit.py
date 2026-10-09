@@ -144,7 +144,7 @@ class AuditSessionForm(TenantScopedFormMixin, forms.ModelForm):
         return cleaned
 
 
-class AuditBarcodeScanForm(forms.Form):
+class AuditBarcodeScanForm(TenantScopedFormMixin, forms.Form):
     barcode = forms.CharField(
         label=_("Scan Asset Tag or Serial Number"),
         widget=forms.TextInput(

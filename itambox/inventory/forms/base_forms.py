@@ -4,12 +4,13 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset
+from core.forms.base import TenantScopedFormMixin
 from core.managers import Scope, get_current_tenant
 from organization.access import resolved_shared_stock_ids
 from organization.models import AssetHolder, Location, TenantResourceGrant
 
 
-class BaseCheckoutForm(forms.Form):
+class BaseCheckoutForm(TenantScopedFormMixin, forms.Form):
     assigned_holder = forms.ModelChoiceField(
         queryset=AssetHolder.objects.all().order_by("last_name", "first_name"),
         required=False,

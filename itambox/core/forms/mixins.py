@@ -55,11 +55,11 @@ class SearchForm(TenantScopedFormMixin, forms.Form):
     )
 
 
-class JournalEntryForm(forms.Form):
+class JournalEntryForm(TenantScopedFormMixin, forms.Form):
     comment = forms.CharField(widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}))
 
 
-class ConfirmationForm(forms.Form):
+class ConfirmationForm(TenantScopedFormMixin, forms.Form):
     return_url = forms.CharField(widget=forms.HiddenInput(), required=False)
 
     def __init__(self, *args, instance=None, **kwargs):

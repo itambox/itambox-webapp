@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from assets.services.type_library.planning import LibraryPlan, LibraryPlanAction
+from core.forms.base import TenantScopedFormMixin
 
 MAX_LIBRARY_DOCUMENT_BYTES = 10 * 1024 * 1024
 MAX_LIBRARY_PLAN_PAYLOAD_BYTES = 2 * 1024 * 1024
@@ -142,7 +143,7 @@ def _optional_string(payload: dict[str, Any], key: str) -> str | None:
     return value
 
 
-class LibraryUploadForm(forms.Form):
+class LibraryUploadForm(TenantScopedFormMixin, forms.Form):
     """Choose one bounded local JSON document for validation and preview."""
 
     document = forms.FileField(
@@ -159,7 +160,7 @@ class LibraryUploadForm(forms.Form):
         return document
 
 
-class LibraryApplyForm(forms.Form):
+class LibraryApplyForm(TenantScopedFormMixin, forms.Form):
     """Carry the original source, plan and signed token into an explicit apply."""
 
     source_document = forms.CharField(widget=forms.HiddenInput, required=True)
@@ -198,7 +199,7 @@ class LibraryApplyForm(forms.Form):
         return {action_id: self.cleaned_data[field_name] for field_name, action_id in self._conflict_field_ids.items()}
 
 
-class LibraryExportForm(forms.Form):
+class LibraryExportForm(TenantScopedFormMixin, forms.Form):
     """Select an explicit provenance-preserving export mode."""
 
     mode = forms.ChoiceField(

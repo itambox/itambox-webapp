@@ -1,8 +1,7 @@
 """Unit tests for the explicit form scoping abstractions (#584, WP2).
 
-These cover ``core.forms.scoping`` and ``core.forms.base``. The abstractions are
-unused by domain forms and the global patches stay installed, so every assertion
-is on observable behaviour and mirrors the WP0 characterization suite
+These cover ``core.forms.scoping`` and ``core.forms.base``. The global patches were
+removed in WP5, so every assertion is on observable behaviour and mirrors the parity suite
 (``test_form_patch_characterization.py``), which remains the parity contract.
 """
 
@@ -241,7 +240,6 @@ class TenantScopedFormMixinTests(_ScopeFixture):
         return type(name, (TenantScopedFormMixin, *bases, forms.Form), attrs)
 
     def test_tenant_not_required_by_default(self):
-        # The class name keeps the still-installed global patch out of the way.
         self.assertFalse(self._form("ThingFilterForm")().fields["tenant"].required)
 
     def test_required_once_a_tenant_exists(self):
@@ -316,7 +314,7 @@ class TenantScopedFormMixinTests(_ScopeFixture):
         class _Off(_On):
             tom_select = False
 
-        _Off.__name__ = "ThingTableConfigForm"  # keeps the still-installed global patch out
+        _Off.__name__ = "ThingTableConfigForm"
         self.assertEqual(_On().fields["a"].widget.attrs["data-tom-select"], "")
         self.assertNotIn("data-tom-select", _Off().fields["a"].widget.attrs)
 
@@ -351,7 +349,6 @@ class ApplyTomSelectTests(TestCase):
             a=forms.ChoiceField(choices=[("1", "One")]),
             b=forms.MultipleChoiceField(choices=[("1", "One")]),
         )
-        # The global patch may already have run; start from a clean slate.
         for f in fields.values():
             f.widget.attrs.pop("data-tom-select", None)
         self.assertEqual(apply_tom_select(fields), ["a", "b"])

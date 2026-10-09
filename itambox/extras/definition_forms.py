@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from django import forms
 
+from core.forms.base import TenantScopedFormMixin
 from extras.models import CustomFieldChoice, CustomFieldChoiceSet
 
 
@@ -34,7 +35,7 @@ class _RevisionFormMixin(forms.Form):
                 self.fields[name].disabled = True
 
 
-class ChoiceSetCreateForm(forms.Form):
+class ChoiceSetCreateForm(TenantScopedFormMixin, forms.Form):
     namespace = forms.CharField(max_length=64)
     slug = forms.SlugField(max_length=128)
     label = forms.CharField(max_length=255)
@@ -62,7 +63,7 @@ class ChoiceSetRetireForm(_RevisionFormMixin):
         self._disable_managed_fields("replacement_identity")
 
 
-class ChoiceCreateForm(forms.Form):
+class ChoiceCreateForm(TenantScopedFormMixin, forms.Form):
     key = forms.CharField(max_length=128)
     label = forms.CharField(max_length=255)
     position = forms.IntegerField(min_value=1)

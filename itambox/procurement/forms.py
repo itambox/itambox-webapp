@@ -312,7 +312,7 @@ class ContractForm(TenantScopedFormMixin, forms.ModelForm):
         )
 
 
-class ReceiveLineForm(forms.Form):
+class ReceiveLineForm(TenantScopedFormMixin, forms.Form):
     line_id = forms.IntegerField(widget=forms.HiddenInput)
     qty_to_receive = forms.IntegerField(
         min_value=0, label=_("Qty to Receive"), widget=forms.NumberInput(attrs={"class": "form-control", "min": 0})
@@ -334,7 +334,7 @@ class BaseReceiveLineFormSet(forms.BaseFormSet):
 ReceiveLineFormSet = forms.formset_factory(ReceiveLineForm, formset=BaseReceiveLineFormSet, extra=0)
 
 
-class AssetProvisionForm(forms.Form):
+class AssetProvisionForm(TenantScopedFormMixin, forms.Form):
     line_id = forms.IntegerField(widget=forms.HiddenInput)
     serial_number = forms.CharField(
         max_length=100,

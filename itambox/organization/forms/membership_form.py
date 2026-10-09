@@ -14,6 +14,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from core.forms import BulkEditForm, FilterForm
+from core.forms.base import TenantScopedFormMixin
 from core.mfa import role_is_privileged
 from organization.services.errors import MembershipServiceError
 from organization.services.membership import (
@@ -75,7 +76,7 @@ class _RoleChoiceField(_RoleLabelMixin, forms.ModelChoiceField):
 # ---------------------------------------------------------------------------
 # Managed-reach grant formset — one row per RoleGrant aggregate
 # ---------------------------------------------------------------------------
-class ManagedRoleGrantForm(forms.Form):
+class ManagedRoleGrantForm(TenantScopedFormMixin, forms.Form):
     """One managed-reach grant: a role plus its own coverage refinement.
 
     Purely a UI row — it does not persist itself; ``MembershipForm.save()``
@@ -200,7 +201,7 @@ ManagedRoleGrantFormSet = forms.formset_factory(
 MANAGED_FORMSET_PREFIX = "managed"
 
 
-class MembershipForm(forms.ModelForm):
+class MembershipForm(TenantScopedFormMixin, forms.ModelForm):
     """ModelForm for ``organization.Membership`` — the unified, lossless grant flow.
 
     Who / This-organization / Managed-tenants sections (see module docstring). The

@@ -4,10 +4,11 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import StatusLabel
+from core.forms.base import TenantScopedFormMixin
 from organization.models import Location
 
 
-class AssetAuditConfirmForm(forms.Form):
+class AssetAuditConfirmForm(TenantScopedFormMixin, forms.Form):
     """Modal form for standalone asset verification (detail-page 'Verify Physical Presence')."""
 
     location = forms.ModelChoiceField(
@@ -48,5 +49,5 @@ class AssetAuditConfirmForm(forms.Form):
 
 
 # Legacy ModelForm kept for API/compliance barcode views — not used by the detail modal.
-class AuditSessionForm(forms.Form):
+class AuditSessionForm(TenantScopedFormMixin, forms.Form):
     pass  # defined in compliance.forms_audit; imported from there

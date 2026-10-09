@@ -14,6 +14,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset, AssetDisposal, StatusLabel
+from core.forms.base import TenantScopedFormMixin
 from core.managers import get_current_tenant
 from core.tenant_scope import accessible_tenant_ids
 from organization.models import AssetHolder, Location, Tenant
@@ -96,7 +97,7 @@ def _tenant_locations():
     return qs
 
 
-class AssetBulkCheckInForm(BulkTenantSelectionMixin, forms.Form):
+class AssetBulkCheckInForm(TenantScopedFormMixin, BulkTenantSelectionMixin, forms.Form):
     """Batch-wide check-in options applied to every scanned asset."""
 
     status = forms.ModelChoiceField(
@@ -147,7 +148,7 @@ class AssetBulkCheckInForm(BulkTenantSelectionMixin, forms.Form):
         )
 
 
-class AssetBulkDisposeForm(BulkTenantSelectionMixin, forms.ModelForm):
+class AssetBulkDisposeForm(TenantScopedFormMixin, BulkTenantSelectionMixin, forms.ModelForm):
     """Batch-wide disposal options. ``proceeds`` is captured per-row in the UI."""
 
     disposal_date = forms.DateField(
@@ -235,7 +236,7 @@ def _tenant_target_assets():
     return qs
 
 
-class AssetBulkCheckOutForm(BulkTenantSelectionMixin, forms.Form):
+class AssetBulkCheckOutForm(TenantScopedFormMixin, BulkTenantSelectionMixin, forms.Form):
     """Batch-wide check-out target + options applied to every scanned asset.
 
     Exactly one target (holder / location / parent asset) is required; the

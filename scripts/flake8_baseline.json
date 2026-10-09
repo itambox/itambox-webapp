@@ -1492,14 +1492,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/apps.py",
-      "code": "C901",
-      "message": "'CoreConfig.ready' is too complex (16)",
-      "source": "    def ready(self):",
-      "context": "Module:body/ClassDef:CoreConfig:body/FunctionDef:ready:self",
-      "count": 1
-    },
-    {
       "path": "itambox/core/auth/oidc.py",
       "code": "B907",
       "message": "'name' is manually surrounded by quotes, consider using the `!r` conversion flag.",

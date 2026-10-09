@@ -37,13 +37,13 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-class UserProfileForm(forms.ModelForm):
+class UserProfileForm(TenantScopedFormMixin, forms.ModelForm):
     class Meta:
         model = User
         fields = ["first_name", "last_name", "email"]
 
 
-class UserForm(forms.ModelForm):
+class UserForm(TenantScopedFormMixin, forms.ModelForm):
     password = forms.CharField(
         widget=forms.PasswordInput(attrs={"class": "form-control"}),
         required=False,
@@ -351,7 +351,7 @@ class TableConfigForm(forms.Form):
         return f"{app_label}.{model_name}"
 
 
-class TokenForm(forms.ModelForm):
+class TokenForm(TenantScopedFormMixin, forms.ModelForm):
     expires = forms.DateField(
         required=False,
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),

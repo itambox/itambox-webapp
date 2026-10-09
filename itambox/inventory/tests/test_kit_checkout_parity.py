@@ -1235,7 +1235,7 @@ class KitCheckoutTenantScopeTests(KitCheckoutRouteTests):
         self.assertEqual(set(form.fields["tenant"].queryset), {self.tenant})
         # Issue #495/#523 follow-up: the modal opens ON the kit's owning tenant,
         # so the dependent choices are the OWNER's -- not empty, and never
-        # unscoped. (ModelChoiceField.queryset re-applies the tenant scope on
+        # unscoped. (the tenant-scoped choice fields re-apply the tenant scope on
         # access, so these reads are the ambient-scope projection of the
         # owner-scoped querysets the modal rendered.)
         self.assertEqual(list(form.fields["assigned_holder"].queryset), [self.holder])

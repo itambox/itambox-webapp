@@ -1,28 +1,27 @@
-"""Characterization of the global Django form patches installed by ``CoreConfig.ready()``.
+"""Parity contract of the explicit form abstractions (issue #584).
 
-Issue #584 (WP0). These tests pin the CURRENT behavior of the three runtime
-patches so the explicit replacements can be proven parity-neutral before any
-form is migrated and before the patches are deleted:
+The behaviors below used to be installed globally by ``CoreConfig.ready()``
+(WP0 pinned them on plain Django forms). WP5 removed those runtime patches, so
+the same matrices now run against the explicit replacements and must stay
+identical:
 
-* patch 1  - ``ModelChoiceField.queryset`` re-applies ``filter_by_tenant()`` on
-  every read (render-time choices and bound validation);
-* patch 2a - ``BaseForm.__init__`` marks a ``tenant`` field required when any
-  ``Tenant`` row exists, except for ``tenant_group`` forms and class names
-  containing ``Filter`` / ``BulkEdit``;
-* patch 2b - ``BaseForm.__init__`` adds ``data-tom-select`` to select widgets,
-  except radio/checkbox widgets, listboxes (``size``), column pickers and
-  ``*TableConfig*`` classes.
+* read-time choice scoping (``TenantScopedModelChoiceField``): scope matrix x
+  {choice reads, bound validation};
+* the tenant requiredness declaration (``TenantScopedFormMixin.tenant_required``)
+  with its ``tenant_group`` exclusion and the no-tenant-row case;
+* ``data-tom-select`` injection (``TenantScopedFormMixin`` / ``apply_tom_select``)
+  and every exclusion.
 
-The forms below are plain module-level forms whose querysets are frozen at
-import time (no tenant context), which is exactly the hazard patch 1 covers.
-Nothing here imports the patch mechanics; every assertion is on observable
-form behavior so the same suite must stay green with the patches removed.
+Plain Django forms are no longer touched by any of this: the last test class
+pins that explicitly.
 """
 
 from django import forms
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from core.forms.base import TenantScopedFormMixin
+from core.forms.scoping import TenantScopedModelChoiceField, TenantScopedModelMultipleChoiceField
 from core.managers import (
     set_current_all_accessible,
     set_current_tenant,
@@ -36,11 +35,11 @@ User = get_user_model()
 
 
 class _LocationPickerForm(forms.Form):
-    location = forms.ModelChoiceField(queryset=Location.objects.all(), required=False)
+    location = TenantScopedModelChoiceField(queryset=Location.objects.all(), required=False)
 
 
 class _LocationMultiPickerForm(forms.Form):
-    locations = forms.ModelMultipleChoiceField(queryset=Location.objects.all(), required=False)
+    locations = TenantScopedModelMultipleChoiceField(queryset=Location.objects.all(), required=False)
 
 
 class _ScopedChoicesBase(TestCase):
@@ -135,7 +134,7 @@ class ModelChoiceFieldQuerysetScopingTests(_ScopedChoicesBase):
         )
 
     def test_scope_narrowed_at_construction_intersects_with_later_scope(self):
-        """Form construction deep-copies the field through the patched getter.
+        """Form construction deep-copies the field through the scoped getter.
 
         The instance's stored queryset is already narrowed to the construction
         scope, and every later read intersects it with the then-ambient scope:
@@ -166,7 +165,7 @@ class ModelChoiceFieldQuerysetScopingTests(_ScopedChoicesBase):
         extra_user = User.objects.create_user(username="extra", password="pw")
 
         class _UserPickerForm(forms.Form):
-            user = forms.ModelChoiceField(queryset=User.objects.all(), required=False)
+            user = TenantScopedModelChoiceField(queryset=User.objects.all(), required=False)
 
         pks = set(_UserPickerForm().fields["user"].queryset.values_list("pk", flat=True))
         self.assertIn(extra_user.pk, pks)
@@ -174,14 +173,15 @@ class ModelChoiceFieldQuerysetScopingTests(_ScopedChoicesBase):
 
 
 class TenantRequiredRuleTests(TestCase):
-    """Patch 2a: the global ``tenant`` requiredness rule and its exclusions."""
+    """The ``tenant`` requiredness declaration and its exclusions."""
 
     @staticmethod
-    def _form_class(name, with_group=False):
+    def _form_class(name, with_group=False, required=True, base=TenantScopedFormMixin):
         attrs = {"tenant": forms.ModelChoiceField(queryset=Tenant.objects.all(), required=False)}
         if with_group:
             attrs["tenant_group"] = forms.ModelChoiceField(queryset=TenantGroup.objects.all(), required=False)
-        return type(name, (forms.Form,), attrs)
+        attrs["tenant_required"] = required
+        return type(name, (base, forms.Form), attrs)
 
     def test_no_tenant_row_keeps_the_field_optional(self):
         self.assertFalse(Tenant.objects.exists())
@@ -191,13 +191,10 @@ class TenantRequiredRuleTests(TestCase):
         Tenant.objects.create(name="A1", slug="t-a1")
         self.assertTrue(self._form_class("AssetThingForm")().fields["tenant"].required)
 
-    def test_filter_class_name_is_excluded(self):
+    def test_undeclared_form_stays_optional_whatever_its_name(self):
         Tenant.objects.create(name="A1", slug="t-a1")
-        self.assertFalse(self._form_class("AssetThingFilterForm")().fields["tenant"].required)
-
-    def test_bulk_edit_class_name_is_excluded(self):
-        Tenant.objects.create(name="A1", slug="t-a1")
-        self.assertFalse(self._form_class("AssetThingBulkEditForm")().fields["tenant"].required)
+        for name in ("AssetThingForm", "AssetThingFilterForm", "AssetThingBulkEditForm"):
+            self.assertFalse(self._form_class(name, required=False)().fields["tenant"].required, name)
 
     def test_tenant_group_sibling_field_is_excluded(self):
         Tenant.objects.create(name="A1", slug="t-a1")
@@ -205,7 +202,7 @@ class TenantRequiredRuleTests(TestCase):
 
     def test_form_without_tenant_field_is_untouched(self):
         Tenant.objects.create(name="A1", slug="t-a1")
-        form = type("PlainForm", (forms.Form,), {"name": forms.CharField(required=False)})()
+        form = type("PlainForm", (TenantScopedFormMixin, forms.Form), {"name": forms.CharField(required=False)})()
         self.assertNotIn("tenant", form.fields)
         self.assertFalse(form.fields["name"].required)
 
@@ -215,18 +212,19 @@ class TenantRequiredRuleTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("tenant", form.errors)
 
-    def test_bound_empty_tenant_is_accepted_for_excluded_forms(self):
+    def test_bound_empty_tenant_is_accepted_for_undeclared_and_group_forms(self):
         Tenant.objects.create(name="A1", slug="t-a1")
-        self.assertTrue(self._form_class("AssetThingFilterForm")(data={}).is_valid())
+        self.assertTrue(self._form_class("AssetThingFilterForm", required=False)(data={}).is_valid())
         self.assertTrue(self._form_class("SupplierThingForm", with_group=True)(data={}).is_valid())
 
 
 class TomSelectInjectionTests(TestCase):
-    """Patch 2b: ``data-tom-select`` injection and every exclusion."""
+    """``data-tom-select`` injection and every exclusion."""
 
     @staticmethod
-    def _form(name="ThingForm", **fields):
-        return type(name, (forms.Form,), fields)()
+    def _form(name="ThingForm", tom_select=True, **fields):
+        fields["tom_select"] = tom_select
+        return type(name, (TenantScopedFormMixin, forms.Form), fields)()
 
     def test_select_widget_gets_the_attribute(self):
         form = self._form(a=forms.ChoiceField(choices=[("1", "One")]))
@@ -266,11 +264,35 @@ class TomSelectInjectionTests(TestCase):
             form = self._form(a=forms.MultipleChoiceField(choices=[("1", "One")], widget=widget))
             self.assertNotIn("data-tom-select", form.fields["a"].widget.attrs, css)
 
-    def test_table_config_class_name_is_excluded(self):
-        form = self._form(name="AssetTableConfigForm", a=forms.ChoiceField(choices=[("1", "One")]))
+    def test_explicit_opt_out_replaces_the_table_config_class_name_rule(self):
+        form = self._form(name="AssetTableConfigForm", tom_select=False, a=forms.ChoiceField(choices=[("1", "One")]))
         self.assertNotIn("data-tom-select", form.fields["a"].widget.attrs)
 
     def test_non_select_widgets_are_untouched(self):
         form = self._form(a=forms.CharField(), b=forms.BooleanField(), c=forms.DateField())
         for name in ("a", "b", "c"):
             self.assertNotIn("data-tom-select", form.fields[name].widget.attrs)
+
+
+class PlainDjangoFormsAreUntouchedTests(_ScopedChoicesBase):
+    """No global patch remains: a plain Django form gets none of the behaviors."""
+
+    def test_plain_model_choice_field_is_not_rescoped(self):
+        _current_user.set(self.member)
+        set_current_tenant(self.a1)
+        plain = type(
+            "PlainPickerForm", (forms.Form,), {"location": forms.ModelChoiceField(queryset=Location.objects.all())}
+        )
+        self.assertEqual(self._choice_pks(plain), {self.loc_a1.pk, self.loc_a2.pk, self.loc_other.pk})
+
+    def test_plain_form_does_not_require_tenant(self):
+        plain = type(
+            "AssetThingForm",
+            (forms.Form,),
+            {"tenant": forms.ModelChoiceField(queryset=Tenant.objects.all(), required=False)},
+        )
+        self.assertFalse(plain().fields["tenant"].required)
+
+    def test_plain_form_does_not_get_tom_select(self):
+        plain = type("ThingForm", (forms.Form,), {"a": forms.ChoiceField(choices=[("1", "One")])})
+        self.assertNotIn("data-tom-select", plain().fields["a"].widget.attrs)
