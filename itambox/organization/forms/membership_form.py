@@ -439,8 +439,9 @@ class MembershipForm(TenantScopedFormMixin, forms.ModelForm):
         """
         self.fields["who"].initial = self.WHO_NEW
         self.fields["own_roles"].initial = []
+        # unscoped: choices span tenants the actor manages; narrowed to the authorized set in the form
         technician_role = (
-            Role.objects.filter(
+            Role._base_manager.filter(
                 tenant=membership_tenant,
                 shared_with_managed=True,
                 name__iexact="technician",
@@ -847,14 +848,16 @@ class MembershipFilterForm(FilterForm):
 class MembershipBulkRoleForm(BulkEditForm):
     """Bulk add/remove direct own-scope grants for selected memberships."""
 
+    # unscoped: choices span tenants the actor manages; narrowed to the authorized set in the form
     roles_to_add = forms.ModelMultipleChoiceField(
-        queryset=Role.objects.filter(deleted_at__isnull=True),
+        queryset=Role._base_manager.filter(deleted_at__isnull=True),
         required=False,
         label=_("Add roles"),
         widget=forms.SelectMultiple(attrs={"class": "form-select"}),
     )
+    # unscoped: choices span tenants the actor manages; narrowed to the authorized set in the form
     roles_to_remove = forms.ModelMultipleChoiceField(
-        queryset=Role.objects.filter(deleted_at__isnull=True),
+        queryset=Role._base_manager.filter(deleted_at__isnull=True),
         required=False,
         label=_("Remove roles"),
         widget=forms.SelectMultiple(attrs={"class": "form-select"}),

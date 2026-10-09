@@ -44,7 +44,8 @@ def _roles_visible_in(tenant):
             tenant__is_provider=True,
             shared_with_managed=True,
         )
-    return Role.objects.filter(deleted_at__isnull=True).filter(q)
+    # unscoped: shared roles live outside the active tenant scope
+    return Role._base_manager.filter(deleted_at__isnull=True).filter(q)
 
 
 def _annotate_member_count(qs):

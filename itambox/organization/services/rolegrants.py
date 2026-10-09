@@ -186,7 +186,8 @@ def assignable_roles_qs(tenant: Optional[Tenant]) -> QuerySet[Role]:
     validation re-checks ownership against the tenant actually submitted, so the
     widened widget queryset carries no authorization weight.
     """
-    qs = Role.objects.filter(deleted_at__isnull=True).select_related("tenant")
+    # unscoped: assignable roles/tenants derive from the actor managed reach, not the ambient tenant
+    qs = Role._base_manager.filter(deleted_at__isnull=True).select_related("tenant")
     if tenant is not None:
         ownership = Q(tenant=tenant)
         if tenant.managed_by_id:
