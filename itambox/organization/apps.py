@@ -32,7 +32,7 @@ class OrganizationConfig(AppConfig):
             accessible_tenant_ids_with_expiry,
             managed_accessible_tenant_ids,
         )
-        from organization.models import AssetHolder
+        from organization.models import AssetHolder, Location
         from organization.rbac import (
             applicable_grants,
             build_accessible_tenant_permissions_map,
@@ -40,6 +40,7 @@ class OrganizationConfig(AppConfig):
         )
         from organization.services.archive import archive_holder, restore_holder
         from organization.services.identity_provisioning import organization_identity_provisioner
+        from organization.services.location_archive import archive_location, restore_location
         from organization.services.restore_authority import organization_restore_authority
         from organization.services.tenant_access import organization_tenant_access_policy
 
@@ -74,6 +75,86 @@ class OrganizationConfig(AppConfig):
                     ArchiveBehaviour.DETACH,
                     "subscription assignments are ended; restore does not re-attach",
                 ),
+            ),
+        )
+        register_archive_handler(
+            Location._meta.label_lower,
+            archive=archive_location,
+            restore=restore_location,
+            relations=(
+                ArchiveRelation("assets.asset.location", ArchiveBehaviour.REFUSE, "while live assets reference it"),
+                ArchiveRelation(
+                    "assets.assetassignment.assigned_location",
+                    ArchiveBehaviour.REFUSE,
+                    "while active; closed rows KEEP",
+                ),
+                ArchiveRelation(
+                    "assets.assetrequest.source_location", ArchiveBehaviour.DETACH, "open requests; closed rows KEEP"
+                ),
+                ArchiveRelation(
+                    "assets.assetrequest.assigned_location", ArchiveBehaviour.DETACH, "open requests; closed rows KEEP"
+                ),
+                ArchiveRelation(
+                    "inventory.componentstock.location",
+                    ArchiveBehaviour.ARCHIVE,
+                    "refused while qty > 0; empty rows archived with the location",
+                ),
+                ArchiveRelation(
+                    "inventory.accessorystock.location",
+                    ArchiveBehaviour.ARCHIVE,
+                    "refused while qty > 0; empty rows archived with the location",
+                ),
+                ArchiveRelation(
+                    "inventory.consumablestock.location",
+                    ArchiveBehaviour.ARCHIVE,
+                    "refused while qty > 0; empty rows archived with the location",
+                ),
+                ArchiveRelation(
+                    "inventory.componentallocation.assigned_location",
+                    ArchiveBehaviour.REFUSE,
+                    "while open; closed rows KEEP",
+                ),
+                ArchiveRelation(
+                    "inventory.componentallocation.from_location",
+                    ArchiveBehaviour.REFUSE,
+                    "while open; closed rows KEEP",
+                ),
+                ArchiveRelation(
+                    "inventory.accessoryassignment.assigned_location",
+                    ArchiveBehaviour.REFUSE,
+                    "while open; closed rows KEEP",
+                ),
+                ArchiveRelation(
+                    "inventory.accessoryassignment.from_location",
+                    ArchiveBehaviour.REFUSE,
+                    "while open; closed rows KEEP",
+                ),
+                ArchiveRelation(
+                    "inventory.consumableassignment.assigned_location",
+                    ArchiveBehaviour.REFUSE,
+                    "while open; closed rows KEEP",
+                ),
+                ArchiveRelation(
+                    "inventory.consumableassignment.from_location",
+                    ArchiveBehaviour.REFUSE,
+                    "while open; closed rows KEEP",
+                ),
+                ArchiveRelation(
+                    "compliance.auditsession.location", ArchiveBehaviour.DETACH, "open sessions; finished rows KEEP"
+                ),
+                ArchiveRelation(
+                    "compliance.assetaudit.location", ArchiveBehaviour.KEEP, "audit results stay as evidence"
+                ),
+                ArchiveRelation(
+                    "organization.location.parent", ArchiveBehaviour.REFUSE, "while live child locations exist"
+                ),
+                ArchiveRelation(
+                    "procurement.purchaseorder.destination_location",
+                    ArchiveBehaviour.REFUSE,
+                    "while an open order targets it",
+                ),
+                ArchiveRelation("subscriptions", ArchiveBehaviour.DETACH, "subscription assignments are ended"),
+                ArchiveRelation("journal_entries", ArchiveBehaviour.KEEP, "journal entries stay as evidence"),
             ),
         )
         register_tenant_scope_provider(
