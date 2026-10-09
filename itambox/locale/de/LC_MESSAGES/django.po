@@ -15713,3 +15713,23 @@ msgid "Cannot delete %(object)s: %(count)s dependent record must be resolved fir
 msgid_plural "Cannot delete %(object)s: %(count)s dependent records must be resolved first (%(detail)s)."
 msgstr[0] "%(object)s kann nicht gelöscht werden: %(count)s abhängiger Datensatz muss zuerst aufgelöst werden (%(detail)s)."
 msgstr[1] "%(object)s kann nicht gelöscht werden: %(count)s abhängige Datensätze müssen zuerst aufgelöst werden (%(detail)s)."
+
+msgid "active assignments"
+msgstr "aktive Zuweisungen"
+
+msgid "held license seats"
+msgstr "belegte Lizenzplätze"
+
+msgid "live reservations"
+msgstr "laufende Reservierungen"
+
+msgid "open maintenance records"
+msgstr "offene Wartungseinträge"
+
+#, python-format
+msgid "Cannot restore %(object)s: another active asset already uses the serial number '%(serial)s'."
+msgstr "%(object)s kann nicht wiederhergestellt werden: Ein anderes aktives Asset verwendet bereits die Seriennummer '%(serial)s'."
+
+#, python-format
+msgid "Cannot restore %(object)s: an installed software entry was recorded again after the archive."
+msgstr "%(object)s kann nicht wiederhergestellt werden: Nach der Archivierung wurde erneut ein Eintrag für installierte Software erfasst."
