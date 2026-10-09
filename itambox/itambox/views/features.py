@@ -24,6 +24,7 @@ class ObjectChangeFilterForm(FilterForm):
 
 @method_decorator(login_required, name="dispatch")
 class ObjectChangeListView(ObjectListView):
+    # Scoped per request: TenantScopingViewMixin applies filter_by_tenant().
     queryset = ObjectChange.objects.prefetch_related("user", "changed_object_type", "related_object_type")
     filterset = ObjectChangeFilterSet
     filterset_form = ObjectChangeFilterForm
