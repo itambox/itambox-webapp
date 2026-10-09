@@ -23,7 +23,7 @@ class OrganizationConfig(AppConfig):
         import organization.signals
 
         # inline imports: app-registry: domain modules load only after the app registry is ready.
-        from core.archive_handlers import register_archive_handler
+        from core.archive_handlers import ArchiveBehaviour, ArchiveRelation, register_archive_handler
         from core.identity_provisioning import configure_identity_provisioner
         from core.restore_authority import configure_restore_authority_validator
         from core.tenant_access import configure_tenant_access_policy
@@ -50,6 +50,31 @@ class OrganizationConfig(AppConfig):
             AssetHolder._meta.label_lower,
             archive=archive_holder,
             restore=restore_holder,
+            relations=(
+                ArchiveRelation(
+                    "assets.assetassignment.assigned_user", ArchiveBehaviour.REFUSE, "while active; closed rows KEEP"
+                ),
+                ArchiveRelation("assets.assetrequest.assigned_user", ArchiveBehaviour.REFUSE, "while open"),
+                ArchiveRelation("assets.assetreservation.reserved_for", ArchiveBehaviour.REFUSE, "while live"),
+                ArchiveRelation("compliance.custodyreceipt.holder", ArchiveBehaviour.KEEP, "receipts stay as evidence"),
+                ArchiveRelation(
+                    "compliance.custodysigningsession.intended_holder", ArchiveBehaviour.REFUSE, "while pending"
+                ),
+                ArchiveRelation("inventory.accessoryassignment.assigned_holder", ArchiveBehaviour.REFUSE, "while open"),
+                ArchiveRelation("inventory.componentallocation.assigned_holder", ArchiveBehaviour.REFUSE, "while open"),
+                ArchiveRelation(
+                    "inventory.consumableassignment.assigned_holder", ArchiveBehaviour.REFUSE, "while open"
+                ),
+                ArchiveRelation("journal_entries", ArchiveBehaviour.KEEP, "journal entries stay as evidence"),
+                ArchiveRelation(
+                    "licenses.licenseseatassignment.assigned_holder", ArchiveBehaviour.REFUSE, "while the seat is held"
+                ),
+                ArchiveRelation(
+                    "subscriptions",
+                    ArchiveBehaviour.DETACH,
+                    "subscription assignments are ended; restore does not re-attach",
+                ),
+            ),
         )
         register_tenant_scope_provider(
             accessible_tenant_ids_with_expiry=accessible_tenant_ids_with_expiry,

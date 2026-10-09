@@ -100,3 +100,17 @@ def check_production_field_encryption_keys(app_configs, **kwargs):
             )
         ]
     return []
+
+
+@register()
+def check_archive_behaviour_tables(app_configs, **kwargs):
+    """Every registered aggregate archive table must match the live model graph (#619).
+
+    A child relation added to an aggregate root without a declared archive
+    behaviour (or a declared relation that no longer exists) would let an
+    archive silently orphan or ignore it, so the mismatch is a hard error.
+    """
+    # inline import: app-registry: the archive registry is populated by app ready() hooks.
+    from core.archive_handlers import archive_table_problems
+
+    return [Error(problem, id="core.E003") for problem in archive_table_problems()]

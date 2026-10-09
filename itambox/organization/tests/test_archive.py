@@ -270,7 +270,8 @@ class AssetHolderArchiveServiceTests(AssetHolderArchiveFixtureMixin, TenantTestM
     def test_clean_holder_is_archived_with_one_audit_row(self):
         result = self.archive()
 
-        self.assertEqual(result, type(result)(archived=1, detached=0, kept=0))
+        self.assertEqual((result.archived, result.detached, result.kept), (1, 0, 0))
+        self.assertIsNotNone(result.operation_id)
         self.holder.refresh_from_db()
         self.assertIsNotNone(self.holder.deleted_at)
         self.assertFalse(AssetHolder.objects.filter(pk=self.holder.pk).exists())
