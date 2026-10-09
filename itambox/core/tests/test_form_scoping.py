@@ -483,7 +483,11 @@ class CoreFormsUseExplicitScopingTests(TestCase):
             pick = forms.ChoiceField(choices=[("a", "A")], required=False)
             listbox = forms.ChoiceField(choices=[("a", "A")], widget=forms.Select(attrs={"size": "5"}))
 
+        class _FS(django_filters.FilterSet):
+            pass
+
         class _Filter(FilterForm):
+            filterset_class = _FS
             pick = forms.ChoiceField(choices=[("a", "A")], required=False)
             radio = forms.ChoiceField(choices=[("a", "A")], widget=forms.RadioSelect)
 
