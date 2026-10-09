@@ -203,11 +203,11 @@ def archive_table_problems() -> list[str]:
         declared = [row.relation for row in table]
         actual = reverse_relation_keys(apps.get_model(label))
         duplicated = sorted({key for key in declared if declared.count(key) > 1})
-        problems.extend(f"{label}: relation '{key}' is declared twice." for key in duplicated)
+        problems.extend(f"{label}: relation {key!r} is declared twice." for key in duplicated)
         problems.extend(
-            f"{label}: relation '{key}' has no archive behaviour." for key in sorted(actual - set(declared))
+            f"{label}: relation {key!r} has no archive behaviour." for key in sorted(actual - set(declared))
         )
-        problems.extend(f"{label}: declared relation '{key}' does not exist." for key in sorted(set(declared) - actual))
+        problems.extend(f"{label}: declared relation {key!r} does not exist." for key in sorted(set(declared) - actual))
     return problems
 
 

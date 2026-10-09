@@ -34,7 +34,7 @@ class ArchiveTableCheckTests(TestCase):
         with patch.dict(archive_handlers._ARCHIVE_TABLES, {LABEL: table}):
             errors = check_archive_behaviour_tables(None)
         self.assertEqual([e.id for e in errors], ["core.E003"])
-        self.assertIn("'subscriptions' has no archive behaviour", errors[0].msg)
+        self.assertIn("relation 'subscriptions' has no archive behaviour", errors[0].msg)
 
     def test_stale_and_duplicate_rows_are_errors(self):
         table = archive_table(LABEL) + (
