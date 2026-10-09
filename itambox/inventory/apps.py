@@ -14,3 +14,22 @@ class InventoryConfig(AppConfig):
 
         for model in ASSIGNMENT_MODELS:
             register_purge_handler(model._meta.label_lower, purge_inventory_assignment)
+
+        # inline imports: app-registry: the archive registry is populated once models are loaded.
+        from core.archive_handlers import ArchiveBehaviour, ArchiveRelation, register_archive_handler
+        from inventory.archive_services import archive_kit, restore_kit
+        from inventory.models import Kit
+
+        register_archive_handler(
+            Kit._meta.label_lower,
+            archive=archive_kit,
+            restore=restore_kit,
+            relations=(
+                ArchiveRelation(
+                    "inventory.kititem.kit",
+                    ArchiveBehaviour.ARCHIVE,
+                    "archived with the kit through their own save(); restore brings them back",
+                ),
+                ArchiveRelation("journal_entries", ArchiveBehaviour.KEEP, "journal entries stay as evidence"),
+            ),
+        )

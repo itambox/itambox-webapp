@@ -5,6 +5,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.db.models import Q
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -12,7 +13,6 @@ from django.utils.translation import gettext_lazy as _
 from core.currency import CurrencyField
 from core.managers import (
     ExplicitScopeAllObjectsManager,
-    ExplicitScopeManager,
     ExplicitScopeSoftDeleteManager,
 )
 from core.mixins import (
@@ -24,6 +24,7 @@ from core.mixins import (
     FileAttachmentMixin,
     ImageAttachmentMixin,
     JournalingMixin,
+    SoftDeleteMixin,
 )
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel
 from extras.models import Tag
@@ -430,14 +431,27 @@ class Subscription(CustomFieldDataMixin, AutoSlugMixin, BookmarkableMixin, Delet
             return True
 
 
-class SubscriptionAssignment(ChangeLoggingMixin, BaseModel):
+class SubscriptionAssignment(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     tenant_lookup = "subscription__tenant"
     # Subscriptions are always tenant-owned; a global (tenant=None) parent would
     # be an anomaly, so never expose its assignments cross-tenant.
     deny_global_tenant = True
-    objects = ExplicitScopeManager()
+    # An assignment is a leaf row of the Subscription aggregate: archiving a
+    # subscription archives its assignments with it (and restores them with it),
+    # so the model carries its own `deleted_at` and the soft-delete-aware default
+    # manager. `all_objects` is the including-deleted manager the aggregate
+    # service reads under its lock.
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
-    """Flexibly links a Subscription to the entity (or entities) it covers."""
+    "Flexibly links a Subscription to the entity (or entities) it covers."
+
+    #: Correlates the leaf row with the aggregate archive operation that moved it
+    #: (#619). A restore only brings back rows an operation archived; a row ended
+    #: on its own (a holder detachment or a leaf delete) has no marker and stays
+    #: deleted. NULL for every pre-existing row.
+    archive_operation_id = models.UUIDField(null=True, blank=True, editable=False, verbose_name=_("Archive Operation"))
+
     subscription = models.ForeignKey(
         to=Subscription, on_delete=models.CASCADE, related_name="assignments", verbose_name=_("Subscription")
     )
@@ -472,7 +486,9 @@ class SubscriptionAssignment(ChangeLoggingMixin, BaseModel):
         verbose_name_plural = _("Subscription Assignments")
         constraints = [
             models.UniqueConstraint(
-                fields=["subscription", "content_type", "object_id"], name="subscriptions_assignment_unique"
+                fields=["subscription", "content_type", "object_id"],
+                condition=Q(deleted_at__isnull=True),
+                name="subscriptions_assignment_unique",
             )
         ]
 

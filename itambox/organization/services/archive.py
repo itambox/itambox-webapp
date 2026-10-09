@@ -111,10 +111,14 @@ def _detach_user_link(holder: AssetHolder) -> int:
 def _end_subscription_assignments(holder: AssetHolder, operation: ArchiveOperation) -> int:
     """End the subscriptions covering this holder.
 
-    A subscription assignment is a generic relation with no leaf ``deleted_at``
-    yet (that flag arrives with the subscription step of #619), so ending it
-    means closing the row through its own ``delete()`` — one audited delete per
-    assignment, and no live row keeps pointing at the archived holder.
+    A subscription assignment is a leaf row of its subscription and carries its
+    own ``deleted_at`` since #619 step 3, so ending it is a leaf soft delete
+    through the row's own ``delete()``: one audited delete per assignment, and no
+    live row keeps pointing at the archived holder. The row keeps no
+    ``archive_operation_id``, so a later subscription restore never resurrects an
+    assignment that was ended here, and the conditional
+    ``(subscription, content_type, object_id)`` unique slot is free for a
+    re-assignment.
     """
     holder_ct = ContentType.objects.get_for_model(AssetHolder)
     assignments = SubscriptionAssignment.objects.for_scope(Scope.current()).filter(

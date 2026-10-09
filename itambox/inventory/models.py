@@ -712,17 +712,29 @@ class Kit(
         return reverse("inventory:kit_detail", kwargs={"pk": self.pk})
 
 
-class KitItem(ChangeLoggingMixin, BaseModel):
+class KitItem(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     tenant_lookup = "kit__tenant"
     # Global Kits (tenant=None) are cross-tenant templates, so their items stay
     # READABLE by default (the manager's default behaviour for tenant_lookup
     # models). Cross-tenant WRITE is blocked by StrictTenantPermission /
     # perform_create tenant-defaulting.
-    objects = ExplicitScopeManager()
+    #
+    # Kit items are leaf rows of the Kit aggregate: archiving a kit archives its
+    # items with it (and restores them with it), so the model carries its own
+    # `deleted_at` and the soft-delete-aware default manager. `all_objects` is the
+    # including-deleted manager the aggregate service reads under its lock.
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     @property
     def tenant(self):
         return self.kit.tenant if self.kit_id else None
+
+    #: Correlates the leaf row with the aggregate archive operation that moved it
+    #: (#619). A restore only brings back rows an operation archived; a row
+    #: deleted on its own (leaf delete) has no marker and stays deleted. NULL for
+    #: every pre-existing row.
+    archive_operation_id = models.UUIDField(null=True, blank=True, editable=False, verbose_name=_("Archive Operation"))
 
     kit = models.ForeignKey(Kit, on_delete=models.CASCADE, related_name="items", verbose_name=_("Kit"), db_index=True)
     asset_type = models.ForeignKey(

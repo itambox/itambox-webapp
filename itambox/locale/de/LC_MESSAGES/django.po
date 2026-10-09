@@ -5850,6 +5850,33 @@ msgstr ""
 
 #, python-format
 msgid ""
+"Cannot restore %(object)s: another active kit already uses the name "
+"'%(name)s'."
+msgstr ""
+"%(object)s kann nicht wiederhergestellt werden: Ein anderes aktives Kit "
+"verwendet bereits den Namen '%(name)s'."
+
+#, python-format
+msgid ""
+"Cannot restore %(object)s: another active subscription already uses the "
+"slug '%(slug)s'."
+msgstr ""
+"%(object)s kann nicht wiederhergestellt werden: Ein anderes aktives "
+"Abonnement verwendet bereits den Slug '%(slug)s'."
+
+#, python-format
+msgid ""
+"Cannot restore %(object)s: one of its targets is already covered by a live "
+"subscription assignment."
+msgstr ""
+"%(object)s kann nicht wiederhergestellt werden: Eines seiner Ziele ist "
+"bereits durch eine aktive Abonnementszuweisung abgedeckt."
+
+msgid "Archive Operation"
+msgstr "Archivierungsvorgang"
+
+#, python-format
+msgid ""
 "Detached %(count)s linked record that referenced the asset holder."
 msgid_plural ""
 "Detached %(count)s linked records that referenced the asset holder."
