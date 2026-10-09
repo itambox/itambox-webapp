@@ -72,8 +72,8 @@ def _scoped(model) -> QuerySet:
 
 
 def _including_deleted(model) -> QuerySet:
-    # unscoped by deletion state: archived rows are hidden from the default
-    # manager by design; the ambient scope is applied explicitly.
+    # unscoped: archived rows are hidden from the default manager by design;
+    # the ambient scope is applied explicitly where the manager supports it.
     manager = model.all_objects
     if hasattr(manager, "for_scope"):
         return manager.for_scope(Scope.current())
@@ -208,7 +208,10 @@ def _kept_evidence_count(asset: Asset) -> int:
     closed_target_assignments = _scoped(AssetAssignment).filter(assigned_asset=asset, is_active=False).count()
     released_seats = _including_deleted(_seat_model()).filter(asset=asset, deleted_at__isnull=False).count()
     disposals = asset.disposals.count()
+    # unscoped: evidence counts must include soft-deleted rows; the asset is
+    # already locked and scope-checked by the caller.
     receipts = _model("compliance", "CustodyReceipt")._base_manager.filter(asset=asset).count()
+    # unscoped: same reason as the receipt count above.
     audits = _model("compliance", "AssetAudit")._base_manager.filter(asset=asset).count()
     return (
         closed_requests
