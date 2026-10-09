@@ -1,9 +1,10 @@
 import django_filters
 
+from core.forms.scoping import TenantScopedFilterSetMixin
 from organization.models import TenantResourceGrant
 
 
-class TenantResourceGrantAuditFilterSet(django_filters.FilterSet):
+class TenantResourceGrantAuditFilterSet(TenantScopedFilterSetMixin, django_filters.FilterSet):
     state = django_filters.ChoiceFilter(
         choices=(("active", "Active"), ("revoked", "Revoked")),
         method="filter_state",

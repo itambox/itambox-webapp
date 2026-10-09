@@ -4,6 +4,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
 from django.utils.translation import gettext_lazy as _
 
+from core.forms import TenantScopedAdminFormMixin
 from users.models import GroupMembership
 
 try:
@@ -17,7 +18,7 @@ User = get_user_model()
 
 
 @admin.register(User)
-class UserAdmin(BaseUserAdmin):
+class UserAdmin(TenantScopedAdminFormMixin, BaseUserAdmin):
     """Stock Django UserAdmin extended to surface the custom ``can_login`` flag."""
 
     list_display = (
@@ -47,7 +48,7 @@ class UserAdmin(BaseUserAdmin):
 
 
 @admin.register(GroupMembership)
-class GroupMembershipAdmin(admin.ModelAdmin):
+class GroupMembershipAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("user_group", "membership", "source", "external_id", "added_at")
     list_filter = ("source", "user_group__tenant")
     search_fields = (

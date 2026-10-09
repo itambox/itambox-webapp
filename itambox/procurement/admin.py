@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
+from core.forms import TenantScopedAdminFormMixin
+
 from .models import Contract, FulfillmentLink, PurchaseOrder, PurchaseOrderLine
 
 
@@ -11,7 +13,7 @@ class PurchaseOrderLineInline(admin.TabularInline):
 
 
 @admin.register(PurchaseOrder)
-class PurchaseOrderAdmin(admin.ModelAdmin):
+class PurchaseOrderAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = (
         "order_number",
         "supplier",
@@ -27,7 +29,7 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
 
 
 @admin.register(PurchaseOrderLine)
-class PurchaseOrderLineAdmin(admin.ModelAdmin):
+class PurchaseOrderLineAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = (
         "purchase_order",
         "qty_ordered",
@@ -42,12 +44,12 @@ class PurchaseOrderLineAdmin(admin.ModelAdmin):
 
 
 @admin.register(FulfillmentLink)
-class FulfillmentLinkAdmin(admin.ModelAdmin):
+class FulfillmentLinkAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("asset_request", "purchase_order_line", "qty_allocated", "qty_received")
 
 
 @admin.register(Contract)
-class ContractAdmin(admin.ModelAdmin):
+class ContractAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = (
         "contract_number",
         "name",
