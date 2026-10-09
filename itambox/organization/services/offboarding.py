@@ -7,7 +7,7 @@ capabilities into a single, **read-only** report:
 - active :class:`~assets.models.AssetAssignment` rows,
 - accessory / component / consumable checkouts,
 - license seats,
-- unaccepted custody receipts,
+- unaccepted custody receipts and custody signing sessions that are still open,
 - open :class:`~assets.models.AssetRequest` rows (requester **and** assigned_user),
 - active :class:`~assets.models.AssetReservation` rows,
 - subscription assignments,
@@ -32,6 +32,7 @@ from typing import Optional
 
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
+from django.utils import timezone
 
 from assets.choices import RequestStatusChoices
 from assets.models import (
@@ -40,7 +41,7 @@ from assets.models import (
     AssetReservation,
 )
 from assets.models.choices import ReservationStatusChoices
-from compliance.models import CustodyReceipt
+from compliance.models import CustodyReceipt, CustodySigningSession
 from core.managers import Scope
 from inventory.models import (
     AccessoryAssignment,
@@ -243,6 +244,37 @@ def _custody_items(holder: AssetHolder) -> list[ObligationItem]:
     ]
 
 
+def _signing_session_items(holder: AssetHolder) -> list[ObligationItem]:
+    """Custody signing sessions prepared for this holder that are still open.
+
+    A session is open until it is consumed, canceled, or expired. It is a real
+    outstanding item: the operator prepared a handoff for this person and the
+    bearer token can still be redeemed. The queryset filter mirrors the model's
+    ``is_active`` property in indexable form.
+    """
+    sessions = (
+        CustodySigningSession.objects.for_scope(Scope.current())
+        .filter(
+            intended_holder=holder,
+            consumed_at__isnull=True,
+            canceled_at__isnull=True,
+            expires_at__gt=timezone.now(),
+        )
+        .select_related("receipt__asset")
+    )
+    return [
+        ObligationItem(
+            kind="custody_signing_session",
+            label="Custody signing session",
+            description=f"Open signing session for: {session.receipt.asset}",
+            url=session.receipt.get_absolute_url(),
+            object_pk=session.pk,
+            model_label="compliance.CustodySigningSession",
+        )
+        for session in sessions
+    ]
+
+
 def _request_items(holder: AssetHolder) -> list[ObligationItem]:
     """Open asset requests where this person is the requester *or* the assignee."""
     user = _holder_user(holder)
@@ -353,6 +385,7 @@ def get_offboarding_report(holder: AssetHolder, *, include_custody: bool = True)
     items += _license_items(holder)
     if include_custody:
         items += _custody_items(holder)
+        items += _signing_session_items(holder)
     items += _request_items(holder)
     items += _reservation_items(holder)
     items += _subscription_items(holder)

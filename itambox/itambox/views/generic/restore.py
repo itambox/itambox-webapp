@@ -12,6 +12,7 @@ from django.utils.translation import gettext as _
 from django.views.generic import View
 
 from core import restore_authority
+from core.archive_handlers import AggregateArchiveBlocked, restore_object
 from core.purge_handlers import TombstonePurgeBlocked, purge_object
 from itambox.utils import get_model_viewname
 from itambox.views.generic.htmx_responses import is_htmx_request, success_response
@@ -71,7 +72,15 @@ class ObjectRestoreView(HtmxActionMixin, PermissionRequiredMixin, LoginRequiredM
         try:
             with transaction.atomic():
                 restore_authority.validate_restore_grant_authority(request.user, self.object)
-                self.object.restore()
+                restore_object(self.object, actor=request.user, request=request)
+        except AggregateArchiveBlocked as exc:
+            # The object's own aggregate service refused the restore (for
+            # example a conditional unique slot is taken again): report it and
+            # leave the recycle-bin row as it is.
+            messages.error(request, exc.user_message)
+            return HttpResponseRedirect(
+                safe_return_url(request, request.META.get("HTTP_REFERER"), _recycle_bin_list_url(self.model))
+            )
         except ValidationError as exc:
             logger.warning(
                 "Blocked unsafe restore of %s pk=%s by user pk=%s: %s",
@@ -151,6 +160,50 @@ class ObjectBulkRestoreView(HtmxActionMixin, PermissionRequiredMixin, LoginRequi
 
         return self.request.user.has_perm(f"{app_label}.change_{model_name}")
 
+    def _restore_validated_batch(self, request, rows):
+        """Validate the complete batch, then restore it as a whole.
+
+        Returns ``(error_response, unsafe_skipped)``: an error response when an
+        aggregate service refused a row — the batch is rolled back entirely —
+        otherwise ``None`` plus the count of rows skipped for missing restore
+        authority. The complete batch is validated before anything is restored:
+        one restore could otherwise grant authority that changes a later
+        decision.
+        """
+        safe_rows = []
+        unsafe_skipped = 0
+        try:
+            with transaction.atomic():
+                for obj in rows:
+                    try:
+                        restore_authority.validate_restore_grant_authority(request.user, obj)
+                    except ValidationError as exc:
+                        unsafe_skipped += 1
+                        logger.warning(
+                            "Skipped unsafe bulk restore of %s pk=%s by user pk=%s: %s",
+                            self.model._meta.label_lower,
+                            obj.pk,
+                            request.user.pk,
+                            "; ".join(exc.messages),
+                        )
+                    else:
+                        safe_rows.append(obj)
+
+                for obj in safe_rows:
+                    restore_object(obj, actor=request.user, request=request)
+        except AggregateArchiveBlocked as exc:
+            # An aggregate service refused one of the rows: the reason belongs to
+            # that row, so the operator sees the typed message and nothing is
+            # restored.
+            messages.error(request, exc.user_message)
+            return (
+                HttpResponseRedirect(
+                    safe_return_url(request, request.META.get("HTTP_REFERER"), _recycle_bin_list_url(self.model))
+                ),
+                unsafe_skipped,
+            )
+        return None, unsafe_skipped
+
     def post(self, request, *args, **kwargs):
         pks = request.POST.getlist("pk")
         if not pks:
@@ -170,28 +223,9 @@ class ObjectBulkRestoreView(HtmxActionMixin, PermissionRequiredMixin, LoginRequi
                 % {"count": skipped, "objects": self.model._meta.verbose_name_plural},
             )
 
-        safe_rows = []
-        unsafe_skipped = 0
-        with transaction.atomic():
-            for obj in rows:
-                try:
-                    restore_authority.validate_restore_grant_authority(request.user, obj)
-                except ValidationError as exc:
-                    unsafe_skipped += 1
-                    logger.warning(
-                        "Skipped unsafe bulk restore of %s pk=%s by user pk=%s: %s",
-                        self.model._meta.label_lower,
-                        obj.pk,
-                        request.user.pk,
-                        "; ".join(exc.messages),
-                    )
-                else:
-                    safe_rows.append(obj)
-
-            # Validate the complete batch before restoring anything. Otherwise
-            # one restore could grant authority that changes a later decision.
-            for obj in safe_rows:
-                obj.restore()
+        error_response, unsafe_skipped = self._restore_validated_batch(request, rows)
+        if error_response is not None:
+            return error_response
 
         if unsafe_skipped:
             messages.warning(
@@ -207,7 +241,7 @@ class ObjectBulkRestoreView(HtmxActionMixin, PermissionRequiredMixin, LoginRequi
             )
 
         success_msg = _("Successfully restored {count} {model_plural}.").format(
-            count=len(safe_rows),
+            count=len(rows) - unsafe_skipped,
             model_plural=self.model._meta.verbose_name_plural,
         )
 

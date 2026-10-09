@@ -5991,7 +5991,7 @@
       "path": "itambox/organization/views/assetholder_views.py",
       "code": "F401",
       "message": "'django.http.HttpResponseBadRequest' imported but unused",
-      "source": "from django.http import HttpResponseBadRequest",
+      "source": "from django.http import HttpResponseBadRequest, HttpResponseRedirect",
       "context": "Module:body",
       "count": 1
     },
