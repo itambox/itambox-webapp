@@ -275,7 +275,7 @@ class MigrationBaselineManifestTests(SimpleTestCase):
         self.assertEqual(len(manifest["historical_ids"]), 262)
         self.assertEqual(len(manifest["replacement_ids"]), 62)
         self.assertEqual(len(manifest["replacement_target_ids"]), 262)
-        self.assertEqual(len(manifest["post_transition_ids"]), 55)
+        self.assertEqual(len(manifest["post_transition_ids"]), 57)
         self.assertTrue(
             {
                 "assets.0102_asset_type_composition_schema",
@@ -297,9 +297,9 @@ class MigrationBaselineManifestTests(SimpleTestCase):
             [
                 "assets.0122_repair_maintenance_anchor",
                 "compliance.0107_custodyreceipt_assignment_superseded",
-                "inventory.0101_alter_accessoryassignment_options_and_more",
+                "inventory.0102_kititem_leaf_deleted_at",
                 "procurement.0103_remove_fulfillmentlink_unique_request_po_line_link_and_more",
-                "subscriptions.0103_unified_vendor_cutover",
+                "subscriptions.0104_subscriptionassignment_leaf_deleted_at",
                 "users.0103_oidcidentity",
             ],
         )

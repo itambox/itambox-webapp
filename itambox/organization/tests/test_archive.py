@@ -388,7 +388,13 @@ class AssetHolderArchiveServiceTests(AssetHolderArchiveFixtureMixin, TenantTestM
         self.assertEqual(result.detached, 2)
         self.holder.refresh_from_db()
         self.assertIsNone(self.holder.user_id)
-        self.assertFalse(SubscriptionAssignment._base_manager.filter(pk=assignment.pk).exists())
+        # The end is a leaf soft delete, not a physical delete: the row survives as
+        # a tombstone (hidden from the live manager) and carries no operation
+        # marker, so a later subscription restore never resurrects it.
+        assignment.refresh_from_db()
+        self.assertIsNotNone(assignment.deleted_at)
+        self.assertIsNone(assignment.archive_operation_id)
+        self.assertFalse(SubscriptionAssignment.objects.filter(pk=assignment.pk).exists())
         self.assertEqual(holder_changes(self.holder, action="delete").count(), 1)
 
     def test_archive_is_atomic_when_a_detach_fails(self):

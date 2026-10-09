@@ -3838,6 +3838,46 @@
     },
     {
       "dependencies": [
+        "inventory.0101_alter_accessoryassignment_options_and_more",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "inventory.0102_kititem_leaf_deleted_at",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/inventory/migrations/0102_kititem_leaf_deleted_at.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": false,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "assets.0100_issue88_shard_10_assets_history_1"
       ],
       "id": "licenses.0100_issue88_shard_11_licenses_schema",
@@ -5154,6 +5194,47 @@
     },
     {
       "dependencies": [
+        "contenttypes.0002_remove_content_type_name",
+        "subscriptions.0103_unified_vendor_cutover",
+        "users.0100_issue88_shard_62_users_relations"
+      ],
+      "id": "subscriptions.0104_subscriptionassignment_leaf_deleted_at",
+      "is_replacement": false,
+      "operations": {
+        "BtreeGistExtension": {
+          "count": 0
+        },
+        "RunPython": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "RunSQL": {
+          "with_noop_reverse": 0,
+          "with_reverse": 0,
+          "without_reverse": 0
+        },
+        "SeparateDatabaseAndState": {
+          "count": 0
+        }
+      },
+      "path": "itambox/subscriptions/migrations/0104_subscriptionassignment_leaf_deleted_at.py",
+      "replaces": [],
+      "reviewed_disposition": null,
+      "run_before": [],
+      "special_users_bootstrap": false,
+      "swappable_user_dependency": true,
+      "syntactic_facts": {
+        "has_custom_operations": {
+          "BtreeGistExtension": false,
+          "RunPython": false,
+          "RunSQL": false,
+          "SeparateDatabaseAndState": false
+        }
+      }
+    },
+    {
+      "dependencies": [
         "auth.0012_alter_user_first_name_max_length"
       ],
       "id": "users.0000_issue88_shard_01_users_bootstrap",
@@ -5662,6 +5743,7 @@
     "extras.0126_scheduledreport_last_run_archive",
     "extras.0127_retire_report_designer_legacy",
     "inventory.0101_alter_accessoryassignment_options_and_more",
+    "inventory.0102_kititem_leaf_deleted_at",
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
     "organization.0103_tenant_resource_grant_expiry",
@@ -5671,6 +5753,7 @@
     "subscriptions.0101_remove_subscription_auto_renewal_and_more",
     "subscriptions.0102_commercial_vendor_and_terms",
     "subscriptions.0103_unified_vendor_cutover",
+    "subscriptions.0104_subscriptionassignment_leaf_deleted_at",
     "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",
     "users.0102_token_updated_at",
     "users.0103_oidcidentity"
@@ -5729,7 +5812,8 @@
       "extras.0107_scheduledreportscopeauthorization_revocation",
       "extras.0108_alertlog_delivery_outcome",
       "extras.0109_webhookdelivery",
-      "organization.0101_membership_external_id_and_more"
+      "organization.0101_membership_external_id_and_more",
+      "subscriptions.0104_subscriptionassignment_leaf_deleted_at"
     ]
   },
   "summary": {
@@ -5748,7 +5832,7 @@
     "global_roots": [],
     "missing_replacement_targets": 0,
     "per_app_local_roots_and_leaves": {},
-    "post_transition_migrations": 55,
+    "post_transition_migrations": 57,
     "replacement_shards": 62,
     "replacement_targets": 262
   }

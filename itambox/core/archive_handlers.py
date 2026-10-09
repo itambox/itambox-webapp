@@ -83,7 +83,8 @@ class ArchiveRelation:
 class ArchiveResult:
     """What one archive operation moved.
 
-    :param archived: aggregate-root rows archived (0 or 1 per root).
+    :param archived: rows archived: the aggregate root (0 or 1) plus the child
+        rows archived with it.
     :param detached: live rows detached from the root.
     :param kept: evidence rows deliberately left referencing the root.
     :param operation_id: id of the :class:`ArchiveOperation`; ``None`` for a no-op.
@@ -122,6 +123,10 @@ class ArchiveOperation:
     def detach_message(self) -> str:
         """Change-log message of a row detached from the root."""
         return f"Detached from {self.root_label} {self.root_pk}"
+
+    def archive_message(self) -> str:
+        """Change-log message of a child row archived with the root."""
+        return f"Archived with {self.root_label} {self.root_pk}"
 
 
 class AggregateArchiveBlocked(ValidationError):

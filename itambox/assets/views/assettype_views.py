@@ -86,7 +86,7 @@ class AssetTypeDetailView(ObjectDetailView):
 
         kits_qs = (
             Kit.objects.for_scope(Scope.current())
-            .filter(items__asset_type=assettype)
+            .filter(items__asset_type=assettype, items__deleted_at__isnull=True)
             .distinct()
             .select_related("tenant")
         )
