@@ -33,3 +33,15 @@ class InventoryConfig(AppConfig):
                 ArchiveRelation("journal_entries", ArchiveBehaviour.KEEP, "journal entries stay as evidence"),
             ),
         )
+
+        # inline imports: app-registry: the inventory item aggregates (step 4 of #619).
+        from inventory.item_archive_services import AGGREGATES, HANDLERS, archive_relations
+
+        for aggregate in AGGREGATES:
+            archive_handler, restore_handler = HANDLERS[aggregate.model._meta.label_lower]
+            register_archive_handler(
+                aggregate.model._meta.label_lower,
+                archive=archive_handler,
+                restore=restore_handler,
+                relations=archive_relations(aggregate),
+            )

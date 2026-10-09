@@ -15689,8 +15689,24 @@ msgstr "Bestandszeilen mit Restmenge"
 msgid "open inventory checkouts"
 msgstr "offene Bestandsausgaben"
 
+msgid "open assignments"
+msgstr "offene Zuweisungen"
+
+msgid "live kit items"
+msgstr "aktive Kit-Positionen"
+
+msgid "held seats"
+msgstr "belegte Lizenzplätze"
+
+msgid "live kit items listing the license"
+msgstr "aktive Kit-Positionen, die die Lizenz auflisten"
+
 msgid "Cannot restore %(object)s: its parent location is archived or unavailable."
 msgstr "%(object)s kann nicht wiederhergestellt werden: Der übergeordnete Lagerort ist archiviert oder nicht verfügbar."
+
+#, python-format
+msgid "Cannot restore %(object)s: another active item already uses the slug '%(slug)s'."
+msgstr "%(object)s kann nicht wiederhergestellt werden: Ein anderer aktiver Artikel verwendet bereits den Slug '%(slug)s'."
 
 #, python-format
 msgid "Cannot delete %(object)s: %(count)s dependent record must be resolved first (%(detail)s)."
