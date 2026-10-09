@@ -10,6 +10,7 @@
     "itambox/inventory/tests/test_kit_checkout_parity.py",
     "itambox/inventory/tests/test_kit_owner_scope.py",
     "itambox/organization/tests/test_archive.py",
+    "itambox/procurement/tests/test_purchase_order_archive.py",
     "itambox/subscriptions/tests/test_models.py",
     "itambox/subscriptions/tests/test_subscription_archive.py",
     "scripts/tests/test_migration_audit.py"
@@ -791,6 +792,7 @@
     "itambox/procurement/tests/test_form_scoping.py",
     "itambox/procurement/tests/test_invariants.py",
     "itambox/procurement/tests/test_partial_receipts.py",
+    "itambox/procurement/tests/test_purchase_order_archive.py",
     "itambox/procurement/tests/test_purchase_order_lifecycle.py",
     "itambox/procurement/tests/test_seam_stable_upgrade_preservation.py",
     "itambox/procurement/tests/test_security.py",

@@ -7,7 +7,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 from django.views import View
 
@@ -143,7 +143,7 @@ class PurchaseOrderEditView(ObjectEditView):
 class PurchaseOrderDeleteView(ObjectDeleteView):
     queryset = PurchaseOrder.objects.all()
     permission_required = "procurement.delete_purchaseorder"
-    default_return_url = reverse_lazy("procurement:purchaseorder_list")
+    default_return_url = "procurement:purchaseorder_list"
 
 
 class PurchaseOrderLineAddView(PermissionRequiredMixin, View):
