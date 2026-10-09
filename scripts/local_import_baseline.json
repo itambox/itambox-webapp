@@ -24,12 +24,6 @@
     {
       "path": "itambox/assets/filters.py",
       "context": "ClassDef:AssetFilterSet/FunctionDef:filter_audit_due",
-      "statement": "from django.db.models import Case, DurationField, ExpressionWrapper, F, When",
-      "count": 1
-    },
-    {
-      "path": "itambox/assets/filters.py",
-      "context": "ClassDef:AssetFilterSet/FunctionDef:filter_audit_due",
       "statement": "from django.utils import timezone",
       "count": 1
     },
