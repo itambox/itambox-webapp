@@ -1542,7 +1542,7 @@
     {
       "path": "itambox/core/forms/mixins.py",
       "code": "C901",
-      "message": "'BulkEditForm.__init__' is too complex (22)",
+      "message": "'BulkEditForm.__init__' is too complex (18)",
       "source": "    def __init__(self, *args, model=None, **kwargs):",
       "context": "Module:body/ClassDef:BulkEditForm:body/FunctionDef:__init__:self",
       "count": 1
