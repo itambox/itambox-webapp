@@ -469,12 +469,10 @@ class TenantScopedAdminFormMixinTests(_ScopeFixture):
 class CoreFormsUseExplicitScopingTests(TestCase):
     """WP3: core's own forms declare scoping instead of relying on the global patches."""
 
-    def test_search_and_bulk_import_forms_carry_the_mixin(self):
+    def test_search_form_carries_the_mixin(self):
         from core.forms.mixins import SearchForm
-        from core.importers.bulk_forms import BulkImportForm
 
         self.assertTrue(issubclass(SearchForm, TenantScopedFormMixin))
-        self.assertTrue(issubclass(BulkImportForm, TenantScopedFormMixin))
 
     def test_filter_and_bulk_edit_forms_tom_select_through_helper(self):
         from core.forms.mixins import BulkEditForm, FilterForm

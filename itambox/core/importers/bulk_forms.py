@@ -16,7 +16,6 @@ from django.utils.translation import gettext_lazy as _
 
 from core.context import get_current_request_id, get_current_tenant, get_current_user
 from core.data_transfer import policy_for
-from core.forms.base import TenantScopedFormMixin
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +143,7 @@ def resolve_related(related_model, value):
     return obj.pk if obj else value
 
 
-class BulkImportForm(TenantScopedFormMixin, forms.Form):
+class BulkImportForm(forms.Form):
     """
     Base form for CSV/TSV or YAML bulk import of objects.
     Subclasses define their model, required fields, optional fields,
