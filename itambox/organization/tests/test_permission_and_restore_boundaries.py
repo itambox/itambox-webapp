@@ -240,8 +240,10 @@ class RestoreAuthorityDispatchTests(TestCase):
         obj.restore.assert_called_once_with()
 
     def test_bulk_restore_calls_port_wrapper_for_every_selected_row_at_operation_time(self):
-        first = SimpleNamespace(pk=1, restore=mock.Mock())
-        second = SimpleNamespace(pk=2, restore=mock.Mock())
+        # The stubs carry the model label the model-agnostic dispatcher resolves
+        # (`obj._meta.label_lower`), like every real model does.
+        first = SimpleNamespace(pk=1, _meta=SimpleNamespace(label_lower="assets.site"), restore=mock.Mock())
+        second = SimpleNamespace(pk=2, _meta=SimpleNamespace(label_lower="assets.site"), restore=mock.Mock())
         model = SimpleNamespace(
             _meta=SimpleNamespace(verbose_name_plural="sites"),
             _base_manager=SimpleNamespace(filter=mock.Mock(return_value=object())),
