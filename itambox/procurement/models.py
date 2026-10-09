@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from core.currency import CurrencyField
-from core.managers import ExplicitScopeSoftDeleteManager
+from core.managers import ExplicitScopeAllObjectsManager, ExplicitScopeSoftDeleteManager
 from core.models import BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixin
 
 User = get_user_model()
@@ -30,6 +30,7 @@ class PurchaseOrder(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixi
     ]
 
     objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     tenant = models.ForeignKey(
         "organization.Tenant",
@@ -82,6 +83,7 @@ class PurchaseOrder(BaseModel, ChangeLoggingMixin, SoftDeleteMixin, TaggableMixi
 
 class PurchaseOrderLine(BaseModel, ChangeLoggingMixin, SoftDeleteMixin):
     objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
 
     tenant = models.ForeignKey(
         "organization.Tenant",

@@ -34,6 +34,32 @@ class ProcurementConfig(AppConfig):
     def ready(self):
         _warn_legacy_auto_approval_setting()
         self._register_capabilities()
+        self._register_archive_handlers()
+
+    def _register_archive_handlers(self):
+        # inline imports: app-registry: the archive registry is populated once models are loaded.
+        from core.archive_handlers import ArchiveBehaviour, ArchiveRelation, register_archive_handler
+        from procurement.archive_services import archive_purchase_order, restore_purchase_order
+        from procurement.models import PurchaseOrder
+
+        register_archive_handler(
+            PurchaseOrder._meta.label_lower,
+            archive=archive_purchase_order,
+            restore=restore_purchase_order,
+            relations=(
+                ArchiveRelation(
+                    "procurement.purchaseorderline.purchase_order",
+                    ArchiveBehaviour.ARCHIVE,
+                    "archived with the order through their own save(); refused while a line has a live "
+                    "fulfillment link",
+                ),
+                ArchiveRelation(
+                    "procurement.contract.purchase_order",
+                    ArchiveBehaviour.DETACH,
+                    "contracts are unlinked from the order with their own audited update",
+                ),
+            ),
+        )
 
     def _register_capabilities(self):
         # ready() runs again when a test swaps INSTALLED_APPS, and a two-part

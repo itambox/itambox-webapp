@@ -5828,6 +5828,14 @@ msgstr "Verwahrungs-EULAs"
 
 #, python-format
 msgid ""
+"Cannot delete %(object)s: %(count)d asset request fulfillment link(s) still "
+"depend on its lines."
+msgstr ""
+"%(object)s kann nicht gelöscht werden: %(count)d Zuordnung(en) von "
+"Asset-Anfragen hängen noch von den Positionen ab."
+
+#, python-format
+msgid ""
 "Cannot delete %(object)s: %(count)s open obligation must be resolved "
 "first."
 msgid_plural ""
@@ -5855,6 +5863,14 @@ msgid ""
 msgstr ""
 "%(object)s kann nicht wiederhergestellt werden: Ein anderes aktives Kit "
 "verwendet bereits den Namen '%(name)s'."
+
+#, python-format
+msgid ""
+"Cannot restore %(object)s: another active purchase order already uses the "
+"number '%(number)s'."
+msgstr ""
+"%(object)s kann nicht wiederhergestellt werden: Eine andere aktive "
+"Bestellung verwendet bereits die Nummer '%(number)s'."
 
 #, python-format
 msgid ""
