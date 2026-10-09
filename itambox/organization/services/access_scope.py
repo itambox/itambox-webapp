@@ -268,11 +268,13 @@ def _reload_authenticated_actor(actor_context: ActorContextDTO):
 
 def _reload_actor(actor_id: int):
     user_model = get_user_model()
+    # unscoped: scope resolution evaluates visibility itself and must read the unfiltered graph, so it cannot
+    # depend on an ambient scope
     return user_model._base_manager.filter(pk=actor_id, is_active=True).first()
 
 
 def _live_tenant_ids() -> set[int]:
-    return set(Tenant._base_manager.filter(deleted_at__isnull=True).values_list("pk", flat=True))
+    return set(Tenant.objects.filter(deleted_at__isnull=True).values_list("pk", flat=True))
 
 
 def _validate_provider_sets(
@@ -430,7 +432,7 @@ def _fresh_live_descendant_tenant_group_ids(group_id: int | None) -> set[int]:
     """Read the live group tree without the request-local descendant cache."""
     if group_id is None:
         return set()
-    rows = list(TenantGroup._base_manager.filter(deleted_at__isnull=True).values("pk", "parent_id").order_by("pk"))
+    rows = list(TenantGroup.objects.filter(deleted_at__isnull=True).values("pk", "parent_id").order_by("pk"))
     live_ids = {row["pk"] for row in rows}
     if group_id not in live_ids:
         return set()
@@ -464,7 +466,7 @@ def _select_requested_tenants(
     if not group_ids:
         return None
     live_group_ids = set(
-        TenantGroup._base_manager.filter(
+        TenantGroup.objects.filter(
             pk__in=group_ids,
             deleted_at__isnull=True,
         ).values_list("pk", flat=True)
@@ -472,7 +474,7 @@ def _select_requested_tenants(
     if live_group_ids != group_ids:
         raise ValueError("tenant-group provider returned inconsistent topology")
     selected_ids = set(
-        Tenant._base_manager.filter(
+        Tenant.objects.filter(
             group_id__in=group_ids,
             deleted_at__isnull=True,
         ).values_list("pk", flat=True)
@@ -486,6 +488,8 @@ def _load_membership_evidence(
     accessible_ids: set[int],
     membership_ids: set[int],
 ) -> list[dict[str, object]]:
+    # unscoped: scope resolution evaluates visibility itself and must read the unfiltered graph, so it cannot
+    # depend on an ambient scope
     rows = list(
         Membership._base_manager.filter(
             user_id=actor_id,
@@ -519,6 +523,8 @@ def _authorization_evidence(
     if len(grant_ids) != len(grants):
         raise ValueError("grant provider returned duplicate grant identities")
 
+    # unscoped: scope resolution evaluates visibility itself and must read the unfiltered graph, so it cannot
+    # depend on an ambient scope
     grant_rows = list(
         RoleGrant._base_manager.filter(pk__in=grant_ids)
         .values(
@@ -536,12 +542,16 @@ def _authorization_evidence(
     )
     if len(grant_rows) != len(grant_ids):
         raise ValueError("grant provider returned a stale grant")
+    # unscoped: scope resolution evaluates visibility itself and must read the unfiltered graph, so it cannot
+    # depend on an ambient scope
     scope_rows = list(
         RoleGrantScope._base_manager.filter(role_grant_id__in=grant_ids)
         .values("pk", "role_grant_id", "scope_type", "tenant_id", "tenant_group_id")
         .order_by("pk")
     )
     group_ids = {row["user_group_id"] for row in grant_rows if row["user_group_id"] is not None}
+    # unscoped: scope resolution evaluates visibility itself and must read the unfiltered graph, so it cannot
+    # depend on an ambient scope
     user_group_rows = list(
         UserGroup._base_manager.filter(pk__in=group_ids)
         .values("pk", "tenant_id", "is_active", "deleted_at")
@@ -549,6 +559,8 @@ def _authorization_evidence(
     )
     if len(user_group_rows) != len(group_ids):
         raise ValueError("grant provider returned a stale user group")
+    # unscoped: scope resolution evaluates visibility itself and must read the unfiltered graph, so it cannot
+    # depend on an ambient scope
     group_membership_rows = list(
         GroupMembership._base_manager.filter(
             user_group_id__in=group_ids,
@@ -578,7 +590,7 @@ def _authorization_evidence(
     relevant_tenant_ids.update(row["tenant_id"] for row in scope_rows if row["tenant_id"] is not None)
     relevant_tenant_ids.update(row["role__tenant_id"] for row in grant_rows if row["role__tenant_id"] is not None)
     tenant_rows = list(
-        Tenant._base_manager.filter(
+        Tenant.objects.filter(
             pk__in=relevant_tenant_ids,
             deleted_at__isnull=True,
         )
@@ -627,7 +639,7 @@ def _authorization_evidence(
 def _load_group_topology(group_ids: set[int]) -> list[dict[str, object]]:
     if not group_ids:
         return []
-    rows = list(TenantGroup._base_manager.filter(deleted_at__isnull=True).values("pk", "parent_id").order_by("pk"))
+    rows = list(TenantGroup.objects.filter(deleted_at__isnull=True).values("pk", "parent_id").order_by("pk"))
     by_id = {row["pk"]: row for row in rows}
     expanded_ids = set(group_ids)
     for group_id in tuple(group_ids):

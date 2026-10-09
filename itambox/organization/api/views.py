@@ -271,12 +271,14 @@ class CostCenterViewSet(ITAMBoxModelViewSet):
 
 class TenantResourceGrantAuditViewSet(ITAMBoxReadOnlyModelViewSet):
     permission_classes = [TenantResourceGrantAuditPermission]
+    # unscoped: audit listing includes soft-deleted grants; visibility is narrowed by visible_to_containers
     queryset = TenantResourceGrant._base_manager.all()
     serializer_class = TenantResourceGrantAuditSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_class = TenantResourceGrantAuditFilterSet
 
     def get_queryset(self):
+        # unscoped: audit listing includes soft-deleted grants; visibility is narrowed by visible_to_containers
         queryset = TenantResourceGrant._base_manager.all().select_related(
             "tenant",
             "grantee_tenant",

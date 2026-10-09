@@ -87,7 +87,7 @@ class ManagedRoleGrantForm(TenantScopedFormMixin, forms.Form):
 
     id = forms.IntegerField(required=False, widget=forms.HiddenInput)
     role = _RoleChoiceField(
-        queryset=Role._base_manager.none(),
+        queryset=Role.objects.none(),
         required=False,
         label=_("Role"),
         widget=forms.Select(attrs={"class": "form-select managed-role"}),
@@ -104,13 +104,13 @@ class ManagedRoleGrantForm(TenantScopedFormMixin, forms.Form):
         widget=forms.Select(attrs={"class": "form-select managed-scope"}),
     )
     scope_group = forms.ModelChoiceField(
-        queryset=TenantGroup._base_manager.none(),
+        queryset=TenantGroup.objects.none(),
         required=False,
         label=_("Tenant group"),
         widget=forms.Select(attrs={"class": "form-select managed-scope-group"}),
     )
     assigned_tenants = forms.ModelMultipleChoiceField(
-        queryset=Tenant._base_manager.none(),
+        queryset=Tenant.objects.none(),
         required=False,
         label=_("Specific tenants"),
         widget=forms.SelectMultiple(attrs={"class": "form-select managed-assigned-tenants"}),
@@ -138,7 +138,7 @@ class ManagedRoleGrantForm(TenantScopedFormMixin, forms.Form):
         # every decision about this row is taken by validate_grant_plan.
         self.fields["role"].queryset = assignable_roles_qs(membership_tenant)
         self.fields["role"].membership_tenant = membership_tenant
-        self.fields["scope_group"].queryset = TenantGroup._base_manager.filter(deleted_at__isnull=True).order_by("name")
+        self.fields["scope_group"].queryset = TenantGroup.objects.filter(deleted_at__isnull=True).order_by("name")
         self.fields["assigned_tenants"].queryset = managed_target_tenants_qs(membership_tenant)
 
     def is_blank(self):
@@ -260,7 +260,7 @@ class MembershipForm(TenantScopedFormMixin, forms.ModelForm):
         widget=forms.TextInput(attrs={"class": "form-control"}),
     )
     own_roles = _RolePickerField(
-        queryset=Role._base_manager.none(),
+        queryset=Role.objects.none(),
         required=False,
         label=_("Roles"),
         widget=forms.SelectMultiple(attrs={"class": "form-select"}),
@@ -309,7 +309,7 @@ class MembershipForm(TenantScopedFormMixin, forms.ModelForm):
 
         # Cross-tenant pickers must use the unscoped base manager so they're not
         # silently emptied by the active-tenant form-field scoping in core.apps.
-        self.fields["tenant"].queryset = Tenant._base_manager.filter(deleted_at__isnull=True).order_by("name")
+        self.fields["tenant"].queryset = Tenant.objects.filter(deleted_at__isnull=True).order_by("name")
 
         # Resolve the membership's tenant: locked on edit, prefilled from context on
         # create, otherwise (context-free create) recovered from POST data so the
@@ -317,18 +317,20 @@ class MembershipForm(TenantScopedFormMixin, forms.ModelForm):
         membership_tenant = None
         if self.instance.pk:
             membership_tenant = self.instance.tenant
+            # unscoped: choices span tenants the actor manages; narrowed to the authorized set in the form
             self.fields["tenant"].queryset = Tenant._base_manager.filter(pk=self.instance.tenant_id)
             self.fields["tenant"].initial = self.instance.tenant_id
             self.fields["tenant"].disabled = True
             self.fields["user"].disabled = True
         elif self._tenant_ctx is not None:
             membership_tenant = self._tenant_ctx
+            # unscoped: choices span tenants the actor manages; narrowed to the authorized set in the form
             self.fields["tenant"].queryset = Tenant._base_manager.filter(pk=self._tenant_ctx.pk)
             self.fields["tenant"].initial = membership_tenant.pk
             self.fields["tenant"].widget = forms.HiddenInput()
         elif self.is_bound:
             try:
-                membership_tenant = Tenant._base_manager.filter(
+                membership_tenant = Tenant.objects.filter(
                     pk=self.data.get("tenant"),
                     deleted_at__isnull=True,
                 ).first()
@@ -438,7 +440,7 @@ class MembershipForm(TenantScopedFormMixin, forms.ModelForm):
         self.fields["who"].initial = self.WHO_NEW
         self.fields["own_roles"].initial = []
         technician_role = (
-            Role._base_manager.filter(
+            Role.objects.filter(
                 tenant=membership_tenant,
                 shared_with_managed=True,
                 name__iexact="technician",
@@ -846,13 +848,13 @@ class MembershipBulkRoleForm(BulkEditForm):
     """Bulk add/remove direct own-scope grants for selected memberships."""
 
     roles_to_add = forms.ModelMultipleChoiceField(
-        queryset=Role._base_manager.filter(deleted_at__isnull=True),
+        queryset=Role.objects.filter(deleted_at__isnull=True),
         required=False,
         label=_("Add roles"),
         widget=forms.SelectMultiple(attrs={"class": "form-select"}),
     )
     roles_to_remove = forms.ModelMultipleChoiceField(
-        queryset=Role._base_manager.filter(deleted_at__isnull=True),
+        queryset=Role.objects.filter(deleted_at__isnull=True),
         required=False,
         label=_("Remove roles"),
         widget=forms.SelectMultiple(attrs={"class": "form-select"}),

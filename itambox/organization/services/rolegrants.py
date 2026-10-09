@@ -186,7 +186,7 @@ def assignable_roles_qs(tenant: Optional[Tenant]) -> QuerySet[Role]:
     validation re-checks ownership against the tenant actually submitted, so the
     widened widget queryset carries no authorization weight.
     """
-    qs = Role._base_manager.filter(deleted_at__isnull=True).select_related("tenant")
+    qs = Role.objects.filter(deleted_at__isnull=True).select_related("tenant")
     if tenant is not None:
         ownership = Q(tenant=tenant)
         if tenant.managed_by_id:
@@ -205,7 +205,7 @@ def managed_target_tenants_qs(tenant: Optional[Tenant]) -> QuerySet[Tenant]:
     An unknown tenant falls back to every live tenant for rendering only —
     INV-4 is enforced against the submitted tenant during plan validation.
     """
-    qs = Tenant._base_manager.filter(deleted_at__isnull=True)
+    qs = Tenant.objects.filter(deleted_at__isnull=True)
     if tenant is not None:
         qs = qs.filter(managed_by=tenant)
     return qs.order_by("name")
@@ -291,6 +291,7 @@ def _group_expansion(principal_tenant: Tenant, group: TenantGroup) -> set:
     """Concrete tenants a ``tenant_group`` row covers, exactly as the form
     computed it (deliberately unfiltered by ``deleted_at``, matching the
     coverage the guard has always been handed)."""
+    # unscoped: assignable roles/tenants derive from the actor managed reach, not the ambient tenant
     return set(
         Tenant._base_manager.filter(
             managed_by=principal_tenant,

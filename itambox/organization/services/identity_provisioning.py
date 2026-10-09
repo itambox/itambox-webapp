@@ -174,6 +174,8 @@ def _lock_existing_user(user: UserRef) -> User:
     user_id = getattr(user, "pk", None)
     if not isinstance(user_id, int):
         _reject("Identity provisioning requires an existing canonical user.")
+    # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant; the
+    # service is its own authority
     locked = User._base_manager.select_for_update().filter(pk=user_id).first()
     if locked is None:
         _reject("Identity provisioning canonical user does not exist.")
@@ -200,6 +202,8 @@ def _membership_tenant_ids(
 
 
 def _lock_memberships(user_id: int, tenant_ids: set[int]) -> dict[int, Membership]:
+    # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant; the
+    # service is its own authority
     rows = list(
         Membership._base_manager.select_for_update(of=("self",))
         .filter(user_id=user_id, tenant_id__in=sorted(tenant_ids))
@@ -212,6 +216,8 @@ def _lock_memberships(user_id: int, tenant_ids: set[int]) -> dict[int, Membershi
 def _lock_group_memberships(membership_ids: set[int]) -> list[GroupMembership]:
     if not membership_ids:
         return []
+    # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant; the
+    # service is its own authority
     return list(
         GroupMembership._base_manager.select_for_update()
         .filter(membership_id__in=sorted(membership_ids))
@@ -222,6 +228,8 @@ def _lock_group_memberships(membership_ids: set[int]) -> list[GroupMembership]:
 def _lock_grants(membership_ids: set[int]) -> list[RoleGrant]:
     if not membership_ids:
         return []
+    # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant; the
+    # service is its own authority
     return list(
         RoleGrant._base_manager.select_for_update().filter(membership_id__in=sorted(membership_ids)).order_by("pk")
     )
@@ -235,6 +243,8 @@ def _lock_roles(
     predicate = Q(pk__in=sorted({grant.role_id for grant in grants}))
     for tenant_id, name in role_names:
         predicate |= Q(tenant_id=tenant_id, name=name, deleted_at__isnull=True)
+    # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant; the
+    # service is its own authority
     return list(
         Role._base_manager.select_for_update().filter(predicate, deleted_at__isnull=True).order_by("tenant_id", "pk")
     )
@@ -244,6 +254,8 @@ def _lock_scopes(grants: list[RoleGrant]) -> list[RoleGrantScope]:
     grant_ids = sorted({grant.pk for grant in grants})
     if not grant_ids:
         return []
+    # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant; the
+    # service is its own authority
     return list(
         RoleGrantScope._base_manager.select_for_update()
         .filter(role_grant_id__in=grant_ids)
@@ -291,6 +303,8 @@ def _reindex_aggregate_children(aggregate: _AggregateLocks) -> None:
 
 
 def _find_role(tenant_id: int, name: str, *, lock: bool = False) -> Role | None:
+    # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant; the
+    # service is its own authority
     manager = Role._base_manager
     query = manager.filter(tenant_id=tenant_id, name=name, deleted_at__isnull=True).order_by("tenant_id", "pk")
     if lock:
@@ -303,6 +317,8 @@ def _create_role(tenant_id: int, name: str, source: str) -> Role:
     role: Role | None
     try:
         with transaction.atomic():
+            # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant;
+            # the service is its own authority
             role = Role._base_manager.create(
                 tenant_id=tenant_id,
                 name=name,
@@ -376,6 +392,8 @@ def _holder_candidates(*, user_id: int, tenant_id: int, upn: str, email: str) ->
     predicate = Q(user_id=user_id) | Q(upn=upn)
     if email:
         predicate |= Q(email=email)
+    # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant; the
+    # service is its own authority
     return list(
         AssetHolder._base_manager.select_for_update()
         .filter(tenant_id=tenant_id, deleted_at__isnull=True)
@@ -385,6 +403,8 @@ def _holder_candidates(*, user_id: int, tenant_id: int, upn: str, email: str) ->
 
 
 def _all_customer_holders(*, user_id: int, tenant_id: int) -> list[AssetHolder]:
+    # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant; the
+    # service is its own authority
     return list(
         AssetHolder._base_manager.select_for_update()
         .filter(tenant_id=tenant_id, user_id=user_id)
@@ -397,6 +417,8 @@ def _holder_collision_re_read(*, user_id: int, tenant_id: int, upn: str, source:
 
     try:
         with transaction.atomic():
+            # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant;
+            # the service is its own authority
             rows = list(
                 AssetHolder._base_manager.select_for_update()
                 .filter(tenant_id=tenant_id, deleted_at__isnull=True)
@@ -528,6 +550,8 @@ def _create_holder(
     holder: AssetHolder | None
     try:
         with transaction.atomic():
+            # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant;
+            # the service is its own authority
             holder = AssetHolder._base_manager.create(
                 user_id=user.pk,
                 tenant_id=tenant_id,
@@ -748,6 +772,8 @@ def _ensure_own_scope(grant: RoleGrant, existing_scopes: list[RoleGrantScope] | 
     else:
         # Callers outside the ordinary aggregate lock path may ask for a direct
         # exact lookup. The interactive path always supplies the captured rows.
+        # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant; the
+        # service is its own authority
         if RoleGrantScope._base_manager.filter(
             role_grant_id=grant.pk,
             scope_type=RoleGrantScope.SCOPE_OWN,
@@ -755,11 +781,15 @@ def _ensure_own_scope(grant: RoleGrant, existing_scopes: list[RoleGrantScope] | 
             return
     try:
         with transaction.atomic():
+            # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant;
+            # the service is its own authority
             RoleGrantScope._base_manager.create(
                 role_grant_id=grant.pk,
                 scope_type=RoleGrantScope.SCOPE_OWN,
             )
     except IntegrityError:
+        # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant; the
+        # service is its own authority
         if not RoleGrantScope._base_manager.filter(
             role_grant_id=grant.pk,
             scope_type=RoleGrantScope.SCOPE_OWN,
@@ -826,6 +856,8 @@ def _reconcile_customer_grants(
         _refresh_system_grant_metadata(current, metadata)
         _ensure_own_scope(current, existing_scopes=scopes_by_grant.get(current.pk, []))
     else:
+        # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant; the
+        # service is its own authority
         current = RoleGrant._base_manager.create(
             membership_id=membership.pk,
             role_id=role.pk,
@@ -979,6 +1011,8 @@ def _create_membership(*, user_id: int, tenant_id: int) -> tuple[Membership, boo
             membership.save(force_insert=True)
             return membership, True
     except IntegrityError:
+        # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant; the
+        # service is its own authority
         existing_membership = (
             Membership._base_manager.select_for_update().filter(user_id=user_id, tenant_id=tenant_id).first()
         )
@@ -1144,6 +1178,8 @@ def _get_or_create_directory_role(*, tenant_id: int, locked_roles: list[Role]) -
         return role
     try:
         with transaction.atomic():
+            # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant;
+            # the service is its own authority
             role = Role._base_manager.create(
                 tenant_id=tenant_id,
                 name="Member",
@@ -1205,6 +1241,8 @@ def _ensure_directory_grant(
     desired_until = now + LDAP_DIRECTORY_SYNC_PRIVILEGED_TTL if role_is_privileged(role) else None
     try:
         with transaction.atomic():
+            # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant;
+            # the service is its own authority
             grant = RoleGrant._base_manager.create(
                 membership_id=membership.pk,
                 role_id=role.pk,
@@ -1213,6 +1251,8 @@ def _ensure_directory_grant(
                 granted_by_id=None,
             )
     except IntegrityError:
+        # unscoped: provisioning locks and writes rows regardless of soft-delete state and active tenant; the
+        # service is its own authority
         exact = (
             RoleGrant._base_manager.select_for_update()
             .filter(

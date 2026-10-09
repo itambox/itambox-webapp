@@ -86,11 +86,9 @@ class TenantDetailView(ObjectDetailView):
 
         # Managed tenants are a DIFFERENT tenant than whichever one is active for
         # this request — the scoped default manager (``tenant.managed_tenants``)
-        # would silently return none of them, so count via ``_base_manager``.
+        # would silently return none of them, so count via the explicit-scope default manager.
         context["tenant_managed_count"] = (
-            Tenant._base_manager.filter(managed_by_id=tenant.pk, deleted_at__isnull=True).count()
-            if tenant.is_provider
-            else 0
+            Tenant.objects.filter(managed_by_id=tenant.pk, deleted_at__isnull=True).count() if tenant.is_provider else 0
         )
 
         tenant_configs = getattr(settings, "ITAMBOX_TENANT_LDAP_CONFIGS", {})
@@ -312,7 +310,7 @@ class TenantManagedTenantsTabView(LoginRequiredMixin, View):
         # the one active for this request — the scoped default manager would
         # silently return none of them (see "Architecture: tenant scoping").
         managed_tenants = (
-            Tenant._base_manager.filter(managed_by_id=tenant.pk, deleted_at__isnull=True)
+            Tenant.objects.filter(managed_by_id=tenant.pk, deleted_at__isnull=True)
             .select_related("group")
             .annotate(
                 member_count=Count(

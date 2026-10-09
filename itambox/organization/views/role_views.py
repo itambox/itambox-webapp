@@ -44,7 +44,7 @@ def _roles_visible_in(tenant):
             tenant__is_provider=True,
             shared_with_managed=True,
         )
-    return Role._base_manager.filter(deleted_at__isnull=True).filter(q)
+    return Role.objects.filter(deleted_at__isnull=True).filter(q)
 
 
 def _annotate_member_count(qs):
@@ -203,7 +203,7 @@ class RoleEditView(ObjectEditView):
             tenant_id = self.request.GET.get("tenant")
             if tenant_id:
                 try:
-                    tenant = Tenant._base_manager.filter(
+                    tenant = Tenant.objects.filter(
                         pk=tenant_id,
                         deleted_at__isnull=True,
                     ).first()

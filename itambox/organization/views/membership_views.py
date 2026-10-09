@@ -114,7 +114,7 @@ class MembershipListView(ObjectListView):
             return qs.filter(tenant_id__in=scoped_ids)
         allowed = [
             t.pk
-            for t in Tenant._base_manager.filter(
+            for t in Tenant.objects.filter(
                 pk__in=scoped_ids,
                 deleted_at__isnull=True,
             )
@@ -136,7 +136,7 @@ class MembershipListView(ObjectListView):
         """
         if active_group is not None:
             group_ids = get_descendant_tenant_group_ids(active_group.pk)
-            base = Tenant._base_manager.filter(
+            base = Tenant.objects.filter(
                 group_id__in=group_ids,
                 deleted_at__isnull=True,
             )
@@ -144,7 +144,7 @@ class MembershipListView(ObjectListView):
                 base = base.filter(pk__in=accessible_tenant_ids(user))
             return set(base.values_list("pk", flat=True))
         if user.is_superuser:
-            return set(Tenant._base_manager.filter(deleted_at__isnull=True).values_list("pk", flat=True))
+            return set(Tenant.objects.filter(deleted_at__isnull=True).values_list("pk", flat=True))
         if getattr(self.request, "active_all_accessible", False):
             return accessible_tenant_ids(user)
         return set()
@@ -368,7 +368,7 @@ class MembershipCreateView(_MembershipFormViewMixin, ObjectEditView):
         tenant = None
         if explicit:
             try:
-                tenant = Tenant._base_manager.filter(
+                tenant = Tenant.objects.filter(
                     pk=tenant_param,
                     deleted_at__isnull=True,
                 ).first()

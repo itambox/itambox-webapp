@@ -55,6 +55,7 @@ def _validate_expiry_candidate(grant: TenantResourceGrant, *, cutoff=None) -> bo
 
 def _delete_change_for_grant(grant: TenantResourceGrant, request_id) -> list[ObjectChange]:
     grant_type = ContentType.objects.get_for_model(TenantResourceGrant)
+    # unscoped: grant revoke/restore must see soft-deleted grants and evidence outside the active tenant scope
     return list(
         ObjectChange._base_manager.filter(
             tenant_id=grant.tenant_id,
@@ -91,6 +92,7 @@ def revoke_resource_grant(  # noqa: C901
         raise PermissionDenied("Grant revocation cannot combine human and system authorization.")
 
     with transaction.atomic():
+        # unscoped: grant revoke/restore must see soft-deleted grants and evidence outside the active tenant scope
         grant = (
             TenantResourceGrant._base_manager.select_for_update()
             .select_related("resource_type")
@@ -101,7 +103,7 @@ def revoke_resource_grant(  # noqa: C901
             raise TenantResourceGrant.DoesNotExist
         if grant.deleted_at is not None:
             return None
-        if not Tenant._base_manager.filter(pk=grant.tenant_id, deleted_at__isnull=True).exists():
+        if not Tenant.objects.filter(pk=grant.tenant_id, deleted_at__isnull=True).exists():
             raise PermissionDenied("The grant owner tenant is not active.")
         if getattr(active_tenant, "pk", None) != grant.tenant_id:
             raise PermissionDenied("Grant revocation is outside the active tenant.")
@@ -163,6 +165,7 @@ def restore_resource_grant(
                 raise ValidationError({"valid_until": "The corrected deadline must be in the future."})
 
         with transaction.atomic():
+            # unscoped: grant revoke/restore must see soft-deleted grants and evidence outside the active tenant scope
             grant = (
                 TenantResourceGrant._base_manager.select_for_update()
                 .select_related("resource_type")

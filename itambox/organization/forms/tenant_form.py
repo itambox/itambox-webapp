@@ -138,7 +138,7 @@ class TenantForm(TenantScopedFormMixin, forms.ModelForm):
         if is_superuser:
             # Unscoped base manager: the managing-tenant picker must list every
             # live root provider regardless of the active-tenant context.
-            managed_by_qs = Tenant._base_manager.filter(
+            managed_by_qs = Tenant.objects.filter(
                 is_provider=True,
                 managed_by__isnull=True,
                 deleted_at__isnull=True,
@@ -151,7 +151,7 @@ class TenantForm(TenantScopedFormMixin, forms.ModelForm):
             # must use the exact object-level add_tenant decision for each live,
             # root provider. Filtering by mere visibility/access would leak
             # providers that the actor cannot use for onboarding.
-            candidate_providers = Tenant._base_manager.filter(
+            candidate_providers = Tenant.objects.filter(
                 is_provider=True,
                 managed_by__isnull=True,
                 deleted_at__isnull=True,
@@ -163,7 +163,7 @@ class TenantForm(TenantScopedFormMixin, forms.ModelForm):
                 and getattr(requesting_user, "is_authenticated", False)
                 and requesting_user.has_perm("organization.add_tenant", obj=provider)
             }
-            self.fields["managed_by"].queryset = Tenant._base_manager.filter(
+            self.fields["managed_by"].queryset = Tenant.objects.filter(
                 pk__in=eligible_provider_ids,
                 is_provider=True,
                 managed_by__isnull=True,

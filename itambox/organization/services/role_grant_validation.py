@@ -158,7 +158,7 @@ def _validate_explicit_managed_scope(
     # combined with an unrelated read-only/empty coverage grant to manufacture
     # Admin access in that customer.
     targets = list(
-        Tenant._base_manager.filter(
+        Tenant.objects.filter(
             pk__in=requested_tenant_ids,
             deleted_at__isnull=True,
         )
@@ -274,7 +274,7 @@ def _has_live_tenant_group_scope(scope: RoleGrantScope, role: Role) -> bool:
     target_group = scope.tenant_group
     if target_group is None or target_group.deleted_at is not None:
         return False
-    return Tenant._base_manager.filter(
+    return Tenant.objects.filter(
         managed_by_id=role.tenant_id,
         group_id__in=get_descendant_tenant_group_ids(
             target_group.pk,
