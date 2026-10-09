@@ -10,12 +10,10 @@ from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django.views import View
 from django.views.decorators.http import require_POST
-from django_tables2 import RequestConfig
 
 from assets.tables import AccessoryTable, AssetTable, ConsumableTable, KitTable
 from core.managers import Scope
 from itambox.panels import Panel
-from itambox.utils import get_paginate_count
 from itambox.views.generic import (
     ObjectBulkDeleteView,
     ObjectBulkEditView,

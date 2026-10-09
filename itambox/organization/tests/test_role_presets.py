@@ -14,7 +14,6 @@ from django.test import TestCase
 
 from core.tests.mixins import TenantTestMixin
 from organization.forms import MATRIX_MODELS, RoleForm
-from organization.models import Role
 
 User = get_user_model()
 

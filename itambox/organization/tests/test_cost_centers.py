@@ -65,7 +65,6 @@ class CostCenterModelTests(TestCase):
     # --- unique code per tenant ---
 
     def test_code_unique_within_tenant(self):
-        from django.db import IntegrityError
 
         self._make(name="Engineering", slug="engineering", code="CC-001")
         with self.assertRaises(Exception):  # IntegrityError or ValidationError

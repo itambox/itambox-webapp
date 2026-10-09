@@ -1,35 +1,28 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, Q
-from django.http import HttpResponseBadRequest, HttpResponseRedirect
-from django.shortcuts import get_object_or_404, redirect, render
+from django.http import HttpResponseRedirect
+from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
-from django.views.generic import View
-from django_tables2 import RequestConfig
 
-from assets.forms.import_forms import AssetHolderBulkImportForm
 from compliance.services import scope_custody_receipts
 from core.managers import Scope
 from itambox.panels import Panel
-from itambox.utils import get_paginate_count
 from itambox.views.generic import (
     ObjectBulkDeleteView,
     ObjectBulkEditView,
     ObjectDeleteView,
     ObjectDetailView,
     ObjectEditView,
-    ObjectImportView,
     ObjectListView,
 )
 from organization.services.archive import ArchiveBlocked, archive_holder
 from organization.services.offboarding import get_offboarding_report
 
 from ..filters import AssetHolderFilterSet
-from ..forms import AssetHolderFilterForm, AssetHolderForm, ContactAssignmentForm
-from ..models import AssetHolder, ContactAssignment
+from ..forms import AssetHolderFilterForm, AssetHolderForm
+from ..models import AssetHolder
 from ..tables import (
     AssetAssignmentTable,
     AssetHolderTable,

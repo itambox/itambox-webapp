@@ -341,6 +341,17 @@ Manager hierarchy for tenant-aware models:
 
 Soft-delete models must use `UniqueConstraint(..., condition=Q(deleted_at__isnull=True))` rather than `unique=True` on name/slug fields (active rows only must be unique). Documented exception: `Asset.asset_tag` stays unique across soft-deleted rows, so a printed tag is never reissued while the record can still be restored.
 
+### Form scoping conventions
+
+Tenant scoping on forms is declared **explicitly**; the codebase performs no runtime replacement of Django form internals. The former global monkey patches were removed in the #584 series, and `core/tests/test_no_form_patches.py` is an AST gate that fails closed if a production module reintroduces a runtime replacement (assignment, `setattr`/`del` on form classes, module-attribute swaps).
+
+- **Model forms** inherit `TenantScopedFormMixin` (`core/forms/scoping.py`): it narrows choice querysets to the request scope (single-tenant, group and all-accessible) and keeps requiredness parity with the former patch behavior.
+- **Helpers**: `apply_tenant_scoped_choices()` (e.g. on `BaseForm.__init__`), `apply_tom_select()` to emit the `data-tom-select` frontend contract, and `scope_tenant_field()` for narrowing a single field.
+- **Field classes**: `TenantScopedModelChoiceField` / `TenantScopedModelMultipleChoiceField` re-declare `queryset` as a read-time property (subclass delegation to Django's own property — never a patch).
+- **Filter surfaces** use `TenantScopedFilterSetMixin` so group and all-accessible scopes narrow exactly like the single-tenant path in `BaseFilterSet.__init__`.
+- **Admin**: `TenantScopedAdminFormMixin` for `ModelAdmin` form classes (superuser console; UI consistency, not isolation).
+- **New forms declare their scoping explicitly**; the WP0 characterization suite is the parity contract for any change in this area.
+
 ## Architecture: change logging
 
 `ChangeLoggingMixin` (`core/models.py`) records an `ObjectChange` on every `save()` and `delete()`. It relies on two contextvars from `itambox/middleware.py`:
