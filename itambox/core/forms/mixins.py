@@ -14,6 +14,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.urls import NoReverseMatch, reverse
 from django.utils.translation import gettext_lazy as _
 
+from core.forms.base import TenantScopedFormMixin, apply_tom_select
 from core.search import SEARCH_INDEXES
 from itambox.middleware import get_current_user
 from itambox.utils import get_model_viewname
@@ -27,7 +28,7 @@ OBJ_TYPE_CHOICES = [
 ]
 
 
-class SearchForm(forms.Form):
+class SearchForm(TenantScopedFormMixin, forms.Form):
     q = forms.CharField(
         label=_("Search"), widget=forms.TextInput(attrs={"placeholder": _("Search ITAMbox"), "class": "form-control"})
     )
@@ -209,16 +210,8 @@ class BulkEditForm(forms.Form):
                 existing_classes.append(target_class)
                 field.widget.attrs["class"] = " ".join(existing_classes)
 
-            # Auto-apply TomSelect attribute to all select fields (excluding CheckboxSelectMultiple/RadioSelect/listboxes)
-            if isinstance(field.widget, (forms.Select, forms.SelectMultiple)) and not isinstance(
-                field.widget, (forms.RadioSelect, forms.CheckboxSelectMultiple)
-            ):
-                if "size" in field.widget.attrs:
-                    continue
-                widget_classes = field.widget.attrs.get("class", "")
-                if "available-columns" not in widget_classes and "selected-columns" not in widget_classes:
-                    if "data-tom-select" not in field.widget.attrs:
-                        field.widget.attrs["data-tom-select"] = ""
+        # TomSelect attribute through the shared helper (same exclusions as the former local loop)
+        apply_tom_select(self.fields)
 
 
 class CrispyFormMixin:
@@ -309,17 +302,8 @@ class FilterForm(forms.Form):
         if ajax_fields:
             self.setup_ajax_fields(ajax_fields, filterset_data)
 
-        # Auto-apply TomSelect attribute to all select fields (excluding CheckboxSelectMultiple/RadioSelect/listboxes)
-        for field in self.fields.values():
-            if isinstance(field.widget, (forms.Select, forms.SelectMultiple)) and not isinstance(
-                field.widget, (forms.RadioSelect, forms.CheckboxSelectMultiple)
-            ):
-                if "size" in field.widget.attrs:
-                    continue
-                widget_classes = field.widget.attrs.get("class", "")
-                if "available-columns" not in widget_classes and "selected-columns" not in widget_classes:
-                    if "data-tom-select" not in field.widget.attrs:
-                        field.widget.attrs["data-tom-select"] = ""
+        # TomSelect attribute through the shared helper (same exclusions as the former local loop)
+        apply_tom_select(self.fields)
 
     def setup_ajax_fields(self, ajax_fields, filterset_data):
         for field_name, config in ajax_fields.items():

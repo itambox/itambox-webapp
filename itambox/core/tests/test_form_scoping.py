@@ -464,3 +464,32 @@ class TenantScopedAdminFormMixinTests(_ScopeFixture):
         self.assertTrue(is_tenant_scoped_field(form.fields["parent"]))
         self.assertFalse(is_tenant_scoped_field(form.fields["site"]))
         self.assertEqual(self.pks(form, "parent"), {self.loc_a1.pk})
+
+
+class CoreFormsUseExplicitScopingTests(TestCase):
+    """WP3: core's own forms declare scoping instead of relying on the global patches."""
+
+    def test_search_and_bulk_import_forms_carry_the_mixin(self):
+        from core.forms.mixins import SearchForm
+        from core.importers.bulk_forms import BulkImportForm
+
+        self.assertTrue(issubclass(SearchForm, TenantScopedFormMixin))
+        self.assertTrue(issubclass(BulkImportForm, TenantScopedFormMixin))
+
+    def test_filter_and_bulk_edit_forms_tom_select_through_helper(self):
+        from core.forms.mixins import BulkEditForm, FilterForm
+
+        class _Edit(BulkEditForm):
+            pick = forms.ChoiceField(choices=[("a", "A")], required=False)
+            listbox = forms.ChoiceField(choices=[("a", "A")], widget=forms.Select(attrs={"size": "5"}))
+
+        class _Filter(FilterForm):
+            pick = forms.ChoiceField(choices=[("a", "A")], required=False)
+            radio = forms.ChoiceField(choices=[("a", "A")], widget=forms.RadioSelect)
+
+        edit = _Edit(model=Location) if "model" in _Edit.__init__.__code__.co_varnames else _Edit()
+        self.assertIn("data-tom-select", edit.fields["pick"].widget.attrs)
+        self.assertNotIn("data-tom-select", edit.fields["listbox"].widget.attrs)
+        flt = _Filter()
+        self.assertIn("data-tom-select", flt.fields["pick"].widget.attrs)
+        self.assertNotIn("data-tom-select", flt.fields["radio"].widget.attrs)
