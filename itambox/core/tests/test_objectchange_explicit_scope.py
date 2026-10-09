@@ -2,17 +2,12 @@
 
 import uuid
 
-from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 
 from core.managers import ExplicitScopeManager, Scope, set_current_tenant
 from core.models import ObjectChange
-from core.tests.mixins import grant
 from organization.models import Tenant
-from users.models import Role
-
-User = get_user_model()
 
 
 class ObjectChangeExplicitScopeTests(TestCase):
@@ -20,9 +15,6 @@ class ObjectChangeExplicitScopeTests(TestCase):
     def setUpTestData(cls):
         cls.tenant_a = Tenant.objects.create(name="OC A", slug="oc-a")
         cls.tenant_b = Tenant.objects.create(name="OC B", slug="oc-b")
-        cls.user = User.objects.create_user(username="oc-member", password="x")
-        role = Role.objects.create(tenant=cls.tenant_a, name="OC Role", permissions=["core.view_objectchange"])
-        grant(cls.user, cls.tenant_a, role)
         cls.ct = ContentType.objects.get_for_model(Tenant)
         cls.row_a = cls._make(cls.tenant_a, "a")
         cls.row_b = cls._make(cls.tenant_b, "b")
@@ -40,6 +32,9 @@ class ObjectChangeExplicitScopeTests(TestCase):
             object_repr=repr_,
         )
 
+    def tearDown(self):
+        set_current_tenant(None)
+
     def test_default_manager_is_explicit(self):
         self.assertIsInstance(ObjectChange.objects, ExplicitScopeManager)
         self.assertTrue(ObjectChange.allow_global_tenant)
@@ -50,7 +45,7 @@ class ObjectChangeExplicitScopeTests(TestCase):
         self.assertEqual(pks, {self.row_a.pk, self.row_b.pk, self.row_global.pk})
 
     def test_for_scope_tenant_keeps_own_and_global_rows(self):
-        scope = Scope(kind=Scope.TENANT, user=self.user, tenant=self.tenant_a)
+        scope = Scope(kind=Scope.TENANT, tenant=self.tenant_a)
         pks = set(ObjectChange.objects.for_scope(scope).values_list("pk", flat=True))
         self.assertEqual(pks, {self.row_a.pk, self.row_global.pk})
 
