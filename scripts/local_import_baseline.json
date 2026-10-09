@@ -624,31 +624,7 @@
     {
       "path": "itambox/core/apps.py",
       "context": "ClassDef:CoreConfig/FunctionDef:ready",
-      "statement": "from django.forms.forms import BaseForm",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/apps.py",
-      "context": "ClassDef:CoreConfig/FunctionDef:ready",
       "statement": "import core.signals",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/apps.py",
-      "context": "ClassDef:CoreConfig/FunctionDef:ready/FunctionDef:scoped_baseform_init",
-      "statement": "from django import forms",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/apps.py",
-      "context": "ClassDef:CoreConfig/FunctionDef:ready/FunctionDef:scoped_baseform_init",
-      "statement": "from django.db import connection",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/apps.py",
-      "context": "ClassDef:CoreConfig/FunctionDef:ready/FunctionDef:scoped_baseform_init",
-      "statement": "from organization.models import Tenant",
       "count": 1
     },
     {
