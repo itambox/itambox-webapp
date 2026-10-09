@@ -41,7 +41,7 @@ from .models import (
 from .signals import _SIGNAL_SKIP_MODELS
 
 
-class TagForm(ColorFieldFormMixin, forms.ModelForm):
+class TagForm(TenantScopedFormMixin, ColorFieldFormMixin, forms.ModelForm):
     # color is handled by ColorFieldFormMixin (prepends '#' on init, strips on clean)
     color = forms.CharField(
         max_length=7,

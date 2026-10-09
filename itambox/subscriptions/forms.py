@@ -313,7 +313,7 @@ class SubscriptionAssignmentForm(TenantScopedFormMixin, forms.ModelForm):
         return instance
 
 
-class SubscriptionRenewForm(forms.Form):
+class SubscriptionRenewForm(TenantScopedFormMixin, forms.Form):
     renewal_date = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
         label=_("Next Renewal Date"),
@@ -356,7 +356,7 @@ class SubscriptionRenewForm(forms.Form):
         )
 
 
-class SubscriptionCancelForm(forms.Form):
+class SubscriptionCancelForm(TenantScopedFormMixin, forms.Form):
     cancellation_date = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
         label=_("Cancellation Date"),

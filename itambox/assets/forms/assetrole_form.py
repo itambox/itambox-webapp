@@ -5,11 +5,12 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from core.forms import ColorFieldFormMixin
+from core.forms.base import TenantScopedFormMixin
 
 from ..models import AssetRole
 
 
-class AssetRoleForm(ColorFieldFormMixin, forms.ModelForm):
+class AssetRoleForm(TenantScopedFormMixin, ColorFieldFormMixin, forms.ModelForm):
     class Meta:
         model = AssetRole
         fields = ["name", "slug", "description", "color", "allows_components", "tags"]

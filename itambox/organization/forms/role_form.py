@@ -17,6 +17,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from core.forms import FilterForm
+from core.forms.base import TenantScopedFormMixin
 from core.managers import get_current_tenant
 from core.mfa import role_is_privileged
 from organization.services.role_grant_validation import validate_permission_grant, validate_role_grant
@@ -57,7 +58,7 @@ def get_custom_permissions():
     ]
 
 
-class RoleForm(forms.ModelForm):
+class RoleForm(TenantScopedFormMixin, forms.ModelForm):
     """ModelForm for ``organization.Role`` — owner tenant comes from context, never a picker."""
 
     class Meta:
@@ -435,7 +436,7 @@ class RoleFilterForm(FilterForm):
     filterset_class = RoleFilterSet
 
 
-class RoleAssignUsersForm(forms.Form):
+class RoleAssignUsersForm(TenantScopedFormMixin, forms.Form):
     """Bulk-add users to a Role (used by the "Assign Users" action).
 
     The view creates memberships (get_or_create) at the role's owning tenant plus

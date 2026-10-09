@@ -194,7 +194,7 @@ class BulkImportForm(forms.Form):
         label=_("CSV Delimiter"),
         choices=[(",", _("Comma (,)")), ("\t", _("Tab")), (";", _("Semicolon (;)"))],
         initial=",",
-        widget=forms.Select(attrs={"class": "form-select"}),
+        widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
         required=False,
     )
 

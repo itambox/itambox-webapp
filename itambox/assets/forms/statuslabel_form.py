@@ -5,12 +5,13 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from core.forms import ColorFieldFormMixin
+from core.forms.base import TenantScopedFormMixin
 from extras.models import Tag
 
 from ..models import StatusLabel
 
 
-class StatusLabelForm(ColorFieldFormMixin, forms.ModelForm):
+class StatusLabelForm(TenantScopedFormMixin, ColorFieldFormMixin, forms.ModelForm):
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         required=False,
