@@ -1,11 +1,13 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
+from core.forms import TenantScopedAdminFormMixin
+
 from .models import License, LicenseSeatAssignment
 
 
 @admin.register(License)
-class LicenseAdmin(admin.ModelAdmin):
+class LicenseAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = (
         "name",
         "software",
@@ -27,7 +29,7 @@ class LicenseAdmin(admin.ModelAdmin):
 
 
 @admin.register(LicenseSeatAssignment)
-class LicenseSeatAssignmentAdmin(admin.ModelAdmin):
+class LicenseSeatAssignmentAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("license", "asset", "assigned_holder", "assigned_date")
     list_filter = ("license__software__manufacturer", "license__software", "license")
     search_fields = ("license__name", "asset__name", "assigned_holder__upn", "notes")

@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
+from core.forms.scoping import TenantScopedFilterSetMixin
 from core.tenant_scope import get_ancestor_tenant_group_ids
 from organization.models import Role, RoleGrantScope, Tenant
 
@@ -14,7 +15,7 @@ from .models import UserGroup
 User = get_user_model()
 
 
-class UserFilterSet(django_filters.FilterSet):
+class UserFilterSet(TenantScopedFilterSetMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(
         method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": _("Search...")})
     )
@@ -80,7 +81,7 @@ class UserFilterSet(django_filters.FilterSet):
         ).distinct()
 
 
-class UserGroupFilterSet(django_filters.FilterSet):
+class UserGroupFilterSet(TenantScopedFilterSetMixin, django_filters.FilterSet):
     # Canonical joins flow through RoleGrant/RoleGrantScope and GroupMembership.
     q = django_filters.CharFilter(
         method="search", label=_("Search"), widget=forms.TextInput(attrs={"placeholder": _("Search...")})

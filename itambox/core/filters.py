@@ -6,12 +6,32 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from core.choices import ObjectChangeActionChoices
+from core.forms.scoping import TenantScopedFilterSetMixin
 from core.models import ObjectChange
 
 User = get_user_model()
 
 
-class BaseFilterSet(django_filters.FilterSet):
+class BaseFilterSet(TenantScopedFilterSetMixin, django_filters.FilterSet):
+    """Product-wide ``FilterSet`` base: read-time tenant scoping for choice filters.
+
+    ``TenantScopedFilterSetMixin`` re-applies ``filter_by_tenant()`` on every read
+    of a model-choice filter's queryset, so both the rendered choices and the
+    bound filter's validation follow the ambient scope: single tenant, tenant
+    group and all-accessible alike. That is exactly the behaviour the removed
+    global ``ModelChoiceField.queryset`` patch gave the filter forms (#584 WP5);
+    querysets that cannot be scoped (``User``, ``ContentType``, ``_base_manager``
+    pickers, callable request-time resolvers) are left untouched, as before.
+
+    The single-active-tenant narrowing in ``__init__`` is kept on purpose. For
+    the global catalogue models (``Manufacturer``, ``AssetType``, ``Category``,
+    ``StatusLabel``, ``AssetRole``) it is the only narrowing there is -- those
+    managers expose no ``filter_by_tenant()`` -- while for the tenant-bearing
+    models it intersects harmlessly with the mixin's read-time scope. Replacing
+    its name branches with explicit declarations is a separate change: the
+    read-time mixin must not introduce name-based rules.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         from core.managers import get_current_tenant
