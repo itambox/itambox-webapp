@@ -13,7 +13,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
 from core.data_transfer import policy_for
-from core.forms import ColorFieldFormMixin, FilterForm
+from core.forms import ColorFieldFormMixin, FilterForm, TenantScopedFormMixin
 from core.managers import Scope, get_current_tenant
 from core.validators import validate_external_url
 from itambox.middleware import get_current_user
@@ -105,7 +105,7 @@ def _add_immutable_tamper_errors(form, model):
             form.add_error(form_field, _("This value is immutable after creation."))
 
 
-class CustomFieldForm(forms.ModelForm):
+class CustomFieldForm(TenantScopedFormMixin, forms.ModelForm):
     choice_set = forms.ModelChoiceField(
         queryset=CustomFieldChoiceSet.objects.all(),
         required=False,
@@ -285,7 +285,7 @@ class CustomFieldForm(forms.ModelForm):
         return instance
 
 
-class CustomFieldsetForm(forms.ModelForm):
+class CustomFieldsetForm(TenantScopedFormMixin, forms.ModelForm):
     fields = forms.ModelMultipleChoiceField(
         queryset=CustomField.objects.all(),
         required=False,
@@ -422,7 +422,7 @@ class CustomFieldsetFilterForm(FilterForm):
     filterset_class = CustomFieldsetFilterSet
 
 
-class SavedFilterForm(forms.ModelForm):
+class SavedFilterForm(TenantScopedFormMixin, forms.ModelForm):
     # ``parameters`` is captured from the list view (the quick-save endpoint), not
     # edited here. ``tenant``/``created_by`` are set by the view, not the user.
     class Meta:
@@ -578,7 +578,10 @@ _EVENT_RULE_CONDITIONS_WITHDRAWN_MESSAGE = _(
 )
 
 
-class WebhookEndpointForm(forms.ModelForm):
+class WebhookEndpointForm(TenantScopedFormMixin, forms.ModelForm):
+    # Admin-visible tenant stays required once a Tenant row exists.
+    tenant_required = True
+
     payload_preset = forms.ChoiceField(
         choices=PAYLOAD_PRESET_CHOICES,
         required=False,
@@ -680,7 +683,10 @@ class WebhookEndpointForm(forms.ModelForm):
         return data
 
 
-class EventRuleForm(forms.ModelForm):
+class EventRuleForm(TenantScopedFormMixin, forms.ModelForm):
+    # Admin-visible tenant stays required once a Tenant row exists.
+    tenant_required = True
+
     events = forms.MultipleChoiceField(
         choices=Event.ACTION_CHOICES,
         widget=forms.CheckboxSelectMultiple,
@@ -844,7 +850,7 @@ class EventRuleForm(forms.ModelForm):
         return cleaned
 
 
-class LabelTemplateForm(forms.ModelForm):
+class LabelTemplateForm(TenantScopedFormMixin, forms.ModelForm):
     class Meta:
         model = LabelTemplate
         fields = ["name", "description", "page_width", "page_height", "barcode_format", "template_code"]
@@ -886,7 +892,7 @@ class LabelTemplateForm(forms.ModelForm):
         )
 
 
-class ExportTemplateForm(forms.ModelForm):
+class ExportTemplateForm(TenantScopedFormMixin, forms.ModelForm):
     """Author a global ExportTemplate (superuser-only; see ExportTemplateEditView).
 
     Curates ``content_type`` to exportable domain models and validates that
@@ -1029,7 +1035,7 @@ def _resolve_nonadmin_write_tenant(form, user):
     return tenant
 
 
-class ReportTemplateForm(forms.ModelForm):
+class ReportTemplateForm(TenantScopedFormMixin, forms.ModelForm):
     COLUMN_CHOICES = [
         # Asset Inventory Summary Columns
         ("asset_tag", _("Asset Tag")),
@@ -1211,7 +1217,7 @@ class ReportTemplateForm(forms.ModelForm):
         return instance
 
 
-class ScheduledReportForm(forms.ModelForm):
+class ScheduledReportForm(TenantScopedFormMixin, forms.ModelForm):
     class Meta:
         model = ScheduledReport
         fields = [
@@ -1340,7 +1346,10 @@ class ScheduledReportForm(forms.ModelForm):
         return instance
 
 
-class AlertRuleForm(forms.ModelForm):
+class AlertRuleForm(TenantScopedFormMixin, forms.ModelForm):
+    # Admin-visible tenant stays required once a Tenant row exists.
+    tenant_required = True
+
     # Alert types whose threshold_value is a *days* horizon rather than a unit count.
     _DAYS_ALERT_TYPES = {
         AlertRule.ALERT_TYPE_UPCOMING_EOL,
@@ -1481,7 +1490,7 @@ class AlertRuleForm(forms.ModelForm):
         return instance
 
 
-class NotificationChannelForm(forms.ModelForm):
+class NotificationChannelForm(TenantScopedFormMixin, forms.ModelForm):
     """Channel config via typed, per-type fields rather than a raw JSON blob.
 
     The model stores everything in a single ``config`` JSONField, but users
@@ -1490,6 +1499,9 @@ class NotificationChannelForm(forms.ModelForm):
     on save. ``form-toggles.ts`` shows only the fields relevant to the
     selected channel type.
     """
+
+    # Admin-visible tenant stays required once a Tenant row exists.
+    tenant_required = True
 
     webhook_url = forms.URLField(
         required=False,
