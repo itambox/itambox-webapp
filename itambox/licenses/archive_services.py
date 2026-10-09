@@ -98,12 +98,8 @@ def _kept_evidence_count(license_row: License) -> int:
     archived license and are never resurrected by a restore.
     """
     # unscoped: released seats are soft-deleted tombstones the scoped default
-    # manager hides by design; the scope is applied explicitly.
-    released_seats = (
-        LicenseSeatAssignment.all_objects.for_scope(Scope.current())
-        .filter(license=license_row, deleted_at__isnull=False)
-        .count()
-    )
+    # manager hides by design; they are bound to the already scoped license.
+    released_seats = LicenseSeatAssignment.all_objects.filter(license=license_row, deleted_at__isnull=False).count()
     return (
         _scoped(PurchaseOrderLine).filter(license=license_row).count()
         + released_seats
