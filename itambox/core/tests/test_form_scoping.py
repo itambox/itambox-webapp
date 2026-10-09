@@ -5,6 +5,9 @@ removed in WP5, so every assertion is on observable behaviour and mirrors the pa
 (``test_form_patch_characterization.py``), which remains the parity contract.
 """
 
+import importlib
+import inspect
+from pathlib import Path
 from unittest import mock
 
 import django_filters
@@ -36,6 +39,8 @@ from itambox.middleware import _current_user
 from organization.models import Location, Role, Site, Tenant, TenantGroup
 
 User = get_user_model()
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 class _ScopedPickerForm(forms.Form):
@@ -494,3 +499,57 @@ class CoreFormsUseExplicitScopingTests(TestCase):
         flt = _Filter()
         self.assertIn("data-tom-select", flt.fields["pick"].widget.attrs)
         self.assertNotIn("data-tom-select", flt.fields["radio"].widget.attrs)
+
+
+class AdminFormHookWiringTests(_ScopeFixture):
+    """G3: the admin form hook is wired per admin, not merely exported.
+
+    ``TenantScopedAdminFormMixin`` was unused in production after WP5, so the
+    admin-generated forms silently stopped following the ambient scope. The
+    wiring is asserted over the whole tree: a new ``ModelAdmin`` that forgets the
+    mixin fails here instead of shipping an unscoped admin form.
+    """
+
+    @staticmethod
+    def _product_model_admins():
+        for path in sorted(PROJECT_ROOT.glob("*/admin.py")):
+            module_name = path.relative_to(PROJECT_ROOT).with_suffix("").as_posix().replace("/", ".")
+            module = importlib.import_module(module_name)
+            for name, obj in vars(module).items():
+                if not inspect.isclass(obj) or obj.__module__ != module_name:
+                    continue
+                from django.contrib import admin as django_admin
+
+                if issubclass(obj, django_admin.ModelAdmin):
+                    yield module_name, name, obj
+
+    def test_every_product_model_admin_carries_the_hook(self):
+        offenders = [
+            f"{module_name}:{name}"
+            for module_name, name, obj in self._product_model_admins()
+            if not issubclass(obj, TenantScopedAdminFormMixin)
+        ]
+        self.assertEqual(
+            offenders,
+            [],
+            f"these ModelAdmins generate unscoped forms (#584 G3): {offenders}",
+        )
+
+    def test_the_census_reaches_the_product_admins(self):
+        module_names = {module_name for module_name, _name, _obj in self._product_model_admins()}
+        for expected in ("assets.admin", "inventory.admin", "organization.admin", "users.admin"):
+            self.assertIn(expected, module_names)
+
+    def test_a_wired_admin_scopes_its_generated_form(self):
+        from organization.admin import LocationAdmin
+
+        model_admin = LocationAdmin(Location, AdminSite())
+        request = RequestFactory().get("/")
+        request.user = self.superuser
+        form_class = model_admin.get_form(request)
+        self.assertTrue(issubclass(form_class, forms.ModelForm))  # sanity: a generated ModelForm
+        _current_user.set(self.member)
+        set_current_tenant(self.a1)
+        form = form_class()
+        self.assertTrue(is_tenant_scoped_field(form.fields["parent"]))
+        self.assertEqual(self.pks(form, "parent"), {self.loc_a1.pk})
