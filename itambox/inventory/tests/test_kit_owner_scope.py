@@ -16,8 +16,8 @@ Maintainer decisions under test:
 
 The tests drive the real ORM and the real HTTP routes; nothing here is a mocked
 scope helper. Choice-list expectations are asserted against the rendered
-response, because ``ModelChoiceField.queryset`` re-applies the tenant scope on
-every access (``core.apps.CoreConfig.ready``) and would otherwise be re-scoped
+response, because the tenant-scoped choice fields re-apply the tenant scope on
+every access (``core.forms.scoping``) and would otherwise be re-scoped
 to the test's ambient scope instead of the scope the modal was rendered under.
 """
 
