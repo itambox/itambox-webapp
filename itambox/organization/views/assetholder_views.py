@@ -2,10 +2,11 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Count, Q
-from django.http import HttpResponseBadRequest
+from django.http import HttpResponseBadRequest, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from django.views.generic import View
 from django_tables2 import RequestConfig
 
@@ -23,6 +24,7 @@ from itambox.views.generic import (
     ObjectImportView,
     ObjectListView,
 )
+from organization.services.archive import ArchiveBlocked, archive_holder
 from organization.services.offboarding import get_offboarding_report
 
 from ..filters import AssetHolderFilterSet
@@ -186,23 +188,37 @@ class AssetHolderDeleteView(ObjectDeleteView):
     template_name = "generic/object_confirm_delete.html"
     success_url = reverse_lazy("organization:assetholder_list")
 
-    def post(self, request, *args, **kwargs):
-        assetholder = self.get_object()
-        assignment_count = assetholder.asset_assignments.filter(is_active=True).count()
+    def form_valid(self, form):
+        """Archive the holder through the per-aggregate service.
 
-        if assignment_count > 0:
-            messages.error(
-                request,
-                _("Cannot delete asset holder '%(holder)s': It has %(count)d active assignment%(plural)s.")
-                % {
-                    "holder": assetholder,
-                    "count": assignment_count,
-                    "plural": "s" if assignment_count != 1 else "",
-                },
+        The holder is an aggregate root: the archive refuses while any open
+        obligation exists, so the refusal is reported here and the operator is
+        sent back to the detail page, which lists what is still outstanding.
+        This replaces the view-level guard that only inspected asset
+        assignments and left the API and bulk-delete paths unprotected.
+        """
+        obj_repr = self.get_object_display()
+        try:
+            result = archive_holder(self.object, actor=self.request.user, request=self.request)
+        except ArchiveBlocked as exc:
+            messages.error(self.request, exc.headline)
+            return redirect(self.object.get_absolute_url())
+
+        messages.success(
+            self.request,
+            _("Deleted %(model)s %(object)s.") % {"model": self.object._meta.verbose_name, "object": obj_repr},
+        )
+        if result.detached:
+            messages.info(
+                self.request,
+                ngettext(
+                    "Detached %(count)s linked record that referenced the asset holder.",
+                    "Detached %(count)s linked records that referenced the asset holder.",
+                    result.detached,
+                )
+                % {"count": result.detached},
             )
-            return redirect(assetholder.get_absolute_url())
-
-        return super().post(request, *args, **kwargs)
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class AssetHolderBulkEditView(ObjectBulkEditView):

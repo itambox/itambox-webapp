@@ -11,6 +11,7 @@ from django.utils.translation import gettext_lazy as _
 from django.views.generic import View
 from django.views.generic.base import TemplateResponseMixin
 
+from core.archive_handlers import AggregateArchiveBlocked, archive_object
 from core.forms import BulkEditForm
 from itambox.views.generic.mixins import (
     BulkViewMixin,
@@ -291,8 +292,14 @@ class ObjectBulkDeleteView(
                 for obj in objects_to_delete:
                     if hasattr(obj, "snapshot") and callable(obj.snapshot):
                         obj.snapshot()
-                    obj.delete()
+                    archive_object(obj, actor=request.user, request=request)
                     deleted_count += 1
+        except AggregateArchiveBlocked as exc:
+            # An aggregate service refused one of the rows: the whole batch is
+            # rolled back (the reason is about the row, not the batch) and the
+            # operator sees the typed message.
+            messages.error(request, exc.user_message)
+            return HttpResponseRedirect(return_url)
         except ProtectedError as exc:
             messages.error(
                 request,

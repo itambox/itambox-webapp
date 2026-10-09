@@ -9,6 +9,7 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.translation import gettext as _
 from django.views.generic import DeleteView
 
+from core.archive_handlers import AggregateArchiveBlocked, archive_object
 from core.forms import ConfirmationForm
 from itambox.utils import get_help_url, get_model_viewname
 from itambox.views.generic.authorization import PermissionResolver
@@ -70,12 +71,20 @@ class ObjectDeleteView(
         try:
             with lock_unmanaged_definition(self.object) as locked_object:
                 self.object = locked_object
-                self.object.delete()
+                archive_object(self.object, actor=self.request.user, request=self.request)
             messages.success(
                 self.request,
                 _("Deleted %(model)s %(object)s.") % {"model": model._meta.verbose_name, "object": obj_repr},
             )
             return HttpResponseRedirect(self.get_success_url())
+        except AggregateArchiveBlocked as exc:
+            # A typed refusal from the object's own aggregate service (the
+            # reason it cannot be archived belongs to that domain): report it
+            # and leave the object untouched.
+            messages.error(self.request, exc.user_message)
+            if hasattr(self.object, "get_absolute_url"):
+                return redirect(self.object.get_absolute_url())
+            return redirect(self.get_success_url())
         except ProtectedError as e:
             messages.error(
                 self.request,

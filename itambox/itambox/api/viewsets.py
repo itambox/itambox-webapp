@@ -10,6 +10,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
+from core.archive_handlers import archive_object
 from core.managers import Scope, get_current_tenant
 from itambox.api.mixins import BulkDestroyModelMixin, BulkUpdateModelMixin, ETagMixin, ObjectValidationMixin
 from itambox.api.serializers.features import ChangeLogMessageSerializer
@@ -348,7 +349,7 @@ class ITAMBoxModelViewSet(
                 locked = _scoped_manager(model).select_for_update().get(pk=instance.pk)
                 self._ensure_unmanaged_definition(locked)
                 self._validate_etag(self.request, locked)
-                super().perform_destroy(locked)
+                archive_object(locked, actor=self.request.user, request=self.request)
         except ObjectDoesNotExist:
             logger.warning(
                 "perform_destroy: %s pk=%s not visible in tenant scope; denying.",
