@@ -13,7 +13,7 @@ class AssetsConfig(AppConfig):
         # inline import: app-registry: curated import forms load only after the app registry is ready.
         import assets.forms.import_forms
         import assets.search
-        import assets.signals
+        import assets.signals  # noqa: F401  # registers signal receivers
 
         # inline import: app-registry: attach dynamic Asset/AssetType definitions to the shared value validator.
         from assets.customfields import asset_custom_field_definitions, asset_type_custom_field_definitions

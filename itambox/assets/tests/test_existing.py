@@ -41,7 +41,6 @@ from inventory.models import (
     Component,
     ComponentAllocation,
     Consumable,
-    ConsumableAssignment,
     Kit,
     KitItem,
 )

@@ -7,7 +7,6 @@ Requires: running PostgreSQL (same as all other assets tests).
 Uses TenantTestMixin + model_bakery per project convention.
 """
 
-import pytest
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from model_bakery import baker

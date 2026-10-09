@@ -13,7 +13,6 @@ from itambox.views.generic import (
     ObjectDeleteView,
     ObjectDetailView,
     ObjectEditView,
-    ObjectImportView,
     ObjectListView,
 )
 

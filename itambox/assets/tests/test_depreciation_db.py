@@ -11,7 +11,6 @@ from decimal import Decimal
 
 import pytest
 from django.test import TestCase
-from django.utils import timezone
 
 from assets.depreciation import compute_book_value, resolve_policy
 from assets.models import Asset, AssetType, Depreciation, Manufacturer, StatusLabel

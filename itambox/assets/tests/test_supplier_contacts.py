@@ -9,7 +9,6 @@ Verifies:
 
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
-from django.urls import reverse
 
 from assets.models import Supplier
 from core.tests.mixins import TenantTestMixin
