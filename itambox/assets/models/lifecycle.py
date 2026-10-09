@@ -263,6 +263,12 @@ class Warranty(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     objects = ExplicitScopeSoftDeleteManager()
     all_objects = ExplicitScopeAllObjectsManager()
 
+    #: Correlates the row with the aggregate archive operation that moved it
+    #: (#619). A restore only brings back rows an operation archived; a row
+    #: deleted on its own has no marker and stays deleted. NULL for every
+    #: pre-existing row.
+    archive_operation_id = models.UUIDField(null=True, blank=True, editable=False, verbose_name=_("Archive Operation"))
+
     @property
     def tenant(self):
         return self.asset.tenant if self.asset_id else None
@@ -338,6 +344,12 @@ class AssetReservation(JournalingMixin, SoftDeleteMixin, ChangeLoggingMixin, Bas
     tenant_lookup = "asset__tenant"
     objects = ExplicitScopeSoftDeleteManager()
     all_objects = ExplicitScopeAllObjectsManager()
+
+    #: Correlates the row with the aggregate archive operation that moved it
+    #: (#619). A restore only brings back rows an operation archived; a row
+    #: deleted on its own has no marker and stays deleted. NULL for every
+    #: pre-existing row.
+    archive_operation_id = models.UUIDField(null=True, blank=True, editable=False, verbose_name=_("Archive Operation"))
 
     @property
     def tenant(self):
