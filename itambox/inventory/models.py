@@ -9,7 +9,6 @@ from core.context import _deletion_cascade_allows
 from core.managers import (
     AllObjectsManager,
     ExplicitScopeAllObjectsManager,
-    ExplicitScopeManager,
     ExplicitScopeSoftDeleteManager,
     Scope,
     SoftDeleteManager,
