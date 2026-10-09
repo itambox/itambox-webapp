@@ -1550,14 +1550,6 @@
     {
       "path": "itambox/core/forms/mixins.py",
       "code": "C901",
-      "message": "'FilterForm.__init__' is too complex (15)",
-      "source": "    def __init__(self, *args, **kwargs):",
-      "context": "Module:body/ClassDef:FilterForm:body/FunctionDef:__init__:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/mixins.py",
-      "code": "C901",
       "message": "'FilterForm.setup_ajax_fields' is too complex (15)",
       "source": "    def setup_ajax_fields(self, ajax_fields, filterset_data):",
       "context": "Module:body/ClassDef:FilterForm:body/FunctionDef:setup_ajax_fields:self",
