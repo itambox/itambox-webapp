@@ -20,6 +20,7 @@ from django.utils.translation import gettext_lazy as _lazy
 
 from assets.models import Asset, AssetMaintenance, StatusLabel
 from core.context import override_current_tenant_scope
+from core.forms import TenantScopedFormMixin
 from core.managers import Scope
 from core.tenant_access import accessible_tenant_ids, active_membership
 from inventory.models import (
@@ -242,7 +243,7 @@ class ScopedConsumableWrapper:
 # -----------------------------------------------------------------------------
 
 
-class WidgetConfigForm(forms.Form):
+class WidgetConfigForm(TenantScopedFormMixin, forms.Form):
     pass
 
 
