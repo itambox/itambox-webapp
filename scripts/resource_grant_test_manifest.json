@@ -6,6 +6,7 @@
     "itambox/core/tests/test_tenant_group_scoping.py",
     "itambox/core/tests/test_tenant_scope_resolution.py",
     "itambox/organization/tests/test_cost_centers.py",
+    "itambox/organization/tests/test_form_scoping.py",
     "itambox/organization/tests/test_scoping.py",
     "itambox/software/tests/test_form_scoping.py",
     "itambox/subscriptions/tests/test_form_scoping.py"
@@ -737,6 +738,7 @@
     "itambox/organization/tests/test_clone.py",
     "itambox/organization/tests/test_contact_assignment_tenant_isolation.py",
     "itambox/organization/tests/test_cost_centers.py",
+    "itambox/organization/tests/test_form_scoping.py",
     "itambox/organization/tests/test_holders.py",
     "itambox/organization/tests/test_identity_provisioning.py",
     "itambox/organization/tests/test_identity_provisioning_concurrency.py",

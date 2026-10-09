@@ -3,7 +3,7 @@ from crispy_forms.layout import Layout
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
-from core.forms import FilterForm
+from core.forms import FilterForm, TenantScopedFormMixin
 from extras.models import Tag
 
 from ..filters import RegionFilterSet
@@ -11,7 +11,7 @@ from ..models import Region
 from .helpers import add_standard_buttons
 
 
-class RegionForm(forms.ModelForm):
+class RegionForm(TenantScopedFormMixin, forms.ModelForm):
     parent = forms.ModelChoiceField(
         queryset=Region.objects.all(), required=False, widget=forms.Select(attrs={"class": "form-select"})
     )

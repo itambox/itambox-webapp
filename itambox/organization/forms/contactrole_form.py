@@ -3,14 +3,14 @@ from crispy_forms.layout import HTML, Layout, Submit
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
-from core.forms import FilterForm
+from core.forms import FilterForm, TenantScopedFormMixin
 
 from ..filters import ContactRoleFilterSet
 from ..models import Contact, ContactAssignment, ContactRole
 from .helpers import add_standard_buttons
 
 
-class ContactRoleForm(forms.ModelForm):
+class ContactRoleForm(TenantScopedFormMixin, forms.ModelForm):
     class Meta:
         model = ContactRole
         fields = ["name", "slug", "description"]
@@ -30,7 +30,7 @@ class ContactRoleForm(forms.ModelForm):
         add_standard_buttons(self.helper, self.instance, "organization:contactrole_list")
 
 
-class ContactAssignmentForm(forms.ModelForm):
+class ContactAssignmentForm(TenantScopedFormMixin, forms.ModelForm):
     contact = forms.ModelChoiceField(
         queryset=Contact.objects.all(), widget=forms.Select(attrs={"class": "form-select"})
     )
