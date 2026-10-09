@@ -1,5 +1,7 @@
 from django.contrib import admin
 
+from core.forms import TenantScopedAdminFormMixin
+
 from .models import (
     Contact,
     ContactAssignment,
@@ -21,57 +23,57 @@ from .models import (
 )
 
 
-class SiteAdmin(admin.ModelAdmin):
+class SiteAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("name", "slug", "status", "region", "group", "tenant")
     list_filter = ("status", "region", "group", "tenant")
     prepopulated_fields = {"slug": ("name",)}
 
 
-class RegionAdmin(admin.ModelAdmin):
+class RegionAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("name", "parent", "description")
     prepopulated_fields = {"slug": ("name",)}
 
 
-class SiteGroupAdmin(admin.ModelAdmin):
+class SiteGroupAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("name", "parent", "description")
     prepopulated_fields = {"slug": ("name",)}
 
 
-class TenantGroupAdmin(admin.ModelAdmin):
+class TenantGroupAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("name", "parent")
     prepopulated_fields = {"slug": ("name",)}
 
 
-class TenantAdmin(admin.ModelAdmin):
+class TenantAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("name", "slug", "group", "managed_by", "is_provider")
     list_filter = ("group", "managed_by", "is_provider")
     search_fields = ("name", "slug", "description", "comments")
     prepopulated_fields = {"slug": ("name",)}
 
 
-class LocationAdmin(admin.ModelAdmin):
+class LocationAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("name", "site", "status", "parent", "facility")
     list_filter = ("site", "status", "parent")
     search_fields = ("name", "slug", "facility", "description")
     prepopulated_fields = {"slug": ("name",)}
 
 
-class ContactAdmin(admin.ModelAdmin):
+class ContactAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("name", "title", "phone", "email", "web_url")
     search_fields = ("name", "title", "phone", "email", "description")
 
 
-class ContactRoleAdmin(admin.ModelAdmin):
+class ContactRoleAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("name", "slug", "description")
     prepopulated_fields = {"slug": ("name",)}
 
 
-class ContactAssignmentAdmin(admin.ModelAdmin):
+class ContactAssignmentAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("contact", "role", "content_type", "object_id", "priority")
     list_filter = ("role", "priority")
 
 
-class MembershipAdmin(admin.ModelAdmin):
+class MembershipAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("user", "tenant", "is_active", "joined_at")
     list_filter = ("tenant", "is_active")
     search_fields = ("user__username", "user__email", "tenant__name")
@@ -83,7 +85,7 @@ class RoleGrantScopeInline(admin.TabularInline):
     raw_id_fields = ("tenant", "tenant_group")
 
 
-class RoleGrantAdmin(admin.ModelAdmin):
+class RoleGrantAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = (
         "role",
         "membership",
@@ -104,14 +106,14 @@ class RoleGrantAdmin(admin.ModelAdmin):
     inlines = (RoleGrantScopeInline,)
 
 
-class RoleAdmin(admin.ModelAdmin):
+class RoleAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("name", "tenant", "shared_with_managed")
     list_filter = ("tenant", "shared_with_managed")
     search_fields = ("name", "tenant__name", "description")
     prepopulated_fields = {"slug": ("name",)}
 
 
-class TenantResourceGrantAdmin(admin.ModelAdmin):
+class TenantResourceGrantAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = (
         "tenant",
         "grantee_tenant",
@@ -135,7 +137,7 @@ class TenantResourceGrantAdmin(admin.ModelAdmin):
         return TenantResourceGrant._base_manager.all()
 
 
-class _ReadOnlyExpiryAdmin(admin.ModelAdmin):
+class _ReadOnlyExpiryAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     def has_module_permission(self, request):
         return bool(request.user and request.user.is_superuser)
 
@@ -177,7 +179,7 @@ class TenantResourceGrantExpiryRevocationAdmin(_ReadOnlyExpiryAdmin):
         )
 
 
-class CostCenterAdmin(admin.ModelAdmin):
+class CostCenterAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("code", "name", "tenant", "parent", "is_active")
     list_filter = ("tenant", "is_active")
     search_fields = ("name", "code", "description")

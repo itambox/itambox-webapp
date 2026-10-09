@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
 
+from core.forms import TenantScopedAdminFormMixin
+
 from .models import Subscription, SubscriptionAssignment
 
 
@@ -14,7 +16,7 @@ class SubscriptionAssignmentInline(admin.TabularInline):
 
 
 @admin.register(Subscription)
-class SubscriptionAdmin(admin.ModelAdmin):
+class SubscriptionAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = (
         "name",
         "supplier",
@@ -130,7 +132,7 @@ class SubscriptionAdmin(admin.ModelAdmin):
 
 
 @admin.register(SubscriptionAssignment)
-class SubscriptionAssignmentAdmin(admin.ModelAdmin):
+class SubscriptionAssignmentAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("subscription", "content_type", "object_id", "assigned_date", "assigned_by")
     list_filter = ("content_type", "subscription__supplier", "subscription__status")
     search_fields = ("subscription__name", "notes")

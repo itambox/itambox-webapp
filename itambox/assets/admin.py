@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils.text import capfirst
 from django.utils.translation import gettext_lazy as _
 
+from core.forms import TenantScopedAdminFormMixin
 from software.models import InstalledSoftware
 
 from .models import Asset, AssetDisposal, AssetReservation, AssetRole, AssetType, Manufacturer, Warranty
@@ -18,7 +19,7 @@ from .services import (
 
 
 @admin.register(AssetRole)
-class AssetRoleAdmin(admin.ModelAdmin):
+class AssetRoleAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("name", "slug", "asset_count")
     prepopulated_fields = {"slug": ("name",)}
 
@@ -29,7 +30,7 @@ class AssetRoleAdmin(admin.ModelAdmin):
 
 
 @admin.register(Manufacturer)
-class ManufacturerAdmin(admin.ModelAdmin):
+class ManufacturerAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("name", "slug", "asset_count")
     prepopulated_fields = {"slug": ("name",)}
     search_fields = ("name",)
@@ -41,7 +42,7 @@ class ManufacturerAdmin(admin.ModelAdmin):
 
 
 @admin.register(AssetType)
-class AssetTypeAdmin(admin.ModelAdmin):
+class AssetTypeAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("manufacturer", "model", "slug", "part_number")
     list_filter = ("manufacturer",)
     search_fields = ("manufacturer__name", "model", "slug", "part_number")
@@ -54,14 +55,14 @@ class AssetTypeAdmin(admin.ModelAdmin):
 
 
 @admin.register(Asset)
-class AssetAdmin(admin.ModelAdmin):
+class AssetAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("name", "asset_tag", "status", "tenant", "manufacturer", "model", "asset_role", "location")
     list_filter = ("status", "asset_role", "asset_type__manufacturer", "location", "asset_type", "tenant")
     search_fields = ("name", "asset_tag", "serial_number", "asset_type__model", "tenant__name")
 
 
 @admin.register(InstalledSoftware)
-class InstalledSoftwareAdmin(admin.ModelAdmin):
+class InstalledSoftwareAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("asset", "software", "version_detected", "last_seen_date", "discovered_by_agent")
     list_filter = ("software__manufacturer", "software", "discovered_by_agent", "asset__location")
     search_fields = ("asset__name", "asset__asset_tag", "software__name", "version_detected", "notes")
@@ -70,7 +71,7 @@ class InstalledSoftwareAdmin(admin.ModelAdmin):
 
 
 @admin.register(AssetDisposal)
-class AssetDisposalAdmin(admin.ModelAdmin):
+class AssetDisposalAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = (
         "asset",
         "disposal_method",
@@ -181,7 +182,7 @@ class AssetDisposalAdmin(admin.ModelAdmin):
 
 
 @admin.register(Warranty)
-class WarrantyAdmin(admin.ModelAdmin):
+class WarrantyAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("asset", "warranty_type", "supplier", "start_date", "end_date", "reference")
     list_filter = ("warranty_type",)
     search_fields = ("asset__name", "asset__asset_tag", "supplier__name", "reference")
@@ -190,7 +191,7 @@ class WarrantyAdmin(admin.ModelAdmin):
 
 
 @admin.register(AssetReservation)
-class AssetReservationAdmin(admin.ModelAdmin):
+class AssetReservationAdmin(TenantScopedAdminFormMixin, admin.ModelAdmin):
     list_display = ("asset", "reserved_for", "start_date", "end_date", "status", "purpose")
     list_filter = ("status",)
     search_fields = ("asset__name", "asset__asset_tag", "purpose")

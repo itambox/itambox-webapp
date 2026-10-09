@@ -6,6 +6,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from core.filters import BaseFilterSet
+from core.forms.scoping import TenantScopedFilterSetMixin
 from core.managers import Scope
 
 from .models import (
@@ -25,7 +26,7 @@ from .models import (
 )
 
 
-class TagFilter(django_filters.FilterSet):
+class TagFilter(TenantScopedFilterSetMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(
         method="search",
         label=_("Search"),
@@ -41,7 +42,7 @@ class TagFilter(django_filters.FilterSet):
         return queryset.filter(Q(name__icontains=value) | Q(slug__icontains=value) | Q(description__icontains=value))
 
 
-class CustomFieldFilterSet(django_filters.FilterSet):
+class CustomFieldFilterSet(TenantScopedFilterSetMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method="search", label=_("Search"))
 
     class Meta:
@@ -54,7 +55,7 @@ class CustomFieldFilterSet(django_filters.FilterSet):
         return queryset.filter(Q(name__icontains=value) | Q(label__icontains=value)).distinct()
 
 
-class CustomFieldsetFilterSet(django_filters.FilterSet):
+class CustomFieldsetFilterSet(TenantScopedFilterSetMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method="search", label=_("Search"))
 
     class Meta:
@@ -95,7 +96,7 @@ class SavedFilterFilterSet(BaseFilterSet):
         return queryset.filter(Q(name__icontains=value) | Q(description__icontains=value)).distinct()
 
 
-class EventRuleFilterSet(django_filters.FilterSet):
+class EventRuleFilterSet(TenantScopedFilterSetMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method="search", label=_("Search"))
 
     class Meta:
@@ -108,7 +109,7 @@ class EventRuleFilterSet(django_filters.FilterSet):
         return queryset.filter(Q(name__icontains=value)).distinct()
 
 
-class WebhookEndpointFilterSet(django_filters.FilterSet):
+class WebhookEndpointFilterSet(TenantScopedFilterSetMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method="search", label=_("Search"))
 
     class Meta:
@@ -121,7 +122,7 @@ class WebhookEndpointFilterSet(django_filters.FilterSet):
         return queryset.filter(Q(name__icontains=value) | Q(url__icontains=value)).distinct()
 
 
-class WebhookDeliveryFilterSet(django_filters.FilterSet):
+class WebhookDeliveryFilterSet(TenantScopedFilterSetMixin, django_filters.FilterSet):
     endpoint = django_filters.ModelChoiceFilter(
         queryset=lambda request: WebhookEndpoint.objects.for_scope(Scope.current()),
         label=_("Endpoint"),
@@ -137,7 +138,7 @@ class WebhookDeliveryFilterSet(django_filters.FilterSet):
         fields = ["endpoint", "status", "test_send"]
 
 
-class NotificationChannelFilterSet(django_filters.FilterSet):
+class NotificationChannelFilterSet(TenantScopedFilterSetMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method="search", label=_("Search"))
 
     class Meta:
@@ -150,7 +151,7 @@ class NotificationChannelFilterSet(django_filters.FilterSet):
         return queryset.filter(Q(name__icontains=value)).distinct()
 
 
-class AlertRuleFilterSet(django_filters.FilterSet):
+class AlertRuleFilterSet(TenantScopedFilterSetMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method="search", label=_("Search"))
 
     class Meta:
@@ -242,7 +243,7 @@ class JournalEntryFilterSet(BaseFilterSet):
         return queryset.filter(Q(comment__icontains=value)).distinct()
 
 
-class ReportTemplateFilterSet(django_filters.FilterSet):
+class ReportTemplateFilterSet(TenantScopedFilterSetMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method="search", label=_("Search"))
 
     class Meta:
@@ -255,7 +256,7 @@ class ReportTemplateFilterSet(django_filters.FilterSet):
         return queryset.filter(Q(name__icontains=value) | Q(description__icontains=value)).distinct()
 
 
-class ScheduledReportFilterSet(django_filters.FilterSet):
+class ScheduledReportFilterSet(TenantScopedFilterSetMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method="search", label=_("Search"))
 
     class Meta:
