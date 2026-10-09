@@ -33,11 +33,20 @@ This module now covers the successor invariants:
       actor who holds ``organization.change_role`` inside the managed tenant.
 """
 
+from importlib import import_module
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.db.models import Q
 from django.test import TestCase
 from django.urls import reverse
+
+from core.tests.mixins import TenantTestMixin
+from organization import models as organization_models
+from organization.forms import RoleForm
+from organization.forms import role_form as role_form_module
+from organization.forms.membership_form import MembershipForm
+from organization.models import Role, Tenant
 
 # Import the view modules at collection time (no tenant context active) so their
 # `queryset = Model.objects.all()` class attributes (RoleEditView) bake UNSCOPED.
@@ -46,13 +55,7 @@ from django.urls import reverse
 # with that tenant active and freeze the queryset to the wrong tenant, causing
 # order-dependent 404s here. Harmless in production (URLconf loads at startup
 # with no tenant). See memory: import-baked-view-querysets-tests.
-import organization.views  # noqa: F401,E402
-from core.tests.mixins import TenantTestMixin
-from organization import models as organization_models
-from organization.forms import RoleForm
-from organization.forms import role_form as role_form_module
-from organization.forms.membership_form import MembershipForm
-from organization.models import Role, Tenant
+import_module("organization.views")
 
 User = get_user_model()
 
