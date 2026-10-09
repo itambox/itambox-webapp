@@ -23,12 +23,14 @@ Gunicorn/WSGI import, management commands, qcluster), not just through a helper.
 """
 
 import importlib
+import importlib.util
 import json
 import logging
 import os
 import signal
 import subprocess
 import sys
+import types
 import warnings
 from pathlib import Path
 from unittest import mock
@@ -127,6 +129,37 @@ def _prod_log_records(extra_env):
     finally:
         logger.removeHandler(handler)
     return records, prod
+
+
+def _load_settings_namespace(env_value: str, source_module: str) -> types.ModuleType:
+    """Execute the settings loader against an isolated, stubbed source module."""
+    settings_path = Path(__file__).resolve().parents[1] / "settings" / "__init__.py"
+    spec = importlib.util.spec_from_file_location(f"core.settings._coverage_probe_{source_module}", settings_path)
+    assert spec is not None and spec.loader is not None
+    loader = importlib.util.module_from_spec(spec)
+    loader.__package__ = "core.settings"
+    fake_source = types.ModuleType(f"core.settings.{source_module}")
+    fake_source.__dict__["SETTINGS_LOADER_SOURCE"] = source_module
+
+    with mock.patch.dict(os.environ, {"ITAMBOX_ENV": env_value}):
+        with mock.patch.dict(sys.modules, {fake_source.__name__: fake_source}):
+            spec.loader.exec_module(loader)
+
+    return loader
+
+
+class TestSettingsNamespaceLoader:
+    def test_prod_environment_imports_the_production_namespace(self):
+        loader = _load_settings_namespace("prod", "prod")
+
+        assert loader.ENV == "prod"
+        assert loader.__dict__["SETTINGS_LOADER_SOURCE"] == "prod"
+
+    def test_unrecognized_environment_falls_back_to_base_namespace(self):
+        loader = _load_settings_namespace("legacy", "base")
+
+        assert loader.ENV == "legacy"
+        assert loader.__dict__["SETTINGS_LOADER_SOURCE"] == "base"
 
 
 class TestProdSettingsPosture:
