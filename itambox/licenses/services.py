@@ -1,6 +1,5 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from assets.models import Asset

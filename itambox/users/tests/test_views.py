@@ -317,8 +317,6 @@ class BookmarkAndNotificationTests(TestCase):
 
         from django.contrib.contenttypes.models import ContentType
 
-        from extras.models import ObjectWatch
-
         ct = ContentType.objects.get_for_model(self.tenant)
         self.client.force_login(self.user)
         url = reverse("users:watch_toggle", kwargs={"content_type_id": ct.pk, "object_id": self.tenant.pk})

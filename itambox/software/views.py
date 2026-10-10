@@ -1,5 +1,4 @@
 from django.db.models import Count, Q
-from django.shortcuts import render
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
@@ -49,10 +48,6 @@ class SoftwareDetailView(ObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         software = self.get_object()
-
-        from django_tables2 import RequestConfig
-
-        from itambox.utils import get_paginate_count
 
         instances_qs = InstalledSoftware.objects.for_scope(Scope.current()).filter(software=software)
         instances_table = InstalledSoftwareTable(instances_qs)

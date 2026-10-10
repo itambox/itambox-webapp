@@ -32,7 +32,7 @@ from compliance.audit_services import (
     rehome_audit_session_mismatches,
 )
 from compliance.filters import AuditSessionFilterSet
-from compliance.forms_audit import AssetAuditForm, AuditBarcodeScanForm, AuditSessionForm
+from compliance.forms_audit import AuditBarcodeScanForm, AuditSessionForm
 from compliance.forms_filter import AuditSessionFilterForm
 from compliance.models import AssetAudit, AuditSession
 from core.csv_utils import csv_safe

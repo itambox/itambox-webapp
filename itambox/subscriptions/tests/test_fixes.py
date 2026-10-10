@@ -28,7 +28,6 @@ from subscriptions.models import (
     Subscription,
     SubscriptionAssignment,
     SubscriptionStatusChoices,
-    SubscriptionTypeChoices,
 )
 from subscriptions.tasks import check_subscription_expiries_and_reminders
 

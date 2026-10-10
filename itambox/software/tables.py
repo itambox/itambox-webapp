@@ -3,8 +3,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
-from assets.models import Manufacturer
-from core.tables import ActionsColumn, BaseTable, BooleanColumn, CountLinkColumn, ToggleColumn
+from core.tables import ActionsColumn, BaseTable, CountLinkColumn, ToggleColumn
 from extras.tables import TagColumn
 
 from .models import InstalledSoftware, Software

@@ -15,16 +15,13 @@ from django.urls import reverse, reverse_lazy
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy as _lazy
 from django.utils.translation import ngettext
-from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView, UpdateView, View
 from django.views.generic.base import TemplateResponseMixin
-from django_tables2 import RequestConfig, SingleTableView
 
 from core.context import get_current_all_accessible, get_current_tenant, get_current_tenant_group
 from core.managers import Scope
 from core.models import ObjectChange
 from core.tables import ObjectChangeTable
-from itambox.utils import get_paginate_count
 from itambox.views.generic import (
     BaseHTMXView,
     ObjectBulkDeleteView,
@@ -50,7 +47,7 @@ from .forms import (
     UserPreferencesForm,
     UserProfileForm,
 )
-from .models import GroupMembership, UserGroup, UserPreference
+from .models import GroupMembership, UserGroup
 from .services import clear_workspace_session
 from .tables import UserGroupTable, UserTable
 

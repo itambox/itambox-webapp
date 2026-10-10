@@ -1,6 +1,3 @@
-import base64
-import json
-
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -8,7 +5,7 @@ from django.utils import timezone
 from rest_framework import status
 
 from core.tests.mixins import grant
-from organization.models import AssetHolder, Membership, Role, Tenant
+from organization.models import AssetHolder, Role, Tenant
 from users.models import Token, UserGroup
 
 User = get_user_model()
