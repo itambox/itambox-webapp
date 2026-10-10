@@ -298,22 +298,22 @@ def _reloaded_authorized_actor(
 
 
 def _available_manufacturer(manufacturer_id: int):
-    return Manufacturer.all_objects.using(_DEFAULT_DB).filter(pk=manufacturer_id, deleted_at__isnull=True).first()
+    return Manufacturer.objects.using(_DEFAULT_DB).filter(pk=manufacturer_id, deleted_at__isnull=True).first()
 
 
 def _available_category(category_id: int):
-    return Category.all_objects.using(_DEFAULT_DB).filter(pk=category_id, deleted_at__isnull=True).first()
+    return Category.objects.using(_DEFAULT_DB).filter(pk=category_id, deleted_at__isnull=True).first()
 
 
 def _tags_exist(tag_ids: tuple[int, ...], *, using: str = _DEFAULT_DB) -> bool:
     if not tag_ids:
         return True
-    return Tag.all_objects.using(using).filter(pk__in=tag_ids, deleted_at__isnull=True).count() == len(tag_ids)
+    return Tag.objects.using(using).filter(pk__in=tag_ids, deleted_at__isnull=True).count() == len(tag_ids)
 
 
 def _lock_asset_type(asset_type_id: int):
     return (
-        AssetType.all_objects.using(_DEFAULT_DB)
+        AssetType.objects.using(_DEFAULT_DB)
         .select_for_update()
         .filter(pk=asset_type_id, deleted_at__isnull=True)
         .first()
@@ -322,10 +322,7 @@ def _lock_asset_type(asset_type_id: int):
 
 def _lock_category(category_id: int):
     return (
-        Category.all_objects.using(_DEFAULT_DB)
-        .select_for_update()
-        .filter(pk=category_id, deleted_at__isnull=True)
-        .first()
+        Category.objects.using(_DEFAULT_DB).select_for_update().filter(pk=category_id, deleted_at__isnull=True).first()
     )
 
 
@@ -348,7 +345,7 @@ def _lock_create_references(
         raise TypeError("native must be an AssetTypeNativeCreateInputDTO")
     if native.suggested_asset_role_id is not None:
         locks.role_exists = (
-            AssetRole.all_objects.using(using)
+            AssetRole.objects.using(using)
             .select_for_update()
             .filter(pk=native.suggested_asset_role_id, deleted_at__isnull=True)
             .exists()
@@ -365,7 +362,7 @@ def _lock_create_references(
             return unavailable()
     if native.depreciation_id is not None:
         locks.depreciation_exists = (
-            Depreciation.all_objects.using(using)
+            Depreciation.objects.using(using)
             .select_for_update()
             .filter(pk=native.depreciation_id, deleted_at__isnull=True)
             .exists()
@@ -374,7 +371,7 @@ def _lock_create_references(
         return unavailable()
     if native.tag_ids:
         locked_tags = list(
-            Tag.all_objects.using(using)
+            Tag.objects.using(using)
             .select_for_update()
             .filter(pk__in=native.tag_ids, deleted_at__isnull=True)
             .order_by("pk")
@@ -386,7 +383,7 @@ def _lock_create_references(
 
 def _lock_manufacturer(manufacturer_id: int):
     return (
-        Manufacturer.all_objects.using(_DEFAULT_DB)
+        Manufacturer.objects.using(_DEFAULT_DB)
         .select_for_update()
         .filter(pk=manufacturer_id, deleted_at__isnull=True)
         .first()
@@ -598,7 +595,7 @@ def _explicit_slug_conflict_issue(native: AssetTypeNativeCreateInputDTO, *, usin
     """Current duplicate explicit-slug conflict in the shared preview/write plan."""
     if native.slug is None:
         return None
-    if AssetType.all_objects.using(using).filter(slug=native.slug, deleted_at__isnull=True).exists():
+    if AssetType.objects.using(using).filter(slug=native.slug, deleted_at__isnull=True).exists():
         return issue("REFERENCE_CONFLICT", path=("slug",), message_key=_REFERENCE_CONFLICT_MESSAGE)
     return None
 
@@ -632,17 +629,13 @@ def _preview_reference_issues(
     issues: list[DomainIssueDTO] = []
     if native.suggested_asset_role_id is not None:
         if (
-            not AssetRole.all_objects.using(using)
+            not AssetRole.objects.using(using)
             .filter(pk=native.suggested_asset_role_id, deleted_at__isnull=True)
             .exists()
         ):
             issues.append(_reference_issue("suggested_asset_role_id"))
     if native.depreciation_id is not None:
-        if (
-            not Depreciation.all_objects.using(using)
-            .filter(pk=native.depreciation_id, deleted_at__isnull=True)
-            .exists()
-        ):
+        if not Depreciation.objects.using(using).filter(pk=native.depreciation_id, deleted_at__isnull=True).exists():
             issues.append(_reference_issue("depreciation_id"))
     if not _tags_exist(native.tag_ids, using=using):
         issues.append(_reference_issue("tag_ids"))
@@ -1201,7 +1194,7 @@ def _preview_apply_locked(
     expected_resource_revision: str,
     patch: SpecificationPatchDTO,
 ) -> AssetTypePreviewResult:
-    owner = AssetType.all_objects.using(_DEFAULT_DB).filter(pk=asset_type_id, deleted_at__isnull=True).first()
+    owner = AssetType.objects.using(_DEFAULT_DB).filter(pk=asset_type_id, deleted_at__isnull=True).first()
     owner_ref = OwnerRefDTO("asset_type", asset_type_id)
     if owner is None:
         return unavailable()

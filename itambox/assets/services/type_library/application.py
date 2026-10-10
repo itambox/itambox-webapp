@@ -262,6 +262,7 @@ def _reload_library_actor(actor: object, *, using: str) -> object | None:
     actor_id = getattr(actor, "pk", None)
     if type(actor_id) is not int or actor_id <= 0:
         return None
+    # unscoped: actor reload for re-authorization must not depend on the ambient tenant
     return get_user_model()._base_manager.using(using).filter(pk=actor_id, is_active=True).first()
 
 
@@ -327,6 +328,8 @@ def _catalogue_reference_issues(incoming: ValidatedLibraryDocument, *, using: st
     for section, model in (("manufacturers", Manufacturer), ("categories", Category)):
         for index, item in enumerate(definitions.get(section, [])):
             slug = item["id"].split("/", 1)[1]
+            # unscoped: library apply checks identities across soft-deleted rows and the command authorizes scope
+            # itself
             collision = (
                 model._base_manager.using(using)
                 .filter(name=item["label"], deleted_at__isnull=True)
@@ -478,12 +481,15 @@ def _definition_exists(section: str, item: dict[str, object], library: object | 
         namespace, slug = item["id"].split("/", 1)  # type: ignore[union-attr]
         return CustomFieldset.objects.using(using).filter(namespace=namespace, slug=slug).exists()
     if section == "categories":
+        # unscoped: library apply checks identities across soft-deleted rows and the command authorizes scope itself
         return Category.all_objects.using(using).filter(slug=item["id"].split("/", 1)[1]).exists()  # type: ignore[union-attr]
     if section == "manufacturers":
+        # unscoped: library apply checks identities across soft-deleted rows and the command authorizes scope itself
         return Manufacturer.all_objects.using(using).filter(slug=item["id"].split("/", 1)[1]).exists()  # type: ignore[union-attr]
     if section == "asset_types":
         if library is None:
             return False
+        # unscoped: library apply checks identities across soft-deleted rows and the command authorizes scope itself
         return (
             AssetType.all_objects.using(using)
             .filter(
@@ -521,6 +527,8 @@ def _require_reference_permission(
             namespace, slug = value.split("/", 1)
             exists = CustomFieldChoiceSet.objects.using(using).filter(namespace=namespace, slug=slug).exists()
         else:
+            # unscoped: library apply checks identities across soft-deleted rows and the command authorizes scope
+            # itself
             exists = model.all_objects.using(using).filter(slug=value.split("/", 1)[1]).exists()
         _require_add_or_change(required, model, exists)
 

@@ -101,6 +101,8 @@ def checkout_asset(
         from assets.models import AssetReservation, ReservationStatusChoices
 
         today = datetime.date.today()
+        # unscoped: disposal and reservation evidence includes cancelled and soft-deleted rows; asset scope narrows
+        # visibility
         blocking_qs = AssetReservation.all_objects.select_for_update().filter(
             asset=asset,
             status__in=[
@@ -615,6 +617,8 @@ def disposal_service_payload(data: Mapping) -> dict:
 
 def _active_disposal_error(asset: Asset) -> ValidationError | None:
     """The clean rejection for an asset that already owns an active disposal (#496)."""
+    # unscoped: disposal and reservation evidence includes cancelled and soft-deleted rows; asset scope narrows
+    # visibility
     if not AssetDisposal.all_objects.filter(asset=asset, cancelled_at__isnull=True).exists():
         return None
     return ValidationError(
@@ -682,7 +686,11 @@ def update_asset_disposal(
         raise ValidationError(_("No disposal fields were submitted."))
 
     with transaction.atomic():
+        # unscoped: command locks and re-reads the row regardless of soft-delete state; the service authorizes
+        # scope itself
         asset = Asset._base_manager.select_for_update().get(pk=disposal.asset_id)
+        # unscoped: disposal and reservation evidence includes cancelled and soft-deleted rows; asset scope narrows
+        # visibility
         locked = AssetDisposal.all_objects.select_for_update().get(pk=disposal.pk)
 
         previous_stamp = asset.disposed_at
@@ -740,6 +748,8 @@ def dispose_asset(
     """
     with transaction.atomic():
         # Lock the asset row to prevent concurrent mutations
+        # unscoped: command locks and re-reads the row regardless of soft-delete state; the service authorizes
+        # scope itself
         asset = Asset._base_manager.select_for_update().get(pk=asset.pk)
 
         # Reject a second disposal while an ACTIVE record exists BEFORE any
@@ -848,7 +858,11 @@ def cancel_asset_disposal(
         raise ValidationError(_("A cancellation must record who cancelled it."))
 
     with transaction.atomic():
+        # unscoped: command locks and re-reads the row regardless of soft-delete state; the service authorizes
+        # scope itself
         asset = Asset._base_manager.select_for_update().get(pk=disposal.asset_id)
+        # unscoped: disposal and reservation evidence includes cancelled and soft-deleted rows; asset scope narrows
+        # visibility
         locked = AssetDisposal.all_objects.select_for_update().get(pk=disposal.pk)
 
         if locked.asset_id != asset.pk:

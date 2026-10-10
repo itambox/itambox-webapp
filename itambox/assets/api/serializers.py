@@ -273,6 +273,8 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
                 command_success_or_raise(result)
                 owner_id = owner_id_from_result(result)
             succeeded = True
+            # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or
+            # ambient scope
             return AssetType.all_objects.get(pk=owner_id)
         except (PermissionDenied, DjangoValidationError) as exc:
             self._command_error(exc)
@@ -287,6 +289,8 @@ class AssetTypeSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerial
             patch_marker = object()
             patch_value = validated_data.pop("specification_patch", patch_marker)
             expected_definition_revision = validated_data.pop("expected_definition_revision", None)
+            # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or
+            # ambient scope
             current = AssetType.all_objects.get(pk=instance.pk)
             if patch_value is not patch_marker:
                 try:
@@ -475,11 +479,15 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
             instance = Asset(**validated_data, custom_field_data={})
             with suppress_custom_field_data_validation(instance):
                 instance.save()
+            # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or
+            # ambient scope
             current = Asset._base_manager.get(pk=instance.pk)
             try:
                 self._apply_specification_command(current, target_type.pk, patch)
             except (PermissionDenied, DjangoValidationError) as exc:
                 self._command_error(exc)
+            # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or
+            # ambient scope
             self.instance = Asset._base_manager.get(pk=current.pk)
         return self.instance
 
@@ -490,6 +498,8 @@ class AssetSerializer(CanonicalSpecificationSerializerMixin, BaseModelSerializer
             expected_definition_revision = validated_data.pop("expected_definition_revision", None)
             target_marker = object()
             target_type = validated_data.pop("asset_type", target_marker)
+            # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or
+            # ambient scope
             current = Asset._base_manager.get(pk=instance.pk)
 
             type_changed = target_type is not target_marker and target_type.pk != current.asset_type_id

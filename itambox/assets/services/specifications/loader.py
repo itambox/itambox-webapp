@@ -800,6 +800,8 @@ def relevant_library_ids(
     """Find libraries reachable from the destination graph before owner locking."""
     library_ids: set[int] = set()
     type_ids = tuple(sorted(set(asset_type_ids)))
+    # unscoped: command locks and re-reads the row regardless of soft-delete state; the service authorizes scope
+    # itself
     type_rows = AssetType.all_objects.using(using).filter(pk__in=type_ids).values("pk", "library_id")
     for row in type_rows:
         _add_library_id(library_ids, row["library_id"])

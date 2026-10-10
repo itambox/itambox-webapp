@@ -129,7 +129,7 @@ def _validate_proposed_graph(
 
 def _lock_type_owner(type_id: int):
     return (
-        AssetType.all_objects.using(_DEFAULT_DB)
+        AssetType.objects.using(_DEFAULT_DB)
         .select_for_update()
         .filter(pk=type_id, deleted_at__isnull=True)
         .order_by("pk")
@@ -139,7 +139,7 @@ def _lock_type_owner(type_id: int):
 
 def _lock_category_owner(category_id: int):
     return (
-        Category.all_objects.using(_DEFAULT_DB)
+        Category.objects.using(_DEFAULT_DB)
         .select_for_update()
         .filter(pk=category_id, deleted_at__isnull=True)
         .order_by("pk")

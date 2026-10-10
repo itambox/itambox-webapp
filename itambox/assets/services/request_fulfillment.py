@@ -137,6 +137,7 @@ def _evidence_candidates(requests: Iterable[AssetRequest]) -> dict[tuple[int | N
             {"tenant_id": request.tenant_id} if request.tenant_id is not None else {"tenant_id__isnull": True}
         )
         scope |= Q(changed_object_id=request.pk, **tenant_filter)
+    # unscoped: audit evidence is read independent of the active tenant scope
     changes = ObjectChange._base_manager.filter(
         scope,
         changed_object_type=content_type,
@@ -305,7 +306,7 @@ def manually_complete_request(
 
 def _manually_complete_group(locked, actor, reason):
     children = list(
-        AssetRequest._base_manager.select_for_update()
+        AssetRequest.objects.select_for_update()
         .filter(
             parent_id=locked.pk,
             tenant_id=locked.tenant_id,
@@ -387,10 +388,13 @@ def _validate_checkout_binding(req, references, actor, asset):
     reference = references[0]
     model = _ALLOWED_TRANSACTION_MODELS[reference["model"]]
     filters = _transaction_filters(req, model, reference, actor, asset)
+    # unscoped: command locks and re-reads the row regardless of soft-delete state; the service authorizes scope
+    # itself
     if not model._base_manager.select_for_update().filter(**filters).exists():
         raise ValidationError(_("Checkout evidence does not match a live handover for this request."))
     identity = {"model": reference["model"], "pk": reference["pk"]}
     content_type = ContentType.objects.get_for_model(AssetRequest)
+    # unscoped: audit evidence is read independent of the active tenant scope
     if (
         ObjectChange._base_manager.filter(
             changed_object_type=content_type,
@@ -503,7 +507,7 @@ def request_fulfillment_labels(requests: Iterable[AssetRequest]) -> dict[int, st
     parent_ids = [request.pk for request in request_list if request.is_group]
     tenant_ids = {request.tenant_id for request in request_list}
     children = list(
-        AssetRequest._base_manager.filter(
+        AssetRequest.objects.filter(
             parent_id__in=parent_ids,
             tenant_id__in=tenant_ids,
             deleted_at__isnull=True,

@@ -296,6 +296,8 @@ class _WriteContext:
 
         for item in self.definitions.get("manufacturers", []):
             slug = _split_identity(item["id"])[1]
+            # unscoped: library apply checks identities across soft-deleted rows and the command authorizes scope
+            # itself
             manufacturer = Manufacturer.all_objects.using(self.using).filter(slug=slug).first()
             if manufacturer is None:
                 manufacturer = Manufacturer(
@@ -307,6 +309,8 @@ class _WriteContext:
             self.manufacturers[item["id"]] = manufacturer
         for item in self.definitions.get("categories", []):
             slug = _split_identity(item["id"])[1]
+            # unscoped: library apply checks identities across soft-deleted rows and the command authorizes scope
+            # itself
             category = Category.all_objects.using(self.using).filter(slug=slug).first()
             if category is None:
                 category = Category(
@@ -322,6 +326,8 @@ class _WriteContext:
 
         for item in self.definitions.get("asset_types", []):
             namespace, definition_key = _split_identity(item["id"])
+            # unscoped: library apply checks identities across soft-deleted rows and the command authorizes scope
+            # itself
             asset_type = (
                 AssetType.all_objects.using(self.using)
                 .filter(library_id=self.library.pk, library_definition_key=definition_key)
@@ -372,6 +378,7 @@ class _WriteContext:
             "choice_sets": set(item["id"] for item in self.definitions.get("choice_sets", [])),
             "asset_types": set(item["id"] for item in self.definitions.get("asset_types", [])),
         }
+        # unscoped: library apply checks identities across soft-deleted rows and the command authorizes scope itself
         for queryset, section, identity in (
             (CustomField.objects.using(self.using).filter(library_id=self.library.pk), "fields", _field_identity),
             (

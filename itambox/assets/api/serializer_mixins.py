@@ -36,6 +36,7 @@ class CanonicalSpecificationSerializerMixin(serializers.Serializer):
     def _persist_native_update(current, validated_data):
         # Commands acquire catalogue/library/owner locks first. Reload their
         # result before native-only persistence so stale JSON cannot overwrite it.
+        # unscoped: post-command re-read of the locked owner must not depend on soft-delete state or ambient scope
         current = type(current)._base_manager.get(pk=current.pk)
         concrete_names = {field.name for field in current._meta.concrete_fields}
         native_fields = []
