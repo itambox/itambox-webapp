@@ -108,9 +108,7 @@ class ReservationJourneyTests(JourneyMixin, TestCase):
 
         self.assertIsNone(replacement.deleted_at)
         self.assertTrue(
-            AssetAssignment.objects.filter(
-                asset=self.asset, assigned_user=replacement_holder, is_active=True
-            ).exists()
+            AssetAssignment.objects.filter(asset=self.asset, assigned_user=replacement_holder, is_active=True).exists()
         )
 
     def test_restoring_reservation_reactivates_checkout_restriction(self):
