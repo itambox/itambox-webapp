@@ -6,7 +6,7 @@ Asset.audit_overdue, AssetFilterSet audit_due filter, alert rule respects per-ca
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
-from django.test import RequestFactory, TestCase
+from django.test import TestCase
 from django.utils import timezone
 from model_bakery import baker
 

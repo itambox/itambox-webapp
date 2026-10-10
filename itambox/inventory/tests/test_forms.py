@@ -1,7 +1,7 @@
 from django.test import TestCase
 
 from assets.models import Category, Manufacturer
-from inventory.models import Accessory, Consumable, Kit, KitItem
+from inventory.models import Accessory, Consumable, Kit
 
 
 def _create_category(name, component=False, accessory=False, consumable=False):

@@ -6,7 +6,7 @@ class InventoryConfig(AppConfig):
     name = "inventory"
 
     def ready(self):
-        import inventory.search  # noqa
+        import inventory.search  # noqa: F401  # registers search providers
 
         # inline import: app-registry: register handlers only after inventory models are loaded.
         from core.purge_handlers import register_purge_handler

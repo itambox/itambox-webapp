@@ -7,6 +7,8 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
 from django_tables2.utils import A  # Alias for Accessor
 
+import extras.tables as _extras_tables
+import inventory.tables as _inventory_tables
 from compliance.models import AssetAudit
 from core.html_styles import color_chip_class, safe_hex_color, status_color_class
 from core.tables import (
@@ -20,12 +22,6 @@ from core.tables import (
     ToggleColumn,
 )
 from core.tables.constants import TABLE_EMPTY_VALUE
-from extras.tables import (
-    CustomFieldsetTable,
-    CustomFieldTable,
-    TagColumn,  # Import TagColumn
-)
-from inventory.tables import AccessoryTable, ComponentAllocationTable, ConsumableTable, KitTable
 
 from .models import (
     Asset,
@@ -43,6 +39,16 @@ from .models import (
     Supplier,
     Warranty,
 )
+
+# Preserve the established assets.tables export surface without hiding these
+# re-exports from the F401 checks.
+CustomFieldsetTable = _extras_tables.CustomFieldsetTable
+CustomFieldTable = _extras_tables.CustomFieldTable
+TagColumn = _extras_tables.TagColumn
+AccessoryTable = _inventory_tables.AccessoryTable
+ComponentAllocationTable = _inventory_tables.ComponentAllocationTable
+ConsumableTable = _inventory_tables.ConsumableTable
+KitTable = _inventory_tables.KitTable
 
 
 class AssetTable(BaseTable):  # Inherit from BaseTable

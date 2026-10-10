@@ -7,13 +7,12 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Count, Prefetch
+from django.db.models import Prefetch
 from django.http import HttpResponse, HttpResponseRedirect
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, render
 from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from django.views.decorators.http import require_POST
 from django_tables2 import RequestConfig
 
 from assets.choices import RequestStatusChoices
@@ -28,8 +27,6 @@ from core.managers import Scope
 from inventory.models import AccessoryAssignment, ConsumableAssignment
 from inventory.tables import AccessoryAssignmentTable, ConsumableAssignmentTable
 from itambox.panels import Panel
-from itambox.quick_add import QuickAddMixin
-from itambox.utils import get_paginate_count
 from itambox.views.generic import (
     ObjectBulkDeleteView,
     ObjectBulkEditView,
@@ -37,10 +34,9 @@ from itambox.views.generic import (
     ObjectDeleteView,
     ObjectDetailView,
     ObjectEditView,
-    ObjectImportView,
     ObjectListView,
 )
-from itambox.views.generic.service_views import GenericTransactionView, SimplePostView
+from itambox.views.generic.service_views import GenericTransactionView
 from itambox.views.generic.utils import safe_return_url
 from organization.models import AssetHolder
 from software.models import InstalledSoftware

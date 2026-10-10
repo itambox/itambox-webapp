@@ -18,13 +18,9 @@ from django.test import TestCase
 from django.urls import reverse
 from model_bakery import baker
 
-# Import the view modules at collection time (no tenant context active) so their
-# `queryset = Model.objects.all()` class attributes bake UNSCOPED. Otherwise the
-# first reverse() in another test that runs under a tenant context would trigger
-# the URLconf to import these views with that tenant active, freezing the
-# querysets to the wrong tenant and 404-ing every object here. (Harmless in
-# production, where the URLconf loads at startup with no tenant.)
-import inventory.views  # noqa: F401,E402
+# Import at collection time with no tenant context so view querysets are frozen
+# tenant-neutral before another test's first reverse() can load the URLconf.
+import inventory.views  # noqa: F401  # needed for tenant-neutral querysets at collection time
 from core.tests.mixins import TenantTestMixin
 from inventory.models import (
     Accessory,
