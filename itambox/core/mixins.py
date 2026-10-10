@@ -2,6 +2,7 @@ from contextlib import contextmanager
 
 from django.contrib.contenttypes.fields import GenericRelation
 from django.db import models
+from django.db.models.deletion import Collector
 from django.utils.translation import gettext_lazy as _
 
 from core.choices import ObjectChangeActionChoices
@@ -240,6 +241,10 @@ class SoftDeleteMixin(models.Model):
                     self.snapshot()
                 self._changelog_action = ObjectChangeActionChoices.ACTION_DELETE
 
+                # Check only: PROTECT/RESTRICT children still refuse the delete
+                # (ProtectedError). Nothing is written; children are retired by
+                # the aggregate's archive handler (#619).
+                Collector(using=using).collect([self])
                 self.soft_delete()
 
     @classmethod
