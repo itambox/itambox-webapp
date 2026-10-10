@@ -76,7 +76,7 @@ def _lock_tenant_scim_user(user, tenant, *, require_membership=True):
     request asked for. Call inside ``transaction.atomic()``.
     """
     try:
-        locked = type(user)._base_manager.select_for_update().get(pk=user.pk)
+        locked = type(user).objects.select_for_update().get(pk=user.pk)
     except User.DoesNotExist as exc:
         raise SCIMPatchError("SCIM user was deleted", status_code=404) from exc
     if require_membership and not Membership.objects.filter(user=locked, tenant=tenant).exists():
@@ -137,7 +137,7 @@ class SCIMTenantMixin:
             raise exceptions.ValidationError("tenant_slug is required")
 
         try:
-            self.tenant = Tenant._base_manager.get(slug=tenant_slug, is_provider=False, deleted_at__isnull=True)
+            self.tenant = Tenant.objects.get(slug=tenant_slug, is_provider=False, deleted_at__isnull=True)
         except Tenant.DoesNotExist:
             raise exceptions.NotFound("Tenant not found.") from None
 
