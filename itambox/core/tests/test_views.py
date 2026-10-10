@@ -268,7 +268,7 @@ class CoreViewsTestCase(TestCase):
         from django.contrib.contenttypes.models import ContentType
 
         from core.tests.mixins import grant
-        from organization.models import Membership, Role, Tenant
+        from organization.models import Role, Tenant
 
         # 1. Setup tenant and standard user
         tenant = Tenant.objects.create(name="ACME Corp", slug="acme")

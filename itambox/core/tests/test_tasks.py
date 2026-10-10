@@ -1,19 +1,16 @@
-import json
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ValidationError
 from django.test import TransactionTestCase
 from django.utils import timezone
 
-from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel
+from assets.models import Manufacturer
 from core.managers import Scope
 from core.models import Job, Notification
 from core.tasks import import_csv_task
 from extras.models import AlertLog, AlertRule, NotificationChannel
 from extras.tasks.alerts import evaluate_alert_rules_task, run_alert_rule_now
-from subscriptions.models import Subscription
 
 User = get_user_model()
 

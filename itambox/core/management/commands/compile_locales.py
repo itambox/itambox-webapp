@@ -20,7 +20,6 @@ Usage:
 import array
 import ast
 import codecs
-import os
 import struct
 from email.parser import HeaderParser
 from pathlib import Path

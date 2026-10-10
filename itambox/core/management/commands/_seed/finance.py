@@ -261,9 +261,7 @@ class SeedFinanceMixin:
     def _seed_contracts_and_costing(self):
         from procurement.models import (
             Contract,
-            ContractBillingCycleChoices,
             ContractStatusChoices,
-            ContractTypeChoices,
         )
 
         engine = self._get_engine()

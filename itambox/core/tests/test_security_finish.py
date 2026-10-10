@@ -7,10 +7,8 @@ FIX-03 security tests:
 """
 
 import io
-import json
 
 from django.contrib.auth import get_user_model
-from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.urls import reverse
 
@@ -18,7 +16,7 @@ from assets.models import Asset, AssetType, Manufacturer, StatusLabel, Supplier
 from core.tests.mixins import grant
 from inventory.models import Accessory
 from licenses.models import License
-from organization.models import Membership, Role, Site, Tenant
+from organization.models import Role, Site, Tenant
 from software.models import Software
 from subscriptions.models import Subscription
 from users.models import Token

@@ -3,7 +3,6 @@
 # Licensed under the Apache License, Version 2.0.
 
 from django import template
-from django.contrib.contenttypes.models import ContentType
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.html import format_html

@@ -2,9 +2,8 @@
 import logging
 
 from django.conf import settings
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import EmptyResultSet, FieldError
-from django.db.models import F, Q, Value
+from django.db.models import Q
 
 from core.managers import Scope
 from itambox.utils import get_content_type_by_natural_key

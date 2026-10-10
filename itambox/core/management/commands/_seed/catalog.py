@@ -417,7 +417,7 @@ class SeedCatalogMixin:
 
     def _seed_catalog(self):
         from assets.models import AssetRole, AssetType, Category, Depreciation, Manufacturer, StatusLabel, Supplier
-        from inventory.models import Accessory, Component, Consumable
+        from inventory.models import Component
         from software.models import Software
 
         self.stdout.write("--- Catalog: reference data ---")

@@ -10,9 +10,9 @@ from operator import attrgetter, or_
 # Third-party / Django
 from django.apps import apps
 from django.conf import settings
-from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models, router, transaction
 from django.db.models import signals, sql
 from django.db.models.deletion import Collector
@@ -29,11 +29,7 @@ from core.context import (
     get_current_user,
 )
 from core.managers import (
-    AllObjectsManager,
     ExplicitScopeManager,
-    SoftDeleteManager,
-    TenantScopingAllObjectsManager,
-    TenantScopingSoftDeleteManager,
 )
 from core.mixins import (
     CloneableMixin,
@@ -47,7 +43,6 @@ from core.mixins import (
 from core.oidc_identity import oidc_audit_excluded_fields, oidc_audit_object_repr
 from core.serialization import serialize_object
 from core.tenant_scope import get_descendant_tenant_group_ids
-from core.validators import validate_file_attachment, validate_image_attachment
 
 # Local application
 from itambox.registry import registry

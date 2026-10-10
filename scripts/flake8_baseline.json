@@ -340,14 +340,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/crypto.py",
-      "code": "F401",
-      "message": "'cryptography.fernet.InvalidToken' imported but unused",
-      "source": "from cryptography.fernet import Fernet, InvalidToken, MultiFernet",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/filters.py",
       "code": "C901",
       "message": "'BaseFilterSet.__init__' is too complex (13)",
@@ -377,94 +369,6 @@
       "message": "'FilterForm.setup_ajax_fields' is too complex (15)",
       "source": "    def setup_ajax_fields(self, ajax_fields, filterset_data):",
       "context": "Module:body/ClassDef:FilterForm:body/FunctionDef:setup_ajax_fields:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/mixins.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Column' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/mixins.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Div' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/mixins.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Field' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/mixins.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Fieldset' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/mixins.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Layout' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/mixins.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Row' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/mixins.py",
-      "code": "F401",
-      "message": "'django.contrib.contenttypes.models.ContentType' imported but unused",
-      "source": "from django.contrib.contenttypes.models import ContentType",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/mixins.py",
-      "code": "F401",
-      "message": "'itambox.middleware.get_current_user' imported but unused",
-      "source": "from itambox.middleware import get_current_user",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/forms/mixins.py",
-      "code": "F401",
-      "message": "'json' imported but unused",
-      "source": "import json",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/graphql_utils.py",
-      "code": "F401",
-      "message": "'django.core.exceptions.ValidationError' imported but unused",
-      "source": "from django.core.exceptions import PermissionDenied, ValidationError",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/graphql_utils.py",
-      "code": "F401",
-      "message": "'django.utils.text.slugify' imported but unused",
-      "source": "from django.utils.text import slugify",
-      "context": "Module:body",
       "count": 1
     },
     {
@@ -580,22 +484,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/management/commands/_seed/catalog.py",
-      "code": "F401",
-      "message": "'inventory.models.Accessory' imported but unused",
-      "source": "        from inventory.models import Accessory, Component, Consumable",
-      "context": "Module:body/ClassDef:SeedCatalogMixin:body/FunctionDef:_seed_catalog:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/catalog.py",
-      "code": "F401",
-      "message": "'inventory.models.Consumable' imported but unused",
-      "source": "        from inventory.models import Accessory, Component, Consumable",
-      "context": "Module:body/ClassDef:SeedCatalogMixin:body/FunctionDef:_seed_catalog:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/management/commands/_seed/compliance.py",
       "code": "C901",
       "message": "'SeedComplianceMixin._seed_compliance' is too complex (24)",
@@ -620,35 +508,11 @@
       "count": 1
     },
     {
-      "path": "itambox/core/management/commands/_seed/finance.py",
-      "code": "F401",
-      "message": "'procurement.models.ContractBillingCycleChoices' imported but unused",
-      "source": "        from procurement.models import (",
-      "context": "Module:body/ClassDef:SeedFinanceMixin:body/FunctionDef:_seed_contracts_and_costing:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/finance.py",
-      "code": "F401",
-      "message": "'procurement.models.ContractTypeChoices' imported but unused",
-      "source": "        from procurement.models import (",
-      "context": "Module:body/ClassDef:SeedFinanceMixin:body/FunctionDef:_seed_contracts_and_costing:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/management/commands/_seed/licensing.py",
       "code": "C901",
       "message": "'SeedLicensingMixin._seed_licensing' is too complex (11)",
       "source": "    def _seed_licensing(self):",
       "context": "Module:body/ClassDef:SeedLicensingMixin:body/FunctionDef:_seed_licensing:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/lifecycle.py",
-      "code": "F401",
-      "message": "'django.utils.timezone' imported but unused",
-      "source": "from django.utils import timezone",
-      "context": "Module:body",
       "count": 1
     },
     {
@@ -660,14 +524,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/management/commands/_seed/operations.py",
-      "code": "F401",
-      "message": "'assets.models.AssetType' imported but unused",
-      "source": "        from assets.models import Asset, AssetRequest, AssetType",
-      "context": "Module:body/ClassDef:SeedOperationsMixin:body/FunctionDef:_seed_operations:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/management/commands/_seed/organizations.py",
       "code": "C901",
       "message": "'SeedOrganizationsMixin._seed_organizations' is too complex (20)",
@@ -676,27 +532,11 @@
       "count": 1
     },
     {
-      "path": "itambox/core/management/commands/_seed/organizations.py",
-      "code": "F401",
-      "message": "'organization.models.AssetHolder' imported but unused",
-      "source": "        from organization.models import (",
-      "context": "Module:body/ClassDef:SeedOrganizationsMixin:body/FunctionDef:_seed_organizations:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/management/commands/compile_locales.py",
       "code": "C901",
       "message": "'_compile_po' is too complex (28)",
       "source": "def _compile_po(po_path: str, mo_path: str) -> None:",
       "context": "Module:body/FunctionDef:_compile_po:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/compile_locales.py",
-      "code": "F401",
-      "message": "'os' imported but unused",
-      "source": "import os",
-      "context": "Module:body",
       "count": 1
     },
     {
@@ -721,14 +561,6 @@
       "message": "'Command.handle' is too complex (24)",
       "source": "    def handle(self, *args, **options):",
       "context": "Module:body/ClassDef:Command:body/FunctionDef:handle:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/import_snipeit.py",
-      "code": "F401",
-      "message": "'django.contrib.contenttypes.models.ContentType' imported but unused",
-      "source": "            from django.contrib.contenttypes.models import ContentType",
-      "context": "Module:body/ClassDef:Command:body/FunctionDef:handle:body/If:UnaryOp(op=Not(), operand=Name(id='dry_run', ctx=Load())):body",
       "count": 1
     },
     {
@@ -833,70 +665,6 @@
       "message": "'ChangeLoggingMixin._log_change' is too complex (11)",
       "source": "    def _log_change(self, action, prechange_data=None, postchange_data=None, message=\"\", user=None):",
       "context": "Module:body/ClassDef:ChangeLoggingMixin:body/FunctionDef:_log_change:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/models.py",
-      "code": "F401",
-      "message": "'core.managers.AllObjectsManager' imported but unused",
-      "source": "from core.managers import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/models.py",
-      "code": "F401",
-      "message": "'core.managers.SoftDeleteManager' imported but unused",
-      "source": "from core.managers import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/models.py",
-      "code": "F401",
-      "message": "'core.managers.TenantScopingAllObjectsManager' imported but unused",
-      "source": "from core.managers import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/models.py",
-      "code": "F401",
-      "message": "'core.managers.TenantScopingSoftDeleteManager' imported but unused",
-      "source": "from core.managers import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/models.py",
-      "code": "F401",
-      "message": "'core.validators.validate_file_attachment' imported but unused",
-      "source": "from core.validators import validate_file_attachment, validate_image_attachment",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/models.py",
-      "code": "F401",
-      "message": "'core.validators.validate_image_attachment' imported but unused",
-      "source": "from core.validators import validate_file_attachment, validate_image_attachment",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/models.py",
-      "code": "F401",
-      "message": "'django.contrib.contenttypes.fields.GenericRelation' imported but unused",
-      "source": "from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/models.py",
-      "code": "F401",
-      "message": "'django.core.exceptions.ValidationError' imported but unused",
-      "source": "from django.core.exceptions import ObjectDoesNotExist, ValidationError",
-      "context": "Module:body",
       "count": 1
     },
     {
@@ -1036,115 +804,11 @@
       "count": 1
     },
     {
-      "path": "itambox/core/search_backends.py",
-      "code": "F401",
-      "message": "'django.contrib.contenttypes.models.ContentType' imported but unused",
-      "source": "from django.contrib.contenttypes.models import ContentType",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/search_backends.py",
-      "code": "F401",
-      "message": "'django.db.models.F' imported but unused",
-      "source": "from django.db.models import F, Q, Value",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/search_backends.py",
-      "code": "F401",
-      "message": "'django.db.models.Value' imported but unused",
-      "source": "from django.db.models import F, Q, Value",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/serialization.py",
       "code": "C901",
       "message": "'serialize_object' is too complex (16)",
       "source": "def serialize_object(obj: Model, extra_fields=None, exclude_fields=None) -> dict:",
       "context": "Module:body/FunctionDef:serialize_object:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/__init__.py",
-      "code": "F401",
-      "message": "'.base.BaseTable' imported but unused",
-      "source": "from .base import BaseTable",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/__init__.py",
-      "code": "F401",
-      "message": "'.columns.ActionsColumn' imported but unused",
-      "source": "from .columns import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/__init__.py",
-      "code": "F401",
-      "message": "'.columns.AssigneeColumn' imported but unused",
-      "source": "from .columns import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/__init__.py",
-      "code": "F401",
-      "message": "'.columns.BooleanColumn' imported but unused",
-      "source": "from .columns import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/__init__.py",
-      "code": "F401",
-      "message": "'.columns.ColorChipColumn' imported but unused",
-      "source": "from .columns import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/__init__.py",
-      "code": "F401",
-      "message": "'.columns.CountLinkColumn' imported but unused",
-      "source": "from .columns import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/__init__.py",
-      "code": "F401",
-      "message": "'.columns.IDColumn' imported but unused",
-      "source": "from .columns import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/__init__.py",
-      "code": "F401",
-      "message": "'.columns.ToggleColumn' imported but unused",
-      "source": "from .columns import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/__init__.py",
-      "code": "F401",
-      "message": "'.jobs.JobTable' imported but unused",
-      "source": "from .jobs import JobTable",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tables/__init__.py",
-      "code": "F401",
-      "message": "'.object_change.ObjectChangeTable' imported but unused",
-      "source": "from .object_change import ObjectChangeTable",
-      "context": "Module:body",
       "count": 1
     },
     {
@@ -1276,30 +940,6 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.csv_import.import_csv_task' imported but unused",
-      "source": "from .csv_import import import_csv_task",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.ldap.sync_tenant_ldap_task' imported but unused",
-      "source": "from .ldap import sync_tenant_ldap_task",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tasks/__init__.py",
-      "code": "F401",
-      "message": "'.retention.prune_changelog_task' imported but unused",
-      "source": "from .retention import prune_changelog_task",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tasks/csv_import.py",
       "code": "C901",
       "message": "'import_csv_task' is too complex (12)",
@@ -1308,139 +948,11 @@
       "count": 1
     },
     {
-      "path": "itambox/core/templatetags/helpers.py",
-      "code": "F401",
-      "message": "'django.contrib.contenttypes.models.ContentType' imported but unused",
-      "source": "from django.contrib.contenttypes.models import ContentType",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/templatetags/utility_tags.py",
-      "code": "F401",
-      "message": "'django.contrib.auth.get_user_model' imported but unused",
-      "source": "from django.contrib.auth import get_user_model  # Import get_user_model",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/templatetags/utility_tags.py",
-      "code": "F401",
-      "message": "'django.contrib.messages.constants as messages' imported but unused",
-      "source": "from django.contrib.messages import constants as messages",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/templatetags/utility_tags.py",
-      "code": "F401",
-      "message": "'urllib.parse.urlencode' imported but unused",
-      "source": "from urllib.parse import urlencode",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_count_link_column.py",
       "code": "B907",
       "message": "'expected_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "assert f'href=\"{expected_url}\"' in html",
       "context": "Module:body/ClassDef:TestCountLinkColumnRender:body/FunctionDef:test_links_count_to_filtered_list:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_htmx.py",
-      "code": "F401",
-      "message": "'organization.models.Membership' imported but unused",
-      "source": "from organization.models import Membership, Role, Tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_intune_sync.py",
-      "code": "F401",
-      "message": "'django.utils.timezone' imported but unused",
-      "source": "from django.utils import timezone",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_label_print_perms.py",
-      "code": "F401",
-      "message": "'organization.models.Membership' imported but unused",
-      "source": "from organization.models import Membership, Role, Tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_models.py",
-      "code": "F401",
-      "message": "'assets.models.AssetType' imported but unused",
-      "source": "from assets.models import Asset, AssetRole, AssetType, Manufacturer",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_oidc.py",
-      "code": "F401",
-      "message": "'django.contrib.auth.models.Permission' imported but unused",
-      "source": "from django.contrib.auth.models import Permission",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_oidc.py",
-      "code": "F401",
-      "message": "'django.contrib.contenttypes.models.ContentType' imported but unused",
-      "source": "from django.contrib.contenttypes.models import ContentType",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_oidc.py",
-      "code": "F401",
-      "message": "'unittest.mock.MagicMock' imported but unused",
-      "source": "from unittest.mock import MagicMock, patch",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_plugins.py",
-      "code": "F401",
-      "message": "'django.urls.resolve' imported but unused",
-      "source": "from django.urls import resolve, reverse",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_asset_disposal_eol.py",
-      "code": "F401",
-      "message": "'pytest' imported but unused",
-      "source": "import pytest",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_contract_renewals.py",
-      "code": "F401",
-      "message": "'assets.models.Asset' imported but unused",
-      "source": "from assets.models import Asset, StatusLabel",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_contract_renewals.py",
-      "code": "F401",
-      "message": "'assets.models.StatusLabel' imported but unused",
-      "source": "from assets.models import Asset, StatusLabel",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_contract_renewals.py",
-      "code": "F401",
-      "message": "'model_bakery.baker' imported but unused",
-      "source": "from model_bakery import baker",
-      "context": "Module:body",
       "count": 1
     },
     {
@@ -1476,203 +988,11 @@
       "count": 1
     },
     {
-      "path": "itambox/core/tests/test_report_custody_compliance.py",
-      "code": "F401",
-      "message": "'pytest' imported but unused",
-      "source": "import pytest",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "F401",
-      "message": "'assets.models.Asset' imported but unused",
-      "source": "from assets.models import Asset, StatusLabel",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "F401",
-      "message": "'assets.models.StatusLabel' imported but unused",
-      "source": "from assets.models import Asset, StatusLabel",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "F401",
-      "message": "'compliance.models.CustodyReceipt' imported but unused",
-      "source": "from compliance.models import CustodyReceipt",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "F401",
-      "message": "'model_bakery.baker' imported but unused",
-      "source": "from model_bakery import baker",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "F401",
-      "message": "'organization.models.AssetHolder' imported but unused",
-      "source": "from organization.models import AssetHolder, Tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "F401",
-      "message": "'organization.models.Tenant' imported but unused",
-      "source": "from organization.models import AssetHolder, Tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_hardware_inventory.py",
-      "code": "F401",
-      "message": "'pytest' imported but unused",
-      "source": "import pytest",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_report_warranty_expiration.py",
-      "code": "F401",
-      "message": "'pytest' imported but unused",
-      "source": "import pytest",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_security_finish.py",
-      "code": "F401",
-      "message": "'django.contrib.contenttypes.models.ContentType' imported but unused",
-      "source": "from django.contrib.contenttypes.models import ContentType",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_security_finish.py",
-      "code": "F401",
-      "message": "'json' imported but unused",
-      "source": "import json",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_security_finish.py",
-      "code": "F401",
-      "message": "'organization.models.Membership' imported but unused",
-      "source": "from organization.models import Membership, Role, Site, Tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/core/tests/test_tables.py",
       "code": "B907",
       "message": "'location.get_absolute_url()' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "self.assertIn(f'Location: <a href=\"{location.get_absolute_url()}\">{location.name}</a>', rendered_1)",
       "context": "Module:body/ClassDef:CoreTablesTestCase:body/FunctionDef:test_assignee_column_render:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_tasks.py",
-      "code": "F401",
-      "message": "'assets.models.Asset' imported but unused",
-      "source": "from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_tasks.py",
-      "code": "F401",
-      "message": "'assets.models.AssetRole' imported but unused",
-      "source": "from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_tasks.py",
-      "code": "F401",
-      "message": "'assets.models.AssetType' imported but unused",
-      "source": "from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_tasks.py",
-      "code": "F401",
-      "message": "'assets.models.StatusLabel' imported but unused",
-      "source": "from assets.models import Asset, AssetRole, AssetType, Manufacturer, StatusLabel",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_tasks.py",
-      "code": "F401",
-      "message": "'django.core.exceptions.ValidationError' imported but unused",
-      "source": "from django.core.exceptions import ValidationError",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_tasks.py",
-      "code": "F401",
-      "message": "'json' imported but unused",
-      "source": "import json",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_tasks.py",
-      "code": "F401",
-      "message": "'subscriptions.models.Subscription' imported but unused",
-      "source": "from subscriptions.models import Subscription",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_tenant_field_scoping.py",
-      "code": "F401",
-      "message": "'organization.models.Membership' imported but unused",
-      "source": "from organization.models import Membership, Role, Tenant, TenantGroup",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_tenant_group_scoping.py",
-      "code": "F401",
-      "message": "'organization.models.Membership' imported but unused",
-      "source": "from organization.models import Membership, Role, Tenant, TenantGroup",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_tenant_security.py",
-      "code": "F401",
-      "message": "'io.BytesIO' imported but unused",
-      "source": "        from io import BytesIO",
-      "context": "Module:body/ClassDef:CrossTenantAttackTestCase:body/FunctionDef:test_image_attachment_upload_cross_tenant_is_404:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/tests/test_views.py",
-      "code": "F401",
-      "message": "'organization.models.Membership' imported but unused",
-      "source": "        from organization.models import Membership, Role, Tenant",
-      "context": "Module:body/ClassDef:CoreViewsTestCase:body/FunctionDef:test_recycle_bin_permissions:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/urls.py",
-      "code": "F401",
-      "message": "'assets.views as asset_views' imported but unused",
-      "source": "from assets import views as asset_views  # Import the assets views",
-      "context": "Module:body",
       "count": 1
     },
     {

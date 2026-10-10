@@ -154,8 +154,6 @@ class Command(SystemTaskCommand):
         if dry_run:
             job_name += " (dry-run)"
         if not dry_run:
-            from django.contrib.contenttypes.models import ContentType
-
             job = Job.objects.create(
                 name=job_name,
                 tenant=tenant,

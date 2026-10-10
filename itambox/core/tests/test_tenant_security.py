@@ -410,7 +410,6 @@ class CrossTenantAttackTestCase(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_image_attachment_upload_cross_tenant_is_404(self):
-        from io import BytesIO
 
         from django.core.files.uploadedfile import SimpleUploadedFile
 

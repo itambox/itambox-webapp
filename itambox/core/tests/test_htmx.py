@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from core.tests.mixins import grant
-from organization.models import Membership, Role, Tenant
+from organization.models import Role, Tenant
 
 User = get_user_model()
 
