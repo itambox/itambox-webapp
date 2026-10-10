@@ -27,6 +27,7 @@
     "itambox/core/tests/test_report_characterization.py",
     "itambox/core/tests/test_report_contract_renewals.py",
     "itambox/core/tests/test_report_custody_compliance.py",
+    "itambox/core/tests/test_report_export_formats.py",
     "itambox/core/tests/test_report_hardware_inventory.py",
     "itambox/core/tests/test_report_warranty_expiration.py",
     "itambox/core/tests/test_security_finish.py",
