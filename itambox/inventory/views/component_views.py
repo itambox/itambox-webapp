@@ -288,7 +288,7 @@ class ComponentCheckoutView(GenericTransactionView):
             TenantResourceGrant.ACCESS_USE,
             "inventory.add_componentallocation",
         )
-        return (queryset | Component._base_manager.filter(stocks__pk__in=shared_stock_ids)).distinct()
+        return (queryset | Component.objects.filter(stocks__pk__in=shared_stock_ids)).distinct()
 
     def has_permission(self):
         active_tenant = get_current_tenant()

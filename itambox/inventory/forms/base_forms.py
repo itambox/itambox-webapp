@@ -65,9 +65,9 @@ class BaseCheckoutForm(TenantScopedFormMixin, forms.Form):
                 source_q |= Q(pk__in=shared_location_ids)
             for loc_field in ("source_location", "from_location"):
                 if loc_field in self.fields:
-                    # _base_manager: a granted pool's location belongs to the
-                    # OWNING tenant and would be hidden by scoped managers
-                    # (incl. the ModelChoiceField monkey-patch).
+                    # unscoped: the picker is explicitly bounded by ``source_q`` (active
+                    # tenant plus granted pools owned by other tenants); ambient re-scoping
+                    # would drop the granted pool's location.
                     self.fields[loc_field].queryset = Location._base_manager.filter(source_q).order_by("name")
 
     @staticmethod
@@ -89,7 +89,7 @@ class BaseCheckoutForm(TenantScopedFormMixin, forms.Form):
             return []
         perm = f"inventory.add_{assignment_name}"
         return list(
-            stock_model._base_manager.filter(
+            stock_model.objects.filter(
                 pk__in=resolved_shared_stock_ids(
                     stock_model,
                     active,

@@ -146,8 +146,8 @@ class ComponentStockForm(TenantScopedFormMixin, forms.ModelForm):
 
 
 class ComponentAllocationForm(TenantScopedFormMixin, forms.ModelForm):
-    # from_location is rebuilt below from the unscoped base manager (the recorded
-    # source of a historical allocation), so it stays non-scoped.
+    # from_location is rebuilt below from the including-deleted manager (the
+    # recorded source of a historical allocation), so it stays non-scoped.
     tenant_scoped_choice_exclusions = ("from_location",)
 
     component = forms.ModelChoiceField(
@@ -231,10 +231,12 @@ class ComponentAllocationForm(TenantScopedFormMixin, forms.ModelForm):
         )
         self.fields["assigned_asset"].queryset = Asset.objects.for_scope(Scope.current()).all().order_by("asset_tag")
         if is_update:
+            # unscoped: an existing allocation must still render its source location after the location was
+            # soft-deleted
             self.fields["from_location"].queryset = (
-                Location._base_manager.filter(pk=self.instance.from_location_id)
+                Location.all_objects.filter(pk=self.instance.from_location_id)
                 if self.instance.from_location_id is not None
-                else Location._base_manager.none()
+                else Location.objects.none()
             )
         self.helper = FormHelper(self)
         self.helper.form_method = "post"
@@ -347,7 +349,7 @@ class ComponentCheckoutForm(BaseCheckoutForm):
         source_location = cleaned_data.get("from_location")
         if self.component and qty and source_location:
             stock_qty = (
-                ComponentStock._base_manager.filter(
+                ComponentStock.objects.filter(
                     component=self.component,
                     location=source_location,
                 )
