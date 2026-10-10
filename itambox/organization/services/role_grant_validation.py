@@ -274,14 +274,16 @@ def _has_live_tenant_group_scope(scope: RoleGrantScope, role: Role) -> bool:
     target_group = scope.tenant_group
     if target_group is None or target_group.deleted_at is not None:
         return False
-    return Tenant.objects.filter(
-        managed_by_id=role.tenant_id,
-        group_id__in=get_descendant_tenant_group_ids(
-            target_group.pk,
-            live_only=True,
-        ),
-        deleted_at__isnull=True,
-    ).exists()
+    return bool(
+        Tenant.objects.filter(
+            managed_by_id=role.tenant_id,
+            group_id__in=get_descendant_tenant_group_ids(
+                target_group.pk,
+                live_only=True,
+            ),
+            deleted_at__isnull=True,
+        ).exists()
+    )
 
 
 def _classify_live_role_grant_scopes(
