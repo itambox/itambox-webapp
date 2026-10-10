@@ -5,7 +5,6 @@ from django.utils.translation import gettext_lazy as _
 
 from assets.models import Manufacturer
 from core.filters import BaseFilterSet
-from extras.filters import TagFilter  # Assuming TagFilter exists for M2M
 from extras.models import Tag
 
 from .models import Software

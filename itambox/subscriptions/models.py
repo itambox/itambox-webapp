@@ -18,12 +18,7 @@ from core.managers import (
 from core.mixins import (
     AutoSlugMixin,
     BookmarkableMixin,
-    CloneableMixin,
     CustomFieldDataMixin,
-    ExportableMixin,
-    FileAttachmentMixin,
-    ImageAttachmentMixin,
-    JournalingMixin,
     SoftDeleteMixin,
 )
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel

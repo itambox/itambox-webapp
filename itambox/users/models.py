@@ -15,7 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from core.managers import AllObjectsManager, ExplicitScopeAllObjectsManager, SoftDeleteManager
+from core.managers import ExplicitScopeAllObjectsManager, SoftDeleteManager
 from core.mixins import AutoSlugMixin, SoftDeleteMixin
 from core.models import ChangeLoggingMixin, StandardModel
 from core.oidc_identity import (

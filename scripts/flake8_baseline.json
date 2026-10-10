@@ -228,14 +228,6 @@
       "count": 1
     },
     {
-      "path": "itambox/compliance/admin.py",
-      "code": "F401",
-      "message": "'django.contrib.admin' imported but unused",
-      "source": "from django.contrib import admin",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/compliance/forms.py",
       "code": "B907",
       "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -249,78 +241,6 @@
       "message": "'cancel_url' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "self.helper.layout = Layout(\n            Row(\n                Column(\"tenant\", css_class=\"col-md-6\"),\n                Column(\"name\", css_class=\"col-md-6\"),\n                css_class=\"row g-3\",\n            ),\n            \"location\",\n            Fieldset(\n                _(\"Campaign Options\"),\n                \"start_immediately\",\n            ),\n            HTML('<div class=\"mt-4\"></div>'),\n            Submit(\"submit\", button_text, css_class=\"btn btn-primary\"),\n            HTML(\n                f'<a href=\"{cancel_url}\" class=\"btn btn-outline-secondary ms-2\"'\n                f' data-no-dirty-track=\"true\">{_(\"Cancel\")}</a>'\n            ),\n        )",
       "context": "Module:body/ClassDef:AuditSessionForm:body/FunctionDef:__init__:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/models.py",
-      "code": "F401",
-      "message": "'core.managers.AllObjectsManager' imported but unused",
-      "source": "from core.managers import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/models.py",
-      "code": "F401",
-      "message": "'core.managers.SoftDeleteManager' imported but unused",
-      "source": "from core.managers import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/models.py",
-      "code": "F401",
-      "message": "'core.mixins.FileAttachmentMixin' imported but unused",
-      "source": "from core.mixins import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/models.py",
-      "code": "F401",
-      "message": "'core.mixins.ImageAttachmentMixin' imported but unused",
-      "source": "from core.mixins import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/models.py",
-      "code": "F401",
-      "message": "'core.mixins.JournalingMixin' imported but unused",
-      "source": "from core.mixins import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/tests/test_audit_basket.py",
-      "code": "F401",
-      "message": "'django.core.exceptions.ValidationError' imported but unused",
-      "source": "from django.core.exceptions import ValidationError",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/tests/test_audit_basket.py",
-      "code": "F401",
-      "message": "'organization.models.Tenant' imported but unused",
-      "source": "from organization.models import Location, Tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/views.py",
-      "code": "F401",
-      "message": "'itambox.panels.Panel' imported but unused",
-      "source": "from itambox.panels import Panel",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/compliance/views_audit.py",
-      "code": "F401",
-      "message": "'compliance.forms_audit.AssetAuditForm' imported but unused",
-      "source": "from compliance.forms_audit import AssetAuditForm, AuditBarcodeScanForm, AuditSessionForm",
-      "context": "Module:body",
       "count": 1
     },
     {
@@ -1212,123 +1132,11 @@
       "count": 1
     },
     {
-      "path": "itambox/licenses/api/serializers.py",
-      "code": "F401",
-      "message": "'django.utils.translation.gettext_lazy as _' imported but unused",
-      "source": "from django.utils.translation import gettext_lazy as _",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/api/views.py",
-      "code": "F401",
-      "message": "'itambox.api.viewsets.ITAMBoxReadOnlyModelViewSet' imported but unused",
-      "source": "from itambox.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/forms.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Column' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/forms.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Row' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/reconciliation.py",
-      "code": "F401",
-      "message": "'django.db.models.Q' imported but unused",
-      "source": "from django.db.models import Count, Q, Sum",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/services.py",
-      "code": "F401",
-      "message": "'django.utils.timezone' imported but unused",
-      "source": "from django.utils import timezone",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/tests/test_h2_create_boundary.py",
-      "code": "F401",
-      "message": "'organization.models.Membership' imported but unused",
-      "source": "from organization.models import AssetHolder, Membership, Role, Tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/licenses/tests/test_models.py",
       "code": "B908",
       "message": "assertRaises-type context should not contain more than one top-level statement.",
       "source": "        with self.assertRaises(ValidationError):",
       "context": "Module:body/ClassDef:LicenseSeatAssignmentTests:body/FunctionDef:test_seat_assignment_single_target_constraint:body/With:[(\"Call(func=Attribute(value=Name(id='self', ctx=Load()), attr='assertRaises', ctx=Load()), args=[Name(id='ValidationError', ctx=Load())], keywords=[])\", None)]:self",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/views.py",
-      "code": "F401",
-      "message": "'assets.forms.import_forms.LicenseBulkImportForm' imported but unused",
-      "source": "from assets.forms.import_forms import LicenseBulkImportForm",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/views.py",
-      "code": "F401",
-      "message": "'django.contrib.auth.mixins.LoginRequiredMixin' imported but unused",
-      "source": "from django.contrib.auth.mixins import LoginRequiredMixin",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/views.py",
-      "code": "F401",
-      "message": "'django.shortcuts.get_object_or_404' imported but unused",
-      "source": "from django.shortcuts import get_object_or_404, render",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/views.py",
-      "code": "F401",
-      "message": "'django.shortcuts.render' imported but unused",
-      "source": "from django.shortcuts import get_object_or_404, render",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/views.py",
-      "code": "F401",
-      "message": "'django_tables2.RequestConfig' imported but unused",
-      "source": "from django_tables2 import RequestConfig",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/views.py",
-      "code": "F401",
-      "message": "'itambox.utils.get_paginate_count' imported but unused",
-      "source": "from itambox.utils import get_paginate_count",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/licenses/views.py",
-      "code": "F401",
-      "message": "'itambox.views.generic.ObjectImportView' imported but unused",
-      "source": "from itambox.views.generic import (",
-      "context": "Module:body",
       "count": 1
     },
     {
@@ -1436,38 +1244,6 @@
       "count": 1
     },
     {
-      "path": "itambox/software/filters.py",
-      "code": "F401",
-      "message": "'extras.filters.TagFilter' imported but unused",
-      "source": "from extras.filters import TagFilter  # Assuming TagFilter exists for M2M",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/models.py",
-      "code": "F401",
-      "message": "'core.models.VaultModel' imported but unused",
-      "source": "from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, VaultModel",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/tables.py",
-      "code": "F401",
-      "message": "'assets.models.Manufacturer' imported but unused",
-      "source": "from assets.models import Manufacturer",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/tables.py",
-      "code": "F401",
-      "message": "'core.tables.BooleanColumn' imported but unused",
-      "source": "from core.tables import ActionsColumn, BaseTable, BooleanColumn, CountLinkColumn, ToggleColumn",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/software/tests/test_api.py",
       "code": "B907",
       "message": "'self.software.updated_at.isoformat()' is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -1481,118 +1257,6 @@
       "message": "'self.software.updated_at.isoformat()' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "etag = f'W/\"{self.software.updated_at.isoformat()}\"'",
       "context": "Module:body/ClassDef:SoftwareApiTenantRepinTests:body/FunctionDef:test_patch_tenant_null_does_not_globalize:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/views.py",
-      "code": "F401",
-      "message": "'django.shortcuts.render' imported but unused",
-      "source": "from django.shortcuts import render",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/views.py",
-      "code": "F401",
-      "message": "'django_tables2.RequestConfig' imported but unused",
-      "source": "        from django_tables2 import RequestConfig",
-      "context": "Module:body/ClassDef:SoftwareDetailView:body/FunctionDef:get_context_data:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/views.py",
-      "code": "F401",
-      "message": "'itambox.utils.get_paginate_count' imported but unused",
-      "source": "        from itambox.utils import get_paginate_count",
-      "context": "Module:body/ClassDef:SoftwareDetailView:body/FunctionDef:get_context_data:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/api/serializers.py",
-      "code": "F401",
-      "message": "'django.contrib.contenttypes.models.ContentType' imported but unused",
-      "source": "from django.contrib.contenttypes.models import ContentType",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/forms.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Column' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/forms.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Row' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Div, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/models.py",
-      "code": "F401",
-      "message": "'core.mixins.CloneableMixin' imported but unused",
-      "source": "from core.mixins import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/models.py",
-      "code": "F401",
-      "message": "'core.mixins.ExportableMixin' imported but unused",
-      "source": "from core.mixins import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/models.py",
-      "code": "F401",
-      "message": "'core.mixins.FileAttachmentMixin' imported but unused",
-      "source": "from core.mixins import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/models.py",
-      "code": "F401",
-      "message": "'core.mixins.ImageAttachmentMixin' imported but unused",
-      "source": "from core.mixins import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/models.py",
-      "code": "F401",
-      "message": "'core.mixins.JournalingMixin' imported but unused",
-      "source": "from core.mixins import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/tests/test_fixes.py",
-      "code": "F401",
-      "message": "'subscriptions.models.SubscriptionTypeChoices' imported but unused",
-      "source": "from subscriptions.models import (",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "code": "F401",
-      "message": "'django_tables2.RequestConfig' imported but unused",
-      "source": "from django_tables2 import RequestConfig",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/subscriptions/views.py",
-      "code": "F401",
-      "message": "'itambox.utils.get_paginate_count' imported but unused",
-      "source": "from itambox.utils import get_paginate_count",
-      "context": "Module:body",
       "count": 1
     },
     {
@@ -1668,46 +1332,6 @@
       "count": 1
     },
     {
-      "path": "itambox/users/forms.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.HTML' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/forms.py",
-      "code": "F401",
-      "message": "'crispy_forms.layout.Submit' imported but unused",
-      "source": "from crispy_forms.layout import HTML, Column, Fieldset, Layout, Row, Submit",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/models.py",
-      "code": "F401",
-      "message": "'core.managers.AllObjectsManager' imported but unused",
-      "source": "from core.managers import AllObjectsManager, ExplicitScopeAllObjectsManager, SoftDeleteManager",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/tests/test_bulk_edit.py",
-      "code": "F401",
-      "message": "'django.contrib.messages.get_messages' imported but unused",
-      "source": "from django.contrib.messages import get_messages",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/tests/test_bulk_edit.py",
-      "code": "F401",
-      "message": "'model_bakery.baker' imported but unused",
-      "source": "from model_bakery import baker",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
       "path": "itambox/users/tests/test_provider_scim.py",
       "code": "B907",
       "message": "'self.admin_user.id' is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -1732,38 +1356,6 @@
       "count": 1
     },
     {
-      "path": "itambox/users/tests/test_scim_stress.py",
-      "code": "F401",
-      "message": "'base64' imported but unused",
-      "source": "import base64",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/tests/test_scim_stress.py",
-      "code": "F401",
-      "message": "'json' imported but unused",
-      "source": "import json",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/tests/test_scim_stress.py",
-      "code": "F401",
-      "message": "'organization.models.Membership' imported but unused",
-      "source": "from organization.models import AssetHolder, Membership, Role, Tenant",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/tests/test_views.py",
-      "code": "F401",
-      "message": "'extras.models.ObjectWatch' imported but unused",
-      "source": "        from extras.models import ObjectWatch",
-      "context": "Module:body/ClassDef:BookmarkAndNotificationTests:body/FunctionDef:test_watch_toggle_detail_context_message_matches_action:body",
-      "count": 1
-    },
-    {
       "path": "itambox/users/views.py",
       "code": "B907",
       "message": "\"reverse('users:watch_toggle', kwargs={'content_type_id': content_type_id, 'object_id': object_id})\" is manually surrounded by quotes, consider using the `!r` conversion flag.",
@@ -1785,46 +1377,6 @@
       "message": "'title' is manually surrounded by quotes, consider using the `!r` conversion flag.",
       "source": "button_html = (\n                f'<button type=\"button\" class=\"btn btn-icon {btn_class}\"'\n                f' hx-post=\"{reverse(\"users:watch_toggle\", kwargs={\"content_type_id\": content_type_id, \"object_id\": object_id})}\"'\n                f' hx-headers=\\'{{\"X-CSRFToken\": \"{csrf_token}\"}}\\''\n                f' hx-target=\"this\" hx-swap=\"outerHTML\" title=\"{title}\">'\n                f'<i class=\"mdi {bell_icon}\"></i></button>'\n            )",
       "context": "Module:body/ClassDef:WatchToggleView:body/FunctionDef:post:body/If:Call(func=Name(id='getattr', ctx=Load()), args=[Name(id='request', ctx=Load()), Constant(value='htmx'), Constant(value=False)], keywords=[]):body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "F401",
-      "message": "'.models.UserPreference' imported but unused",
-      "source": "from .models import GroupMembership, UserGroup, UserPreference",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "F401",
-      "message": "'django.views.decorators.http.require_POST' imported but unused",
-      "source": "from django.views.decorators.http import require_POST",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "F401",
-      "message": "'django_tables2.RequestConfig' imported but unused",
-      "source": "from django_tables2 import RequestConfig, SingleTableView",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "F401",
-      "message": "'django_tables2.SingleTableView' imported but unused",
-      "source": "from django_tables2 import RequestConfig, SingleTableView",
-      "context": "Module:body",
-      "count": 1
-    },
-    {
-      "path": "itambox/users/views.py",
-      "code": "F401",
-      "message": "'itambox.utils.get_paginate_count' imported but unused",
-      "source": "from itambox.utils import get_paginate_count",
-      "context": "Module:body",
       "count": 1
     }
   ]

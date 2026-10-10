@@ -60,7 +60,7 @@ runtime leaf, which is what lets ``software.models`` depend on it directly.
 from typing import TYPE_CHECKING
 
 from django.apps import apps
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Sum
 
 from core.managers import Scope
 

@@ -1,5 +1,4 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 from model_bakery import baker
@@ -7,7 +6,7 @@ from model_bakery import baker
 from assets.models import Asset, StatusLabel
 from compliance.models import AssetAudit, AuditSession
 from core.tests.mixins import TenantTestMixin
-from organization.models import Location, Tenant
+from organization.models import Location
 
 User = get_user_model()
 

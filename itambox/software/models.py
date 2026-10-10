@@ -9,7 +9,7 @@ from core.managers import (
     Scope,
 )
 from core.mixins import CustomFieldDataMixin, SoftDeleteMixin
-from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, VaultModel
+from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel
 from extras.models import Tag
 
 

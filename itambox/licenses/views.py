@@ -1,14 +1,9 @@
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
-from django_tables2 import RequestConfig
 
-from assets.forms.import_forms import LicenseBulkImportForm
 from core.managers import Scope
 from itambox.panels import Panel
 from itambox.quick_add import QuickAddMixin
-from itambox.utils import get_paginate_count
 from itambox.views.generic import (
     ObjectBulkDeleteView,
     ObjectBulkEditView,
@@ -16,7 +11,6 @@ from itambox.views.generic import (
     ObjectDeleteView,
     ObjectDetailView,
     ObjectEditView,
-    ObjectImportView,
     ObjectListView,
 )
 from itambox.views.generic.service_views import GenericTransactionView, SimplePostView
