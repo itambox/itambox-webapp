@@ -9,7 +9,7 @@ import strawberry
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.test import SimpleTestCase, TestCase
-from django.urls import resolve, reverse
+from django.urls import reverse
 from django.utils.html import escape
 from rest_framework import status
 from rest_framework.test import APITestCase

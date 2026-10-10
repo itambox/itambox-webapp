@@ -5,7 +5,7 @@ from django.urls import reverse
 from assets.models import Asset, StatusLabel
 from core.tests.mixins import grant
 from extras.models import LabelTemplate
-from organization.models import Membership, Role, Tenant
+from organization.models import Role, Tenant
 
 User = get_user_model()
 

@@ -717,7 +717,6 @@ class SeedOrganizationsMixin:
         # inline imports: app-registry: assets.models and organization.models load after Django setup.
         from assets.models import Supplier
         from organization.models import (
-            AssetHolder,
             Contact,
             ContactAssignment,
             ContactRole,
