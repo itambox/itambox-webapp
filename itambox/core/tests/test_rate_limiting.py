@@ -2,7 +2,10 @@ from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.cache import caches
-from django.test import TestCase, override_settings
+from django.http import HttpResponse
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
+
+from itambox.ratelimit import RateLimitMiddleware
 
 User = get_user_model()
 
@@ -94,3 +97,68 @@ class RateLimitCacheOutageTestCase(TestCase):
                 f"got {response.status_code} instead of the expected fail-open 200."
             ),
         )
+
+
+@override_settings(RATELIMIT_LIMIT=1, RATELIMIT_PERIOD=60, RATELIMIT_CACHE="default")
+class RateLimitAtomicAdmissionTestCase(SimpleTestCase):
+    """Admission must come from the atomic add()/incr() result, never a prior read."""
+
+    PATH = "/accounts/login/"
+
+    def _run(self, fake_cache):
+        downstream = mock.Mock(return_value=HttpResponse("ok"))
+        request = RequestFactory().get(self.PATH)
+        with mock.patch("itambox.ratelimit._get_cache", return_value=fake_cache):
+            response = RateLimitMiddleware(downstream)(request)
+        return response, downstream
+
+    def test_initialization_loser_is_counted_and_denied(self):
+        cache = mock.Mock()
+        cache.get.return_value = None  # a stale read must not matter
+        cache.add.return_value = False  # another request initialized the counter
+        cache.incr.return_value = 2
+        response, downstream = self._run(cache)
+        self.assertEqual(response.status_code, 429)
+        downstream.assert_not_called()
+        cache.incr.assert_called_once()
+
+    def test_stale_read_below_limit_does_not_admit(self):
+        cache = mock.Mock()
+        cache.get.return_value = 0  # both racers saw limit - 1
+        cache.add.return_value = False
+        cache.incr.return_value = 2  # the other racer incremented first
+        response, downstream = self._run(cache)
+        self.assertEqual(response.status_code, 429)
+        downstream.assert_not_called()
+
+    def test_first_request_admitted_and_counted_via_add(self):
+        cache = mock.Mock()
+        cache.add.return_value = True
+        response, downstream = self._run(cache)
+        self.assertEqual(response.status_code, 200)
+        downstream.assert_called_once()
+        cache.add.assert_called_once()
+        cache.incr.assert_not_called()
+
+    def test_expired_between_add_and_incr_reinitializes_and_admits(self):
+        cache = mock.Mock()
+        cache.add.side_effect = [False, True]
+        cache.incr.side_effect = ValueError("expired")
+        response, downstream = self._run(cache)
+        self.assertEqual(response.status_code, 200)
+        downstream.assert_called_once()
+        self.assertEqual(cache.add.call_count, 2)
+
+    def test_expiry_race_loser_joins_new_window_and_is_denied(self):
+        cache = mock.Mock()
+        cache.add.side_effect = [False, False]
+        cache.incr.side_effect = [ValueError("expired"), 2]
+        response, downstream = self._run(cache)
+        self.assertEqual(response.status_code, 429)
+        downstream.assert_not_called()
+
+    def test_budget_is_exact_with_real_cache(self):
+        caches["default"].clear()
+        with override_settings(RATELIMIT_LIMIT=3):
+            statuses = [self._run(caches["default"])[0].status_code for _ in range(5)]
+        self.assertEqual(statuses, [200, 200, 200, 429, 429])
