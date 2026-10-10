@@ -15715,3 +15715,12 @@ msgstr "%(object)s kann nicht wiederhergestellt werden: Ein anderes aktives Asse
 #, python-format
 msgid "Cannot restore %(object)s: an installed software entry was recorded again after the archive."
 msgstr "%(object)s kann nicht wiederhergestellt werden: Nach der Archivierung wurde erneut ein Eintrag für installierte Software erfasst."
+
+msgid "Cannot restore %(object)s: another tenant already uses its name or slug."
+msgstr "%(object)s kann nicht wiederhergestellt werden: Ein anderer Mandant verwendet bereits den Namen oder das Kürzel."
+
+msgid "Cannot restore %(object)s: its managing tenant is archived or unavailable."
+msgstr "%(object)s kann nicht wiederhergestellt werden: Der verwaltende Mandant ist archiviert oder nicht verfügbar."
+
+msgid "managed tenants"
+msgstr "verwaltete Mandanten"
