@@ -17,6 +17,7 @@
     "itambox/core/tests/test_pwa.py",
     "itambox/core/tests/test_rate_limiting.py",
     "itambox/core/tests/test_report_asset_disposal_eol.py",
+    "itambox/core/tests/test_report_characterization.py",
     "itambox/core/tests/test_report_contract_renewals.py",
     "itambox/core/tests/test_report_custody_compliance.py",
     "itambox/core/tests/test_report_hardware_inventory.py",
