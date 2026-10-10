@@ -2058,18 +2058,6 @@
     {
       "path": "itambox/software/views.py",
       "context": "ClassDef:SoftwareDetailView/FunctionDef:get_context_data",
-      "statement": "from django_tables2 import RequestConfig",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/views.py",
-      "context": "ClassDef:SoftwareDetailView/FunctionDef:get_context_data",
-      "statement": "from itambox.utils import get_paginate_count",
-      "count": 1
-    },
-    {
-      "path": "itambox/software/views.py",
-      "context": "ClassDef:SoftwareDetailView/FunctionDef:get_context_data",
       "statement": "from licenses.models import License",
       "count": 1
     },

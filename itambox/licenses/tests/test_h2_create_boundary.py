@@ -21,7 +21,7 @@ from django.urls import reverse
 from assets.models import Asset, Manufacturer, StatusLabel
 from core.tests.mixins import grant
 from licenses.models import License, LicenseSeatAssignment, LicenseTypeChoices
-from organization.models import AssetHolder, Membership, Role, Tenant
+from organization.models import AssetHolder, Role, Tenant
 from software.models import Software
 
 User = get_user_model()

@@ -3,7 +3,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
 from itambox.api.permissions import StrictTenantPermission, TokenPermissions
-from itambox.api.viewsets import ITAMBoxModelViewSet, ITAMBoxReadOnlyModelViewSet
+from itambox.api.viewsets import ITAMBoxModelViewSet
 from licenses.filters import LicenseFilterSet, LicenseSeatAssignmentFilterSet
 from licenses.models import License, LicenseSeatAssignment
 from licenses.services import checkin_license_seat

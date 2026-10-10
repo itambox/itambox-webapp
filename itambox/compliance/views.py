@@ -24,7 +24,6 @@ from core.context import get_current_request_id
 from core.managers import Scope
 from core.reports.exporters import PDF_MIME, report_pdf_bytes
 from extras.services.events import dispatch_event
-from itambox.panels import Panel
 from itambox.views.generic import ObjectCloneView, ObjectDeleteView, ObjectDetailView, ObjectEditView, ObjectListView
 from itambox.views.generic.htmx_responses import error_response, is_htmx_request, success_response
 from itambox.views.generic.service_views import SimplePostView
