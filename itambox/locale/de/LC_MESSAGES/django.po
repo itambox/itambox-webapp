@@ -6061,24 +6061,6 @@ msgstr "Zugehörige Abonnements"
 msgid "No subscriptions found for this tenant."
 msgstr "Keine Abonnements für diesen Mandanten gefunden."
 
-#, python-format
-msgid "%(count)d sites"
-msgstr "%(count)d Standorte"
-
-#, python-format
-msgid "%(count)d locations"
-msgstr "%(count)d Lagerorte"
-
-#, python-format
-msgid "%(count)d asset holders"
-msgstr "%(count)d Asset-Inhaber"
-
-#, python-format
-msgid "Cannot delete tenant '%(name)s': It is associated with %(details)s."
-msgstr ""
-"Mandant '%(name)s' kann nicht gelöscht werden: Er ist mit %(details)s "
-"verknüpft."
-
 msgid "You do not have permission to sync directory settings for this tenant."
 msgstr ""
 "Sie haben keine Berechtigung, die Verzeichniseinstellungen für diesen "

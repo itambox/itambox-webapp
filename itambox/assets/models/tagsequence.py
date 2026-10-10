@@ -46,6 +46,8 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
     zero_padding = models.PositiveSmallIntegerField(default=6, verbose_name=_("Zero Padding"))
     is_active = models.BooleanField(default=True, verbose_name=_("Is Active"))
 
+    archive_operation_id = models.UUIDField(null=True, blank=True, editable=False, verbose_name=_("Archive Operation"))
+
     class Meta:
         verbose_name = _("Asset Tag Sequence")
         verbose_name_plural = _("Asset Tag Sequences")

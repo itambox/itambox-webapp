@@ -548,7 +548,7 @@ class MigrationAuditTests(unittest.TestCase):
         self.assertEqual(inventory["summary"]["replacement_shards"], 62)
         self.assertEqual(inventory["summary"]["replacement_targets"], 262)
         self.assertEqual(inventory["summary"]["explicit_replacement_chain_edges"], 61)
-        self.assertEqual(inventory["summary"]["post_transition_migrations"], 60)
+        self.assertEqual(inventory["summary"]["post_transition_migrations"], 64)
         self.assertEqual(
             inventory["post_transition_migrations"],
             [
@@ -565,6 +565,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "assets.0121_supplier_scoping_and_commercial_fields",
                 "assets.0122_repair_maintenance_anchor",
                 "assets.0123_asset_archive_leaf_markers",
+                "assets.0124_tenant_archive_leaf_markers",
                 "compliance.0101_alter_custodyreceipt_signed_at",
                 "compliance.0102_clear_unsigned_receipt_timestamps",
                 "compliance.0103_alter_custodyreceipt_options",
@@ -595,12 +596,14 @@ class MigrationAuditTests(unittest.TestCase):
                 "extras.0125_scheduled_report_fire_records_retry_hardening",
                 "extras.0126_scheduledreport_last_run_archive",
                 "extras.0127_retire_report_designer_legacy",
+                "extras.0128_tenant_archive_leaf_markers",
                 "inventory.0101_alter_accessoryassignment_options_and_more",
                 "inventory.0102_kititem_leaf_deleted_at",
                 "inventory.0103_stock_leaf_deleted_at",
                 "organization.0101_membership_external_id_and_more",
                 "organization.0102_alter_tenantresourcegrant_options",
                 "organization.0103_tenant_resource_grant_expiry",
+                "organization.0104_tenant_archive_leaf_markers",
                 "procurement.0101_alter_purchaseorder_options",
                 "procurement.0102_fulfillmentlink_qty_received",
                 "procurement.0103_remove_fulfillmentlink_unique_request_po_line_link_and_more",
@@ -612,6 +615,7 @@ class MigrationAuditTests(unittest.TestCase):
                 "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",
                 "users.0102_token_updated_at",
                 "users.0103_oidcidentity",
+                "users.0104_tenant_archive_leaf_markers",
             ],
         )
         self.assertEqual(inventory["summary"]["missing_replacement_targets"], 0)

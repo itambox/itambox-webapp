@@ -25,6 +25,7 @@
     "itambox/extras/tests/test_dashboard_widgets.py",
     "itambox/extras/tests/test_multi_dashboard.py",
     "itambox/itambox/tests/test_generic_cbv.py",
+    "itambox/organization/tests/test_tenant_archive.py",
     "scripts/tests/test_migration_audit.py"
   ],
   "baseline_tests": [
@@ -810,6 +811,7 @@
     "itambox/organization/tests/test_role_presets.py",
     "itambox/organization/tests/test_scoping.py",
     "itambox/organization/tests/test_specification_access_scope.py",
+    "itambox/organization/tests/test_tenant_archive.py",
     "itambox/organization/tests/test_tenant_managed_by_creation.py",
     "itambox/organization/tests/test_tenant_permissions_map.py",
     "itambox/organization/tests/test_tenant_switcher_context_processor.py",

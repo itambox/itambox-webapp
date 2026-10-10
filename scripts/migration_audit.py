@@ -30,6 +30,7 @@ POST_TRANSITION_MIGRATIONS = {
     "assets.0121_supplier_scoping_and_commercial_fields",
     "assets.0122_repair_maintenance_anchor",
     "assets.0123_asset_archive_leaf_markers",
+    "assets.0124_tenant_archive_leaf_markers",
     "compliance.0101_alter_custodyreceipt_signed_at",
     "compliance.0102_clear_unsigned_receipt_timestamps",
     "compliance.0103_alter_custodyreceipt_options",
@@ -66,6 +67,7 @@ POST_TRANSITION_MIGRATIONS = {
     "organization.0101_membership_external_id_and_more",
     "organization.0102_alter_tenantresourcegrant_options",
     "organization.0103_tenant_resource_grant_expiry",
+    "organization.0104_tenant_archive_leaf_markers",
     "procurement.0101_alter_purchaseorder_options",
     "procurement.0102_fulfillmentlink_qty_received",
     "procurement.0103_remove_fulfillmentlink_unique_request_po_line_link_and_more",
@@ -73,10 +75,12 @@ POST_TRANSITION_MIGRATIONS = {
     "subscriptions.0102_commercial_vendor_and_terms",
     "subscriptions.0103_unified_vendor_cutover",
     "software.0101_asset_archive_leaf_markers",
+    "extras.0128_tenant_archive_leaf_markers",
     "subscriptions.0104_subscriptionassignment_leaf_deleted_at",
     "users.0101_user_scim_id_usergroup_external_id_usergroup_scim_id_and_more",
     "users.0102_token_updated_at",
     "users.0103_oidcidentity",
+    "users.0104_tenant_archive_leaf_markers",
 }
 ISSUE88_SHARD_RE = re.compile(r"issue88_shard_(\d{2})(?:_|$)")
 ALLOWED_DISPOSITIONS = {

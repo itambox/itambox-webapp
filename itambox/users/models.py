@@ -343,6 +343,8 @@ class UserGroup(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         help_text=_("Stable identifier supplied by the provisioning domain that owns this group."),
     )
 
+    archive_operation_id = models.UUIDField(null=True, blank=True, editable=False, verbose_name=_("Archive Operation"))
+
     class Meta:
         ordering = ["name"]
         verbose_name = _("User Group")

@@ -391,30 +391,6 @@ class TenantDeleteView(ObjectDeleteView):
     template_name = "generic/object_confirm_delete.html"
     success_url = reverse_lazy("organization:tenant_list")
 
-    def post(self, request, *args, **kwargs):
-        tenant = self.get_object()
-        related_count = tenant.sites.count() + tenant.locations.count() + tenant.asset_holders.count()
-
-        if related_count > 0:
-            related_details = []
-            if tenant.sites.exists():
-                related_details.append(_("%(count)d sites") % {"count": tenant.sites.count()})
-            if tenant.locations.exists():
-                related_details.append(_("%(count)d locations") % {"count": tenant.locations.count()})
-            if tenant.asset_holders.exists():
-                related_details.append(_("%(count)d asset holders") % {"count": tenant.asset_holders.count()})
-            messages.error(
-                request,
-                _("Cannot delete tenant '%(name)s': It is associated with %(details)s.")
-                % {
-                    "name": tenant.name,
-                    "details": ", ".join(str(d) for d in related_details),
-                },
-            )
-            return redirect(tenant.get_absolute_url())
-
-        return super().post(request, *args, **kwargs)
-
 
 class TenantBulkEditView(ObjectBulkEditView):
     queryset = Tenant.objects.all()
