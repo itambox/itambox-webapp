@@ -157,7 +157,7 @@ class AccessoryCheckoutView(GenericTransactionView):
             TenantResourceGrant.ACCESS_USE,
             "inventory.add_accessoryassignment",
         )
-        return (queryset | Accessory._base_manager.filter(stocks__pk__in=shared_stock_ids)).distinct()
+        return (queryset | Accessory.objects.filter(stocks__pk__in=shared_stock_ids)).distinct()
 
     def has_permission(self):
         active_tenant = get_current_tenant()

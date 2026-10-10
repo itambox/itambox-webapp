@@ -93,7 +93,7 @@ class SCIMProviderMixin:
         # A provider is a Tenant with is_provider=True; the /api/providers/<slug>/
         # mount is kept but resolves against the tenant tree. _base_manager: no tenant
         # context exists yet, so the tenant-scoped default manager would return nothing.
-        self.tenant = Tenant._base_manager.filter(
+        self.tenant = Tenant.objects.filter(
             is_provider=True,
             deleted_at__isnull=True,
             slug=provider_slug,
@@ -149,7 +149,7 @@ def _lock_provider_scim_user(user):
     ``transaction.atomic()``.
     """
     try:
-        return type(user)._base_manager.select_for_update().get(pk=user.pk)
+        return type(user).objects.select_for_update().get(pk=user.pk)
     except UserModel.DoesNotExist as exc:
         raise SCIMPatchError("SCIM user was deleted", status_code=404) from exc
 

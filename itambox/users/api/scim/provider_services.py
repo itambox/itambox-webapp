@@ -232,7 +232,7 @@ def apply_provider_user_patch(user: User, tenant: object, patch: UserPatch, *, a
     _require_provider_actor(tenant, actor, permission="organization.change_membership")
     with transaction.atomic():
         try:
-            user = type(user)._base_manager.select_for_update().get(pk=user.pk)
+            user = type(user).objects.select_for_update().get(pk=user.pk)
         except type(user).DoesNotExist as exc:
             raise SCIMPatchError("SCIM user was deleted", status_code=404) from exc
         if not Membership.objects.filter(user=user, tenant=tenant).exists():

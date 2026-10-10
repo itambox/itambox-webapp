@@ -49,7 +49,8 @@ def purge_inventory_assignment(assignment):
     if model not in ASSIGNMENT_MODELS:
         raise ValidationError(_("Unsupported assignment purge model."))
     with transaction.atomic():
-        assignment = model._base_manager.select_for_update().get(pk=assignment.pk)
+        # unscoped: purge operates on soft-deleted rows, which the default manager hides
+        assignment = model.all_objects.select_for_update().get(pk=assignment.pk)
         if assignment.deleted_at is None:
             raise ValidationError(_("Only a soft-deleted assignment can be permanently purged."))
         assignment_pk = assignment.pk
@@ -125,20 +126,20 @@ def checkout_inventory_item(
     _reject_unsupported_assignment_fields(kwargs)
 
     with transaction.atomic():
-        # Lock the row to prevent concurrent overallocation. _base_manager:
-        # the item may live in another tenant than the active one (granted
-        # cross-tenant checkout) — callers have already resolved the item
-        # through an authorized surface.
-        item = type(item)._base_manager.select_for_update().get(pk=item.pk)
+        # Lock the row to prevent concurrent overallocation. The default manager
+        # applies no ambient scope: the item may live in another tenant than the
+        # active one (granted cross-tenant checkout) and callers have already
+        # resolved it through an authorized surface.
+        item = type(item).objects.select_for_update().get(pk=item.pk)
         source_stock = None
         if source_location is not None:
-            source_location = Location._base_manager.get(
+            source_location = Location.objects.get(
                 pk=source_location.pk,
                 deleted_at__isnull=True,
                 tenant__deleted_at__isnull=True,
             )
             source_stock = (
-                stock_model._base_manager.select_for_update()
+                stock_model.objects.select_for_update()
                 .filter(**{item_field: item, "location": source_location})
                 .select_related("location")
                 .first()
@@ -201,7 +202,7 @@ def validate_checkout_targets(holder, location, asset):
     active_tenant_id = getattr(active_tenant, "pk", None)
     if (
         active_tenant_id is None
-        or not Tenant._base_manager.filter(
+        or not Tenant.objects.filter(
             pk=active_tenant_id,
             deleted_at__isnull=True,
         ).exists()
@@ -216,7 +217,7 @@ def validate_checkout_targets(holder, location, asset):
         filters = {"pk": target_id, "tenant_id": active_tenant_id}
         if any(field.name == "deleted_at" for field in target._meta.fields):
             filters["deleted_at__isnull"] = True
-        persisted_target = type(target)._base_manager.filter(**filters).first()
+        persisted_target = type(target).objects.filter(**filters).first()
         if target_id is None or persisted_target is None:
             raise ValidationError(_("Checkout targets must belong to the active tenant."))
         persisted_targets.append(persisted_target)
@@ -251,7 +252,7 @@ def create_component_allocation(
         raise ValidationError(_("Only a trusted system process can change this component's availability."))
     provenance = _system_authorization_provenance(actor, system_authorization)
     with transaction.atomic():
-        component = type(component)._base_manager.select_for_update().get(pk=component.pk)
+        component = type(component).objects.select_for_update().get(pk=component.pk)
         if not component.allow_overallocate and not system_allow_overallocate and component.available < qty:
             raise ValidationError(_("No stock available for allocation."))
         assignment = ComponentAllocation(
@@ -288,7 +289,8 @@ def update_component_allocation(
         raise ValidationError(_("Allocation update is not authorized in the active tenant."))
 
     with transaction.atomic():
-        assignment = ComponentAllocation._base_manager.select_for_update().get(pk=assignment_pk)
+        # unscoped: a soft-deleted allocation must raise the boundary ValidationError below, not DoesNotExist
+        assignment = ComponentAllocation.all_objects.select_for_update().get(pk=assignment_pk)
         if assignment.deleted_at is not None or assignment.target_tenant_id != active_tenant.pk:
             raise ValidationError(_("Allocation update is outside the active tenant boundary."))
 
@@ -309,7 +311,7 @@ def update_component_allocation(
         if requested_shape != persisted_shape:
             raise ValidationError(_("Component allocation item, source, and destination are immutable."))
 
-        component = type(component)._base_manager.select_for_update().get(pk=assignment.component_id)
+        component = type(component).objects.select_for_update().get(pk=assignment.component_id)
         extra_qty = qty - assignment.qty
         if extra_qty > 0 and not component.allow_overallocate and component.available < extra_qty:
             raise ValidationError(_("No stock available for allocation."))
@@ -360,7 +362,7 @@ def shared_stock_union(queryset, stock_model):
     perm = f"{stock_model._meta.app_label}.view_{stock_model._meta.model_name}"
     return (
         queryset.distinct()
-        | stock_model._base_manager.filter(
+        | stock_model.objects.filter(
             pk__in=resolved_shared_stock_ids(
                 stock_model,
                 tenant,
@@ -381,7 +383,7 @@ def recipient_assignment_union(queryset, assignment_model):
         return queryset
     return (
         queryset.distinct()
-        | assignment_model._base_manager.filter(
+        | assignment_model.objects.filter(
             target_tenant=tenant,
             deleted_at__isnull=True,
         ).distinct()
@@ -409,9 +411,7 @@ def resolve_grant_for_checkout(
     if source_location is None:
         return None
     stock_row = (
-        stock_model._base_manager.filter(**{item_field: item, "location": source_location})
-        .select_related("location")
-        .first()
+        stock_model.objects.filter(**{item_field: item, "location": source_location}).select_related("location").first()
     )
     if stock_row is None:
         return None  # no concrete pool yet — nothing to authorize against
@@ -476,7 +476,7 @@ def _checkin_assignment(assignment_model, stock_model, item_field, assignment_pk
         qty = assignment.qty
         recipient = assignment.assigned_holder or assignment.assigned_location or assignment.assigned_asset
         if assignment.from_location_id:
-            stock_model._base_manager.select_for_update().filter(
+            stock_model.objects.select_for_update().filter(
                 **{
                     item_field: item,
                     "location_id": assignment.from_location_id,
@@ -492,12 +492,12 @@ def _authorized_return_assignment(assignment_model, assignment_pk, user, perm, *
     active_tenant_id = getattr(active_tenant, "pk", None)
     live_active = (
         active_tenant_id is not None
-        and Tenant._base_manager.filter(
+        and Tenant.objects.filter(
             pk=active_tenant_id,
             deleted_at__isnull=True,
         ).exists()
     )
-    queryset = assignment_model._base_manager.filter(deleted_at__isnull=True)
+    queryset = assignment_model.objects.filter(deleted_at__isnull=True)
     if lock:
         queryset = queryset.select_for_update()
     if live_active:
@@ -640,13 +640,13 @@ def _stock_pools(stock_model, assignment_model, item_field, item_ids, tenant):
         return {}
     key = f"{item_field}_id"
     stock_rows = (
-        stock_model._base_manager.filter(tenant=tenant, **{f"{key}__in": item_ids})
+        stock_model.objects.filter(tenant=tenant, **{f"{key}__in": item_ids})
         .values(key)
         .order_by()
         .annotate(total=Sum("qty"))
     )
     committed_rows = (
-        assignment_model._base_manager.filter(
+        assignment_model.objects.filter(
             from_location__isnull=True,
             deleted_at__isnull=True,
             target_tenant=tenant,
@@ -671,7 +671,7 @@ def _license_pools(license_ids, tenant):
     if not license_ids:
         return {}
     rows = (
-        License.all_objects.filter(pk__in=license_ids, tenant=tenant, deleted_at__isnull=True)
+        License.objects.filter(pk__in=license_ids, tenant=tenant, deleted_at__isnull=True)
         .with_counts()
         .values("id", "seats", "assigned_count")
     )

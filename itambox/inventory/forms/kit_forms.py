@@ -131,7 +131,7 @@ def _asset_choice_label(asset):
 def tenant_group_tenant_ids(group):
     """Live tenants of a tenant group's subtree."""
     return set(
-        Tenant._base_manager.filter(
+        Tenant.objects.filter(
             group_id__in=get_descendant_tenant_group_ids(group.pk, live_only=True),
             deleted_at__isnull=True,
         ).values_list("pk", flat=True)
@@ -147,7 +147,7 @@ def kit_target_tenant_queryset(request, kit):
     """
     user = getattr(request, "user", None)
     if user is None or not getattr(user, "is_authenticated", False):
-        return Tenant._base_manager.none()
+        return Tenant.objects.none()
     tenant_ids = accessible_tenant_ids(user)
     group = getattr(request, "active_tenant_group", None)
     if group is not None:
@@ -155,8 +155,8 @@ def kit_target_tenant_queryset(request, kit):
     if kit is not None and kit.tenant_id:
         tenant_ids &= {kit.tenant_id}
     if not tenant_ids:
-        return Tenant._base_manager.none()
-    return Tenant._base_manager.filter(pk__in=tenant_ids, deleted_at__isnull=True).order_by("name")
+        return Tenant.objects.none()
+    return Tenant.objects.filter(pk__in=tenant_ids, deleted_at__isnull=True).order_by("name")
 
 
 def kit_target_tenant(request, kit, raw_value=None):

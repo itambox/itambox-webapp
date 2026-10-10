@@ -167,7 +167,7 @@ class ConsumableCheckoutForm(BaseCheckoutForm):
         source_location = cleaned_data.get("from_location")
         if self.consumable and qty and source_location:
             stock_qty = (
-                ConsumableStock._base_manager.filter(
+                ConsumableStock.objects.filter(
                     consumable=self.consumable,
                     location=source_location,
                 )
