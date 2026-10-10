@@ -4,6 +4,7 @@
   "changed_tests": [
     "itambox/assets/tests/test_asset_archive.py",
     "itambox/compliance/tests/test_audit_basket.py",
+    "itambox/core/tests/test_graphql_throttle.py",
     "itambox/core/tests/test_htmx.py",
     "itambox/core/tests/test_import_boundaries.py",
     "itambox/core/tests/test_intune_sync.py",
@@ -609,6 +610,7 @@
     "itambox/core/tests/test_form_scoping.py",
     "itambox/core/tests/test_framework_import_boundaries.py",
     "itambox/core/tests/test_global_label_template_permissions.py",
+    "itambox/core/tests/test_graphql_throttle.py",
     "itambox/core/tests/test_group_scope_accessible_tenants.py",
     "itambox/core/tests/test_hosted_runner_workflows.py",
     "itambox/core/tests/test_htmx.py",

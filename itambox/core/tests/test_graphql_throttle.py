@@ -6,6 +6,8 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
+from core.tests.mixins import grant
+from organization.models import Role, Tenant
 from users.models import Token
 
 User = get_user_model()
@@ -53,6 +55,9 @@ class GraphQLThrottleTests(TestCase):
         self.assertIn("/login", response["Location"])
 
     def test_token_authenticated_post_still_works_and_is_throttled(self):
+        tenant = Tenant.objects.create(name="GQL Throttle Tenant", slug="gql-throttle-tenant")
+        role = Role.objects.create(tenant=tenant, name="GQL Throttle Role", permissions=["assets.view_asset"])
+        grant(self.user, tenant, role)
         token = Token.objects.create(user=self.user)
         headers = {"HTTP_AUTHORIZATION": f"Token {token.key}"}
         statuses = [
