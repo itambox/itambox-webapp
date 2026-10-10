@@ -5,6 +5,7 @@ from django.test import TestCase
 
 from assets.models import Asset, AssetRole, Manufacturer
 from core.models import Notification
+from core.tasks.context import TaskContext
 from extras.models import Bookmark, JournalEntry
 from inventory.models import Accessory
 from itambox.utils import serialize_object
@@ -78,7 +79,10 @@ class CoreModelsTestCase(TestCase):
 
         self.assertEqual(InstalledSoftware.objects.filter(pk=installed_sw.pk).count(), 1)
 
-        asset.delete()
+        # The install is a soft-deletable leaf of the Asset aggregate, so the cascade
+        # writes its audit row and needs an execution context.
+        with TaskContext(user_id=self.user.pk, operation="cascade_soft_delete_test"):
+            asset.delete()
 
         self.assertIsNotNone(asset.deleted_at)
         self.assertEqual(InstalledSoftware.objects.filter(pk=installed_sw.pk).count(), 0)

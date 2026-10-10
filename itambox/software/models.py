@@ -5,11 +5,10 @@ from django.utils.translation import gettext_lazy as _
 
 from core.managers import (
     ExplicitScopeAllObjectsManager,
-    ExplicitScopeManager,
     ExplicitScopeSoftDeleteManager,
     Scope,
 )
-from core.mixins import CustomFieldDataMixin
+from core.mixins import CustomFieldDataMixin, SoftDeleteMixin
 from core.models import BaseModel, ChangeLoggingMixin, DeletableVaultModel, VaultModel
 from extras.models import Tag
 
@@ -131,7 +130,7 @@ class Software(CustomFieldDataMixin, DeletableVaultModel):
         return License.objects.for_scope(Scope.current()).filter(software=self, deleted_at__isnull=True).count()
 
 
-class InstalledSoftware(ChangeLoggingMixin, BaseModel):
+class InstalledSoftware(SoftDeleteMixin, ChangeLoggingMixin, BaseModel):
     """
     Represents an instance of software discovered or inventoried on a specific asset.
     Distinct from license assignment/tracking.
@@ -144,7 +143,17 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
     # only scopes the manager) — set both so audit rows are attributed to the
     # asset's tenant instead of the ambient request tenant.
     changelog_tenant_lookup = "asset__tenant"
-    objects = ExplicitScopeManager()
+    # An install is a leaf row of the Asset aggregate: archiving an asset archives
+    # its installs with it (and restores them with it), so the model carries its
+    # own `deleted_at` and the soft-delete-aware default manager.
+    objects = ExplicitScopeSoftDeleteManager()
+    all_objects = ExplicitScopeAllObjectsManager()
+
+    #: Correlates the row with the aggregate archive operation that moved it
+    #: (#619). A restore only brings back rows an operation archived; a row
+    #: deleted on its own has no marker and stays deleted. NULL for every
+    #: pre-existing row.
+    archive_operation_id = models.UUIDField(null=True, blank=True, editable=False, verbose_name=_("Archive Operation"))
 
     asset = models.ForeignKey(
         to="assets.Asset",
@@ -189,7 +198,9 @@ class InstalledSoftware(ChangeLoggingMixin, BaseModel):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["asset", "software", "version_detected"], name="unique_asset_software_version"
+                fields=["asset", "software", "version_detected"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="unique_asset_software_version",
             )
         ]
         ordering = ["asset", "software", "-last_seen_date"]

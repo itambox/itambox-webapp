@@ -44075,7 +44075,6 @@ components:
       - software_manufacturer
       - software_name
       - updated_at
-      - version_detected
     JournalEntry:
       type: object
       properties:
