@@ -3642,7 +3642,7 @@ export interface components {
       software_name: string;
       software_manufacturer: string;
       /** @description Specific version discovered on the asset (e.g., 16.78.1) */
-      version_detected: string;
+      version_detected?: string;
       /**
        * Format: date
        * @description Estimated or known installation date
