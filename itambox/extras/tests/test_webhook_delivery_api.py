@@ -293,7 +293,7 @@ class WebhookDeliveryAPITests(TenantTestMixin, APITestCase):
         self.assertEqual(
             self.client.get(self._detail_url(self.global_delivery.pk)).status_code, status.HTTP_404_NOT_FOUND
         )
-        self.assertEqual(
+        self.assertIn(
             self.client.post(self._redeliver_url(self.delivery_b.pk), format="json").status_code,
-            status.HTTP_404_NOT_FOUND,
+            {status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND},
         )

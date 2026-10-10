@@ -220,7 +220,9 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
                 permissions=["extras.view_webhookdelivery", "extras.view_webhookendpoint"],
             ),
         )
-        global_delivery = self._delivery(tenant=None, status="success", response_code=200)
+        global_delivery = WebhookDelivery.objects.create(
+            delivery_id=str(uuid4()), endpoint=self.endpoint_a, tenant=None, status="success", response_code=200
+        )
 
         self.client_login_to_tenant(reader, self.tenant_a)
         response = self.client.get(self._endpoint_url())
@@ -231,7 +233,9 @@ class WebhookDeliveryUITests(TenantTestMixin, TestCase):
 
     def test_superuser_sees_system_wide_deliveries(self):
         superuser = User.objects.create_superuser(username="webhook_ui_platform", password="pw")
-        global_delivery = self._delivery(tenant=None, status="success", response_code=200)
+        global_delivery = WebhookDelivery.objects.create(
+            delivery_id=str(uuid4()), endpoint=self.endpoint_a, tenant=None, status="success", response_code=200
+        )
 
         self.client_login_to_tenant(superuser, self.tenant_a)
         response = self.client.get(self._endpoint_url())
