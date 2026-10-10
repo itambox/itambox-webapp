@@ -124,7 +124,7 @@ class RepairServiceTests(TestCase):
 
     def test_database_allows_one_open_loan_per_maintenance(self):
         first = self._loan()
-        second_loaner = _asset("Second Loaner")
+        second_loaner = _asset("Second Loaner", status=StatusLabel.objects.filter(type="deployed").first())
         with self.assertRaises(IntegrityError), transaction.atomic():
             AssetAssignment.objects.create(
                 asset=second_loaner,

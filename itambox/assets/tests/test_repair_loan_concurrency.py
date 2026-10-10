@@ -5,6 +5,7 @@ import threading
 import uuid
 
 import pytest
+from model_bakery import baker
 from django.core.exceptions import ValidationError
 from django.db import close_old_connections, connection, connections
 from django.test import TransactionTestCase
@@ -53,7 +54,7 @@ class RepairLoanConcurrencyTests(TenantTestMixin, TransactionTestCase):
         suffix = uuid.uuid4().hex[:8]
         self.deployable = StatusLabel.objects.create(name=f"Deployable {suffix}", type="deployable")
         StatusLabel.objects.create(name=f"Deployed {suffix}", type="deployed")
-        self.asset_type = AssetType.objects.create(name=f"Type {suffix}")
+        self.asset_type = baker.make(AssetType)
         self.holder = AssetHolder.objects.create(name=f"Holder {suffix}", tenant=self.tenant)
         self.asset = self._asset(f"FAIL-{suffix}")
         checkout_asset(self.asset, holder=self.holder, user=self.tenant_user)
