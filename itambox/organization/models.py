@@ -668,6 +668,8 @@ class Role(AutoSlugMixin, StandardModel, SoftDeleteMixin):
         ),
     )
 
+    archive_operation_id = models.UUIDField(null=True, blank=True, editable=False, verbose_name=_("Archive Operation"))
+
     class Meta:
         ordering = ["name"]
         verbose_name = _("Role")

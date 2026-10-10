@@ -6061,24 +6061,6 @@ msgstr "Zugehörige Abonnements"
 msgid "No subscriptions found for this tenant."
 msgstr "Keine Abonnements für diesen Mandanten gefunden."
 
-#, python-format
-msgid "%(count)d sites"
-msgstr "%(count)d Standorte"
-
-#, python-format
-msgid "%(count)d locations"
-msgstr "%(count)d Lagerorte"
-
-#, python-format
-msgid "%(count)d asset holders"
-msgstr "%(count)d Asset-Inhaber"
-
-#, python-format
-msgid "Cannot delete tenant '%(name)s': It is associated with %(details)s."
-msgstr ""
-"Mandant '%(name)s' kann nicht gelöscht werden: Er ist mit %(details)s "
-"verknüpft."
-
 msgid "You do not have permission to sync directory settings for this tenant."
 msgstr ""
 "Sie haben keine Berechtigung, die Verzeichniseinstellungen für diesen "
@@ -15733,3 +15715,12 @@ msgstr "%(object)s kann nicht wiederhergestellt werden: Ein anderes aktives Asse
 #, python-format
 msgid "Cannot restore %(object)s: an installed software entry was recorded again after the archive."
 msgstr "%(object)s kann nicht wiederhergestellt werden: Nach der Archivierung wurde erneut ein Eintrag für installierte Software erfasst."
+
+msgid "Cannot restore %(object)s: another tenant already uses its name or slug."
+msgstr "%(object)s kann nicht wiederhergestellt werden: Ein anderer Mandant verwendet bereits den Namen oder das Kürzel."
+
+msgid "Cannot restore %(object)s: its managing tenant is archived or unavailable."
+msgstr "%(object)s kann nicht wiederhergestellt werden: Der verwaltende Mandant ist archiviert oder nicht verfügbar."
+
+msgid "managed tenants"
+msgstr "verwaltete Mandanten"

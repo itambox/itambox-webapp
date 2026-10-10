@@ -32,7 +32,7 @@ class OrganizationConfig(AppConfig):
             accessible_tenant_ids_with_expiry,
             managed_accessible_tenant_ids,
         )
-        from organization.models import AssetHolder, Location
+        from organization.models import AssetHolder, Location, Tenant
         from organization.rbac import (
             applicable_grants,
             build_accessible_tenant_permissions_map,
@@ -43,6 +43,7 @@ class OrganizationConfig(AppConfig):
         from organization.services.location_archive import archive_location, restore_location
         from organization.services.restore_authority import organization_restore_authority
         from organization.services.tenant_access import organization_tenant_access_policy
+        from organization.services.tenant_archive import archive_relations, archive_tenant, restore_tenant
 
         configure_tenant_access_policy(organization_tenant_access_policy)
         configure_identity_provisioner(organization_identity_provisioner)
@@ -76,6 +77,12 @@ class OrganizationConfig(AppConfig):
                     "subscription assignments are ended; restore does not re-attach",
                 ),
             ),
+        )
+        register_archive_handler(
+            Tenant._meta.label_lower,
+            archive=archive_tenant,
+            restore=restore_tenant,
+            relations=archive_relations(),
         )
         register_archive_handler(
             Location._meta.label_lower,

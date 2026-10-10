@@ -940,6 +940,8 @@ class EventRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         help_text=_("The tenant owning this rule. Null represents system-wide rules."),
     )
 
+    archive_operation_id = models.UUIDField(null=True, blank=True, editable=False, verbose_name=_("Archive Operation"))
+
     class Meta:
         ordering = ["name"]
         verbose_name = _("Event Rule")
@@ -1014,6 +1016,8 @@ class WebhookEndpoint(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         verbose_name=_("Tenant"),
         help_text=_("The tenant owning this endpoint. Null represents system-wide endpoints."),
     )
+
+    archive_operation_id = models.UUIDField(null=True, blank=True, editable=False, verbose_name=_("Archive Operation"))
 
     class Meta:
         ordering = ["name"]
@@ -1625,6 +1629,8 @@ class ReportTemplate(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         help_text=_("Optional sandboxed Jinja2 custom HTML template."),
     )
 
+    archive_operation_id = models.UUIDField(null=True, blank=True, editable=False, verbose_name=_("Archive Operation"))
+
     class Meta:
         ordering = ["name"]
         verbose_name = _("Report Template")
@@ -2162,6 +2168,8 @@ class NotificationChannel(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         help_text=_("The tenant owning this channel. Null represents system-wide channels."),
     )
 
+    archive_operation_id = models.UUIDField(null=True, blank=True, editable=False, verbose_name=_("Archive Operation"))
+
     class Meta:
         ordering = ["name"]
         verbose_name = _("Notification Channel")
@@ -2276,6 +2284,8 @@ class AlertRule(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         verbose_name=_("Tenant"),
         help_text=_("The tenant owning this rule. Null represents system-wide rules."),
     )
+
+    archive_operation_id = models.UUIDField(null=True, blank=True, editable=False, verbose_name=_("Archive Operation"))
 
     class Meta:
         ordering = ["name"]
@@ -2558,6 +2568,8 @@ class SavedFilter(ChangeLoggingMixin, SoftDeleteMixin, BaseModel):
         verbose_name=_("Tenant"),
         help_text=_("The tenant owning this filter. Null represents system-wide filters."),
     )
+
+    archive_operation_id = models.UUIDField(null=True, blank=True, editable=False, verbose_name=_("Archive Operation"))
 
     class Meta:
         ordering = ["content_type", "name"]
