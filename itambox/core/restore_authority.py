@@ -16,6 +16,7 @@ class RestoreAuthorityValidator(_Protocol):
         """Validate restore authority for one principal and object."""
 
 
+# provider-slot: process-wide single-provider seam slot; the provider registers explicitly at startup
 _restore_authority_validator = _SingleProviderSlot[RestoreAuthorityValidator]("restore-authority validator")
 
 

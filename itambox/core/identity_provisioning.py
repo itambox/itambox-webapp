@@ -70,6 +70,7 @@ class IdentityProvisioner(_Protocol):
         """Provision one normalized external identity command."""
 
 
+# provider-slot: process-wide single-provider seam slot; the provider registers explicitly at startup
 _identity_provisioner = _SingleProviderSlot[IdentityProvisioner]("identity provisioner")
 
 

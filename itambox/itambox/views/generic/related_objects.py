@@ -129,6 +129,7 @@ class RelatedObjectProvider:
         if not annotations:
             return None
         try:
+            # unscoped: re-reads the already-authorized detail object by pk to attach counts
             return type(self.obj)._base_manager.filter(pk=self.obj.pk).annotate(**annotations).first()
         except Exception:
             return None

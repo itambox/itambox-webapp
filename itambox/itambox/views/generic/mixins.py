@@ -41,6 +41,7 @@ def lock_unmanaged_definition(obj):
         yield obj
         return
     using = router.db_for_write(type(obj), instance=obj)
+    # unscoped: definition row lock by pk; falls back to the base manager when no scoped all_objects exists
     manager = getattr(type(obj), "all_objects", type(obj)._base_manager)
     with transaction.atomic(using=using):
         locked = manager.using(using).select_for_update().get(pk=obj.pk)
