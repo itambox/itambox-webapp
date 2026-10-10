@@ -156,7 +156,7 @@ class ConsumableCheckoutView(GenericTransactionView):
             TenantResourceGrant.ACCESS_USE,
             "inventory.add_consumableassignment",
         )
-        return (queryset | Consumable._base_manager.filter(stocks__pk__in=shared_stock_ids)).distinct()
+        return (queryset | Consumable.objects.filter(stocks__pk__in=shared_stock_ids)).distinct()
 
     def has_permission(self):
         active_tenant = get_current_tenant()
