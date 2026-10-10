@@ -131,7 +131,7 @@ class RepairServiceTests(TestCase):
                 [
                     AssetAssignment(
                         asset=second_loaner,
-                        assigned_user=self.user,
+                        assigned_user=self.holder,
                         is_loan=True,
                         is_active=True,
                         maintenance=self.maintenance,
