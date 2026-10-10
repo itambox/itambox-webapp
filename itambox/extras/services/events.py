@@ -155,6 +155,7 @@ def _eligible_rules(event, instance_tenant_id):
     ambient tenant contextvar (which fails open in system contexts). See
     ``_resolve_instance_tenant_id``.
     """
+    # unscoped: rule matching must not depend on the emitting request's ambient tenant; tenant filtered explicitly
     rules = (
         EventRule._base_manager.filter(
             model=event.model,
@@ -203,6 +204,7 @@ def process_event_rules(event, instance_tenant_id=None):
         return
 
     with transaction.atomic():
+        # unscoped: event row lock by pk in the worker, which has no ambient scope
         locked_event = Event._base_manager.select_for_update(of=("self",)).get(pk=event.pk)
         if locked_event.processed:
             return
@@ -271,6 +273,7 @@ def _send_webhook(rule, event, instance_tenant_id=None):
     if target is None:
         return
 
+    # unscoped: delivery rows are created by the worker, which has no ambient scope
     delivery = WebhookDelivery._base_manager.create(
         tenant_id=instance_tenant_id,
         endpoint=rule.webhook,
@@ -294,6 +297,7 @@ def _encrypted_target_secret(secret):
 
 def _legacy_retry_policy(url, tenant_id):
     """Resolve the historical same-URL retry policy once, at row creation."""
+    # unscoped: endpoint lookup by URL in the worker, which has no ambient scope
     matches = WebhookEndpoint._base_manager.filter(url=url, enabled=True, deleted_at__isnull=True)
     if tenant_id is None:
         match = matches.filter(tenant__isnull=True).order_by("pk").first()

@@ -187,6 +187,7 @@ class AuditSessionSerializer(BaseModelSerializer):
                 {"completed_at": "The completion timestamp is assigned by the close service."}
             )
         if self.instance is not None and self.instance.status == "completed":
+            # unscoped: immutability check re-reads the persisted session row by pk, independent of ambient scope
             persisted = (
                 AuditSession._base_manager.filter(pk=self.instance.pk).values("name", "location_id", "status").first()
             )
@@ -213,6 +214,7 @@ class AuditSessionSerializer(BaseModelSerializer):
 class AssetAuditSerializer(serializers.ModelSerializer):
     session = serializers.PrimaryKeyRelatedField(queryset=AuditSession.objects, required=False, allow_null=True)
     asset = NestedAssetSerializer(read_only=True)
+    # unscoped: asset PK field validates scan targets; tenant authorization is enforced by the audit service on write
     asset_id = serializers.PrimaryKeyRelatedField(queryset=Asset._base_manager.all(), source="asset")
     auditor = serializers.StringRelatedField(read_only=True)
     location = NestedLocationSerializer(read_only=True)

@@ -112,6 +112,7 @@ def _delivery_queryset_for_user(user):
         # A superuser is the explicit platform-wide exception.  Use Django's
         # unscoped base manager so an active tenant selected in the session does
         # not hide tenant=None operational history.
+        # unscoped: platform-authorized delivery listing; non-platform callers take the scoped branch
         return WebhookDelivery._base_manager.all()
 
     queryset = WebhookDelivery.objects.all()
