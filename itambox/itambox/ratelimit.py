@@ -36,6 +36,27 @@ def get_client_ip(request):
     return request.META.get("REMOTE_ADDR", "127.0.0.1")
 
 
+def _consume(rl_cache, key, period):
+    """
+    Count this request and return the resulting counter value.
+
+    Admission is decided from the atomic result of ``add()``/``incr()`` rather than
+    from a prior read, so concurrent requests cannot share a stale count. A lost
+    ``add()`` race falls through to ``incr()`` on the winner's counter, and a key
+    that expires between the two is re-initialized without resetting a live window.
+    """
+    if rl_cache.add(key, 1, period):
+        return 1
+    try:
+        return rl_cache.incr(key)
+    except ValueError:
+        # Key expired between add() and incr(): start a fresh window, or join
+        # the one a concurrent request just created.
+        if rl_cache.add(key, 1, period):
+            return 1
+        return rl_cache.incr(key)
+
+
 class RateLimitMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
@@ -72,20 +93,10 @@ class RateLimitMiddleware:
             # briefly relaxing the rate limiter. This only affects the
             # sensitive paths above; it does not touch cache usage elsewhere.
             try:
-                request_count = rl_cache.get(key)
-                if request_count is None:
-                    # Key does not exist, initialize it with absolute period timeout
-                    rl_cache.add(key, 1, period)
-                else:
-                    if request_count >= limit:
-                        return HttpResponse(
-                            _("Too many requests. Please try again in a minute."), status=429, content_type="text/plain"
-                        )
-                    try:
-                        rl_cache.incr(key)
-                    except ValueError:
-                        # Fallback in case key expired between get and incr
-                        rl_cache.add(key, 1, period)
+                if _consume(rl_cache, key, period) > limit:
+                    return HttpResponse(
+                        _("Too many requests. Please try again in a minute."), status=429, content_type="text/plain"
+                    )
             except Exception:
                 logger.exception(
                     "RateLimitMiddleware: cache backend error on %s; "
