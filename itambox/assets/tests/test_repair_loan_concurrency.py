@@ -5,10 +5,10 @@ import threading
 import uuid
 
 import pytest
-from model_bakery import baker
 from django.core.exceptions import ValidationError
 from django.db import close_old_connections, connection, connections
 from django.test import TransactionTestCase
+from model_bakery import baker
 
 from assets.models import Asset, AssetAssignment, AssetMaintenance, AssetType, StatusLabel
 from assets.services import checkout_asset, complete_repair, issue_repair_loaner
