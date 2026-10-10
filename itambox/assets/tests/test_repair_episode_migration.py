@@ -46,7 +46,15 @@ class RepairEpisodeMigrationTests(TransactionTestCase):
         if status is None:
             status = StatusLabel.objects.create(name="Available (mig)", slug="available-mig", type="deployable")
         self.assets = {}
-        for label in ("one_repair", "no_repair", "several_repairs", "substitute_loan", "substitute_bare", "reserved", "ordinary"):
+        for label in (
+            "one_repair",
+            "no_repair",
+            "several_repairs",
+            "substitute_loan",
+            "substitute_bare",
+            "reserved",
+            "ordinary",
+        ):
             self.assets[label] = Asset.objects.create(name=f"Laptop {label}", asset_tag=f"MIG-{label}", status=status)
         loaner = Asset.objects.create(name="Loaner", asset_tag="MIG-loaner", status=status)
 
@@ -131,7 +139,9 @@ class RepairEpisodeMigrationTests(TransactionTestCase):
         #    (is_loan=False): it is not loan evidence and must not be linked.
         ordinary_asset = self.assets["ordinary"]
         ordinary_loaner = Asset.objects.create(name="Loaner 2", asset_tag="MIG-loaner2", status=status)
-        ordinary_episode = RepairEpisode.objects.create(asset=ordinary_asset, substitute_asset=ordinary_loaner, notes="")
+        ordinary_episode = RepairEpisode.objects.create(
+            asset=ordinary_asset, substitute_asset=ordinary_loaner, notes=""
+        )
         ordinary_repair = _repair(ordinary_asset, episode=ordinary_episode)
         ordinary_assignment = AssetAssignment.objects.create(
             asset=ordinary_loaner,
