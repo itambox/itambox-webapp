@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 def _webhook_deliveries_visible_to(user):
     if user.is_superuser or user.has_perm("extras.view_webhookdelivery"):
+        # unscoped: users with the platform-wide view permission see all deliveries, including tenant=None history
         return WebhookDelivery._base_manager
     return WebhookDelivery.objects.for_scope(Scope.current())
 

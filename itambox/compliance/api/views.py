@@ -103,6 +103,8 @@ class AuditSessionViewSet(ITAMBoxModelViewSet):
             raise ValidationError("Audit sessions must be closed without changing their scope or metadata.")
 
         with transaction.atomic():
+            # unscoped: row lock by pk must see the row irrespective of soft-delete state and ambient tenant; callers
+            # authorize beforehand
             locked = AuditSession._base_manager.filter(pk=current.pk).select_for_update().get()
             # The initial ETag check protects the normal update path; the close
             # path must validate again against the row that the lock actually

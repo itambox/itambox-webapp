@@ -90,6 +90,7 @@ def _lock_asset_request_for_purchase_order(asset_request_id, po):
     except (TypeError, ValueError) as exc:
         raise ValidationError(_("Invalid Asset Request identifier.")) from exc
     try:
+        # unscoped: fulfillment lock by pk; the service authorizes tenant and state explicitly around it
         return AssetRequest._base_manager.select_for_update().get(
             pk=asset_request_id,
             tenant_id=po.tenant_id,
@@ -104,6 +105,7 @@ def _lock_fulfillment_targets(asset_request):
         raise ValidationError(_("Asset Request group children must be procured through their group parent."))
     if not asset_request.is_group:
         return [asset_request]
+    # unscoped: fulfillment lock by pk; the service authorizes tenant and state explicitly around it
     targets = list(
         AssetRequest._base_manager.select_for_update()
         .filter(
@@ -140,6 +142,7 @@ def _lock_fulfillment_targets(asset_request):
 def _existing_fulfillment_link(asset_request, targets, po):
     target_ids = {target.pk for target in targets}
     candidate_ids = target_ids | {asset_request.pk}
+    # unscoped: fulfillment lock by pk; the service authorizes tenant and state explicitly around it
     existing_links = list(
         FulfillmentLink._base_manager.select_related("purchase_order_line")
         .filter(asset_request_id__in=candidate_ids, deleted_at__isnull=True)
@@ -231,6 +234,7 @@ def lock_unit_fulfillment_links(asset_request_ids):
     request_ids = sorted({int(asset_request_id) for asset_request_id in asset_request_ids})
     if not request_ids:
         return []
+    # unscoped: fulfillment lock by pk; the service authorizes tenant and state explicitly around it
     return list(
         FulfillmentLink._base_manager.select_for_update()
         .filter(asset_request_id__in=request_ids, deleted_at__isnull=True)
@@ -252,6 +256,7 @@ def release_fulfillment_links(asset_requests):
     links = lock_unit_fulfillment_links(request_ids)
     # Lock the request rows after their links (global order: links, then requests) so the
     # relative acquisition order matches the receipt path.
+    # unscoped: fulfillment lock by pk; the service authorizes tenant and state explicitly around it
     list(
         AssetRequest._base_manager.select_for_update()
         .filter(pk__in=set(request_ids), deleted_at__isnull=True)
@@ -294,6 +299,7 @@ def _lock_receipt_stock_rows(lines, line_quantities, location):
 
 def _lock_line_fulfillment_links(line):
     """Lock the line's live links and their requests in deterministic (request_date, pk) order."""
+    # unscoped: fulfillment lock by pk; the service authorizes tenant and state explicitly around it
     links = list(
         FulfillmentLink._base_manager.select_for_update()
         .filter(purchase_order_line=line, deleted_at__isnull=True)
@@ -301,6 +307,7 @@ def _lock_line_fulfillment_links(line):
     )
     if not links:
         return []
+    # unscoped: fulfillment lock by pk; the service authorizes tenant and state explicitly around it
     requests = {
         request.pk: request
         for request in AssetRequest._base_manager.select_for_update()
@@ -347,12 +354,14 @@ def _approve_completed_group_parents(linked_requests):
     parent_ids = sorted({request.parent_id for request in linked_requests if request.parent_id is not None})
     if not parent_ids:
         return
+    # unscoped: fulfillment lock by pk; the service authorizes tenant and state explicitly around it
     parents = AssetRequest._base_manager.select_for_update().filter(
         pk__in=parent_ids,
         status=RequestStatusChoices.PROCUREMENT,
         deleted_at__isnull=True,
     )
     for parent in parents:
+        # unscoped: fulfillment lock by pk; the service authorizes tenant and state explicitly around it
         has_pending_child = AssetRequest._base_manager.filter(
             parent_id=parent.pk,
             status=RequestStatusChoices.PROCUREMENT,

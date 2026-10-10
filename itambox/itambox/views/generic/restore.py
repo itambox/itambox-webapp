@@ -57,6 +57,7 @@ class ObjectRestoreView(HtmxActionMixin, PermissionRequiredMixin, LoginRequiredM
         app_label = self.model._meta.app_label
         model_name = self.model._meta.model_name
 
+        # unscoped: restore and purge target soft-deleted rows; tenant authorization is checked per object
         manager = getattr(self.model, "all_objects", self.model._base_manager)
         self.object = get_object_or_404(manager, pk=self.kwargs["object_id"])
 
@@ -111,6 +112,7 @@ class ObjectPurgeView(HtmxActionMixin, PermissionRequiredMixin, LoginRequiredMix
         app_label = self.model._meta.app_label
         model_name = self.model._meta.model_name
 
+        # unscoped: restore and purge target soft-deleted rows; tenant authorization is checked per object
         manager = getattr(self.model, "all_objects", self.model._base_manager)
         self.object = get_object_or_404(manager, pk=self.kwargs["object_id"])
 
@@ -210,6 +212,7 @@ class ObjectBulkRestoreView(HtmxActionMixin, PermissionRequiredMixin, LoginRequi
             messages.warning(request, _("No items selected."))
             return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), "/"))
 
+        # unscoped: restore and purge target soft-deleted rows; tenant authorization is checked per object
         manager = getattr(self.model, "all_objects", self.model._base_manager)
         queryset = manager.filter(pk__in=pks, deleted_at__isnull=False)
 
@@ -274,6 +277,7 @@ class ObjectBulkPurgeView(HtmxActionMixin, PermissionRequiredMixin, LoginRequire
             messages.warning(request, _("No items selected."))
             return HttpResponseRedirect(safe_return_url(request, request.META.get("HTTP_REFERER"), "/"))
 
+        # unscoped: restore and purge target soft-deleted rows; tenant authorization is checked per object
         manager = getattr(self.model, "all_objects", self.model._base_manager)
         queryset = manager.filter(pk__in=pks, deleted_at__isnull=False)
 

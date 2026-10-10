@@ -86,6 +86,8 @@ class ObjectListView(TenantScopingViewMixin, PermissionRequiredMixin, LoginRequi
         """The soft-deleted rows for ``?deleted=true``, still tenant-scoped."""
         if not self.request.user.is_superuser and not self.request.user.has_perm("core.view_recyclebin"):
             raise PermissionDenied(_("You do not have permission to view the Recycle Bin."))
+        # unscoped: the recycle bin lists soft-deleted rows; filter_by_tenant narrows them right below, and a
+        # tenant-bearing model without it raises
         manager = getattr(model, "all_objects", model._base_manager)
         queryset = manager.all()
         if hasattr(queryset, "filter_by_tenant"):

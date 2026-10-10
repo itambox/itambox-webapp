@@ -65,6 +65,7 @@ def ensure_actor(actor: ActorContextDTO) -> None:
 
 def reload_actor(actor: ActorContextDTO, *, using: str = DEFAULT_DB_ALIAS):
     user_model = get_user_model()
+    # unscoped: actor re-read by pk for authorization; user rows are not tenant-owned
     candidate = user_model._base_manager.using(using).filter(pk=actor.actor_id, is_active=True).first()
     if candidate is None:
         return None
