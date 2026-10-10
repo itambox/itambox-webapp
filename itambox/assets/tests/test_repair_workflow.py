@@ -124,14 +124,19 @@ class RepairServiceTests(TestCase):
 
     def test_database_allows_one_open_loan_per_maintenance(self):
         first = self._loan()
-        second_loaner = _asset("Second Loaner", status=StatusLabel.objects.filter(type="deployed").first())
+        second_loaner = _asset("Second Loaner")
         with self.assertRaises(IntegrityError), transaction.atomic():
-            AssetAssignment.objects.create(
-                asset=second_loaner,
-                assigned_user=self.holder,
-                is_loan=True,
-                is_active=True,
-                maintenance=self.maintenance,
+            # bulk_create skips model validation, so only the database constraint answers
+            AssetAssignment.objects.bulk_create(
+                [
+                    AssetAssignment(
+                        asset=second_loaner,
+                        assigned_user=self.user,
+                        is_loan=True,
+                        is_active=True,
+                        maintenance=self.maintenance,
+                    )
+                ]
             )
         first.refresh_from_db()
         self.assertTrue(first.is_active)
