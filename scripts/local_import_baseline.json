@@ -905,18 +905,6 @@
     },
     {
       "path": "itambox/core/mixins.py",
-      "context": "ClassDef:SoftDeleteMixin/FunctionDef:delete",
-      "statement": "from django.db.models.deletion import Collector",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/mixins.py",
-      "context": "ClassDef:SoftDeleteMixin/FunctionDef:delete",
-      "statement": "from django.utils import timezone",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/mixins.py",
       "context": "ClassDef:SoftDeleteMixin/FunctionDef:soft_delete",
       "statement": "from django.utils import timezone",
       "count": 1
