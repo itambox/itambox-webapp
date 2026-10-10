@@ -4,7 +4,6 @@ from typing import Any
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Model
-from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from core.choices import ObjectChangeActionChoices

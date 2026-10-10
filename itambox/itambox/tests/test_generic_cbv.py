@@ -35,19 +35,18 @@ Restore/purge use core URL names:
   object_purge    -> /object/<content_type_id>/<object_id>/purge/
 """
 
-import json
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.urls import NoReverseMatch, reverse
 
 from assets.models import Asset, AssetRole, Manufacturer, StatusLabel
 from core.forms.mixins import ConfirmationForm, SlugModelForm
 from core.tests.mixins import TenantTestMixin
-from organization.models import Membership, Role, Tenant
+from organization.models import Tenant
 
 User = get_user_model()
 

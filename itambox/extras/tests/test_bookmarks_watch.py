@@ -21,7 +21,7 @@ from django.urls import reverse
 from core.tests.mixins import TenantTestMixin, grant
 from extras.dashboard.widgets import BookmarksWidget
 from extras.models import Bookmark, ObjectWatch
-from itambox.middleware import CurrentUserMiddleware, _current_user, _request_id
+from itambox.middleware import _current_user, _request_id
 
 User = get_user_model()
 
@@ -61,8 +61,6 @@ class ObjectWatchModelTests(TenantTestMixin, TestCase):
         self.assertEqual(str(w), f"Watch by {self.user} on {self.user}")
 
     def test_watch_uniqueness(self):
-        from django.db import IntegrityError
-
         ObjectWatch.objects.create(user=self.user, model=self.ct, object_id=self.user.pk)
         with self.assertRaises(Exception):
             ObjectWatch.objects.create(user=self.user, model=self.ct, object_id=self.user.pk)

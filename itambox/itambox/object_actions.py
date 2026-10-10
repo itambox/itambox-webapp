@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 from django.utils.translation import gettext_lazy as _
 

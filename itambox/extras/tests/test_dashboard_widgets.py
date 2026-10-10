@@ -2,7 +2,6 @@ from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
-from django.core.exceptions import PermissionDenied
 from django.db import connection
 from django.test import RequestFactory, TestCase
 from django.test.utils import CaptureQueriesContext
@@ -19,22 +18,18 @@ from core.managers import (
     set_current_tenant,
     set_current_tenant_group,
 )
-from core.models import ObjectChange
 from core.tests.mixins import grant
 from extras.dashboard.widgets import (
     AssetAgeWidget,
-    ChangelogWidget,
     EOLAlertsWidget,
     FinancialWidget,
     LicenseWidget,
     LowStockWidget,
     MaintenanceWidget,
-    NoteWidget,
     ObjectCountsWidget,
     RenewalsWidget,
     StatusLabelsWidget,
     TenantSpendWidget,
-    get_widget,
 )
 from itambox.middleware import set_current_user
 from licenses.models import License
