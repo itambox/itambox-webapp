@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -343,6 +344,24 @@ class SubscriptionFixesTests(TestCase):
         subjects = [n.subject for n in Notification.objects.all()]
         self.assertTrue(any("Subscription Renewal Warning: Sub 14 in 14 Days" in s for s in subjects))
         self.assertTrue(any("Subscription Renewal Warning: Sub 30 B in 30 Days" in s for s in subjects))
+
+    def test_background_task_recovers_a_missed_renewal_warning_boundary(self):
+        today = date(2026, 10, 3)
+        subscription = self._make_sub("Missed 30-day warning", self.supplier_a, self.tenant_a, 30)
+        renewal_date = today + timedelta(days=29)
+        Subscription.objects.filter(pk=subscription.pk).update(renewal_date=renewal_date)
+        Notification.objects.all().delete()
+        self._clear_scope_context()
+
+        with patch("subscriptions.tasks.timezone.localdate", return_value=today):
+            check_subscription_expiries_and_reminders()
+
+        warning = Notification.objects.filter(
+            user=self.super_user,
+            subject="Subscription Renewal Warning: Missed 30-day warning in 30 Days",
+        )
+        self.assertEqual(warning.count(), 1)
+        self.assertIn(str(renewal_date), warning.get().message)
 
     def test_background_task_skips_soft_deleted_subscriptions(self):
         """The bootstrap path is unscoped by tenant, never by soft delete."""
