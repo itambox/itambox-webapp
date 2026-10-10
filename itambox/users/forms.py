@@ -520,7 +520,7 @@ class GroupManagedRoleGrantForm(TenantScopedFormMixin, forms.Form):
     SCOPE_EXPLICIT = "explicit"
     id = forms.IntegerField(required=False, widget=forms.HiddenInput)
     role = forms.ModelChoiceField(
-        queryset=Role._base_manager.none(),
+        queryset=Role.objects.none(),
         required=False,
         label=_("Role"),
         widget=forms.Select(attrs={"class": "form-select managed-role"}),
@@ -537,13 +537,13 @@ class GroupManagedRoleGrantForm(TenantScopedFormMixin, forms.Form):
         widget=forms.Select(attrs={"class": "form-select managed-scope"}),
     )
     scope_group = forms.ModelChoiceField(
-        queryset=TenantGroup._base_manager.none(),
+        queryset=TenantGroup.objects.none(),
         required=False,
         label=_("Tenant group"),
         widget=forms.Select(attrs={"class": "form-select managed-scope-group"}),
     )
     assigned_tenants = forms.ModelMultipleChoiceField(
-        queryset=Tenant._base_manager.none(),
+        queryset=Tenant.objects.none(),
         required=False,
         label=_("Specific tenants"),
         widget=forms.SelectMultiple(attrs={"class": "form-select managed-assigned-tenants"}),
@@ -555,14 +555,14 @@ class GroupManagedRoleGrantForm(TenantScopedFormMixin, forms.Form):
         self._requesting_user = requesting_user
         if owner is None:
             return
-        self.fields["role"].queryset = Role._base_manager.filter(
+        self.fields["role"].queryset = Role.objects.filter(
             tenant=owner,
             deleted_at__isnull=True,
         ).order_by("name")
-        self.fields["scope_group"].queryset = TenantGroup._base_manager.filter(
+        self.fields["scope_group"].queryset = TenantGroup.objects.filter(
             deleted_at__isnull=True,
         ).order_by("name")
-        self.fields["assigned_tenants"].queryset = Tenant._base_manager.filter(
+        self.fields["assigned_tenants"].queryset = Tenant.objects.filter(
             managed_by=owner,
             deleted_at__isnull=True,
         ).order_by("name")
@@ -590,7 +590,7 @@ class GroupManagedRoleGrantForm(TenantScopedFormMixin, forms.Form):
                 self.add_error("scope_group", _("Pick a tenant group."))
                 return cleaned
             requested_tenant_ids = set(
-                Tenant._base_manager.filter(
+                Tenant.objects.filter(
                     managed_by=owner,
                     group_id__in=get_descendant_tenant_group_ids(scope_group.pk),
                     deleted_at__isnull=True,
@@ -700,7 +700,7 @@ class UserGroupForm(TenantScopedFormMixin, forms.ModelForm):
         widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}),
     )
     roles = forms.ModelMultipleChoiceField(
-        queryset=Role._base_manager.none(),
+        queryset=Role.objects.none(),
         required=False,
         label=_("Roles in this tenant"),
         widget=forms.SelectMultiple(attrs={"class": "form-select"}),
@@ -717,7 +717,7 @@ class UserGroupForm(TenantScopedFormMixin, forms.ModelForm):
         ),
     )
     tenant = forms.ModelChoiceField(
-        queryset=Tenant._base_manager.none(),
+        queryset=Tenant.objects.none(),
         required=True,
         label=_("Owning tenant"),
         widget=forms.Select(attrs={"class": "form-select"}),
@@ -757,7 +757,7 @@ class UserGroupForm(TenantScopedFormMixin, forms.ModelForm):
         is_superuser = bool(user is None or user.is_superuser)
         self._submitted_owner_changed = False
 
-        tenant_qs = Tenant._base_manager.filter(deleted_at__isnull=True).order_by("name")
+        tenant_qs = Tenant.objects.filter(deleted_at__isnull=True).order_by("name")
         if not is_superuser:
             manageable_ids = [
                 candidate.pk
@@ -772,7 +772,8 @@ class UserGroupForm(TenantScopedFormMixin, forms.ModelForm):
             if self.is_bound:
                 raw_owner = self.data.get("tenant")
                 self._submitted_owner_changed = raw_owner not in (None, "") and str(raw_owner) != str(owner.pk)
-            self.fields["tenant"].queryset = Tenant._base_manager.filter(pk=owner.pk)
+            # unscoped: an existing group keeps rendering its owner even if that tenant was soft-deleted
+            self.fields["tenant"].queryset = Tenant.all_objects.filter(pk=owner.pk)
             self.fields["tenant"].initial = owner.pk
             self.fields["tenant"].disabled = True
         else:
@@ -788,7 +789,7 @@ class UserGroupForm(TenantScopedFormMixin, forms.ModelForm):
 
         if owner is not None:
             self.fields["roles"].queryset = (
-                Role._base_manager.filter(
+                Role.objects.filter(
                     tenant=owner,
                     deleted_at__isnull=True,
                 )

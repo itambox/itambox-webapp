@@ -191,7 +191,7 @@ def _accessible_group_ids(user, accessible_ids=None):
         return set()
 
     own_group_ids = set(
-        Tenant._base_manager.filter(
+        Tenant.objects.filter(
             pk__in=accessible_ids,
             deleted_at__isnull=True,
         )
@@ -212,17 +212,17 @@ def workspace_choices(user):
     choices = [(WORKSPACE_AUTOMATIC, _("Automatic"))]
     accessible_ids = _accessible_tenant_ids(user)
     if accessible_ids is None:
-        tenants = Tenant._base_manager.filter(deleted_at__isnull=True).order_by("name")
-        groups = TenantGroup._base_manager.filter(deleted_at__isnull=True).order_by("name")
+        tenants = Tenant.objects.filter(deleted_at__isnull=True).order_by("name")
+        groups = TenantGroup.objects.filter(deleted_at__isnull=True).order_by("name")
     else:
         if not accessible_ids:
             return choices
-        tenants = Tenant._base_manager.filter(
+        tenants = Tenant.objects.filter(
             pk__in=accessible_ids,
             deleted_at__isnull=True,
         ).order_by("name")
         group_ids = _accessible_group_ids(user, accessible_ids)
-        groups = TenantGroup._base_manager.filter(
+        groups = TenantGroup.objects.filter(
             pk__in=group_ids,
             deleted_at__isnull=True,
         ).order_by("name")
@@ -247,7 +247,7 @@ def _resolve_tenant_workspace(object_id, accessible_ids):
 
     if accessible_ids is not None and object_id not in accessible_ids:
         return None
-    tenant = Tenant._base_manager.filter(
+    tenant = Tenant.objects.filter(
         pk=object_id,
         deleted_at__isnull=True,
     ).first()
@@ -259,7 +259,7 @@ def _resolve_group_workspace(object_id, accessible_ids):
     from organization.access import get_descendant_tenant_group_ids
     from organization.models import Tenant, TenantGroup
 
-    group = TenantGroup._base_manager.filter(
+    group = TenantGroup.objects.filter(
         pk=object_id,
         deleted_at__isnull=True,
     ).first()
@@ -270,7 +270,7 @@ def _resolve_group_workspace(object_id, accessible_ids):
 
     descendant_group_ids = get_descendant_tenant_group_ids(group.pk, live_only=True)
     group_tenant_ids = set(
-        Tenant._base_manager.filter(
+        Tenant.objects.filter(
             group_id__in=descendant_group_ids,
             deleted_at__isnull=True,
         ).values_list("pk", flat=True)
