@@ -42,7 +42,7 @@ class TenantResourceGrantForm(TenantScopedFormMixin, forms.ModelForm):
             # definition OTHER tenants, which the scoped manager (and the
             # ModelChoiceField monkey-patch) would hide.
             candidate_ids = set(
-                Tenant._base_manager.filter(
+                Tenant.objects.filter(
                     managed_by=owner_tenant,
                     deleted_at__isnull=True,
                 ).values_list("pk", flat=True)
@@ -55,13 +55,13 @@ class TenantResourceGrantForm(TenantScopedFormMixin, forms.ModelForm):
                     live_only=True,
                 )
                 candidate_ids |= set(
-                    Tenant._base_manager.filter(
+                    Tenant.objects.filter(
                         group_id__in=root_ids,
                         deleted_at__isnull=True,
                     ).values_list("pk", flat=True)
                 )
             candidate_ids.discard(owner_tenant.pk)
-            self.fields["grantee_tenant"].queryset = Tenant._base_manager.filter(
+            self.fields["grantee_tenant"].queryset = Tenant.objects.filter(
                 pk__in=candidate_ids,
                 deleted_at__isnull=True,
             ).order_by("name")

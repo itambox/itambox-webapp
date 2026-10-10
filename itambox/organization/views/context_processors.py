@@ -35,18 +35,21 @@ def _bucket_by_group(tenants):
 def _all_tenants(user):
     if not user.is_superuser:
         return []
+    # unscoped: the tenant switcher lists every tenant the principal may enter, before any tenant is active
     return Tenant._base_manager.all().order_by("name")
 
 
 def _grouped_tenants(user):
     if not user.is_superuser:
         return []
+    # unscoped: the tenant switcher lists every tenant the principal may enter, before any tenant is active
     tenants = Tenant._base_manager.all().select_related("group").order_by("group__name", "name")
     return _bucket_by_group(tenants)
 
 
 def _direct_membership_tenant_ids(user):
     """Return active direct memberships; suspended memberships cannot switch."""
+    # unscoped: the tenant switcher lists every tenant the principal may enter, before any tenant is active
     return set(
         Membership._base_manager.filter(
             user=user,
@@ -62,6 +65,7 @@ def _own_tenants(user):
     direct_ids = _direct_membership_tenant_ids(user)
     if not direct_ids:
         return []
+    # unscoped: the tenant switcher lists every tenant the principal may enter, before any tenant is active
     return list(Tenant._base_manager.filter(pk__in=direct_ids).order_by("-is_provider", "name"))
 
 
@@ -73,6 +77,7 @@ def _grouped_managed_tenants(user):
     managed_ids = all_ids - _direct_membership_tenant_ids(user)
     if not managed_ids:
         return []
+    # unscoped: the tenant switcher lists every tenant the principal may enter, before any tenant is active
     tenants = Tenant._base_manager.filter(pk__in=managed_ids).select_related("group").order_by("group__name", "name")
     return _bucket_by_group(tenants)
 

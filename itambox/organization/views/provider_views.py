@@ -27,7 +27,7 @@ def _provider_tenants_with_perm(user, perm):
     if not (user and user.is_authenticated):
         return []
     candidates = (
-        Tenant._base_manager.filter(
+        Tenant.objects.filter(
             is_provider=True,
             deleted_at__isnull=True,
             memberships__user=user,
@@ -58,7 +58,7 @@ class TechnicianQuickAddView(LoginRequiredMixin, View):
         )
         if getattr(request.user, "is_superuser", False) and not candidates:
             candidates = list(
-                Tenant._base_manager.filter(
+                Tenant.objects.filter(
                     is_provider=True,
                     deleted_at__isnull=True,
                 ).order_by("name")

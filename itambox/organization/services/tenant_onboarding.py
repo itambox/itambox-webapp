@@ -27,6 +27,8 @@ def _deny():
 
 
 def _lock_tenants(*, provider_id, tenant_id):
+    # unscoped: onboarding row locks must cover every row of the principal, including soft-deleted ones, outside
+    # any ambient tenant
     tenants = {
         tenant.pk: tenant
         for tenant in Tenant._base_manager.select_for_update().filter(pk__in=(provider_id, tenant_id)).order_by("pk")
@@ -52,15 +54,21 @@ def _lock_provider_groups(*, provider_id):
     # Canonical with users.api.scim.provider_services._sync_provider_group_members:
     # UserGroup -> Tenant -> User -> Membership -> GroupMembership -> grants.
     # Lock every provider group in PK order before requesting either Tenant lock.
+    # unscoped: onboarding row locks must cover every row of the principal, including soft-deleted ones, outside
+    # any ambient tenant
     groups = list(UserGroup._base_manager.select_for_update().filter(tenant_id=provider_id).order_by("pk"))
     return {group.pk for group in groups if group.is_active and group.deleted_at is None}
 
 
 def _lock_provider_principals(*, actor_id, provider, live_group_ids):
+    # unscoped: onboarding row locks must cover every row of the principal, including soft-deleted ones, outside
+    # any ambient tenant
     actor = User._base_manager.select_for_update().filter(pk=actor_id, is_active=True).first()
     if actor is None or not actor.is_authenticated:
         _deny()
 
+    # unscoped: onboarding row locks must cover every row of the principal, including soft-deleted ones, outside
+    # any ambient tenant
     membership = (
         Membership._base_manager.select_for_update()
         .filter(user_id=actor.pk, tenant_id=provider.pk, is_active=True)
@@ -72,6 +80,8 @@ def _lock_provider_principals(*, actor_id, provider, live_group_ids):
 
     # This query deliberately runs after the provider group locks. If SCIM held
     # a group lock first, its committed insert/delete must be visible here.
+    # unscoped: onboarding row locks must cover every row of the principal, including soft-deleted ones, outside
+    # any ambient tenant
     group_memberships = list(
         GroupMembership._base_manager.select_for_update()
         .filter(membership_id=membership.pk, user_group_id__in=live_group_ids)
@@ -85,13 +95,21 @@ def _lock_principal_grants(*, membership, group_ids):
     principal = Q(membership_id=membership.pk)
     if group_ids:
         principal |= Q(user_group_id__in=group_ids)
+    # unscoped: onboarding row locks must cover every row of the principal, including soft-deleted ones, outside
+    # any ambient tenant
     locked_grants = list(RoleGrant._base_manager.select_for_update().filter(principal).order_by("pk"))
 
     role_ids = {grant.role_id for grant in locked_grants}
+    # unscoped: onboarding row locks must cover every row of the principal, including soft-deleted ones, outside
+    # any ambient tenant
     list(Role._base_manager.select_for_update().filter(pk__in=role_ids).order_by("pk"))
     grant_ids = {grant.pk for grant in locked_grants}
+    # unscoped: onboarding row locks must cover every row of the principal, including soft-deleted ones, outside
+    # any ambient tenant
     list(RoleGrantScope._base_manager.select_for_update().filter(role_grant_id__in=grant_ids).order_by("pk"))
 
+    # unscoped: onboarding row locks must cover every row of the principal, including soft-deleted ones, outside
+    # any ambient tenant
     return list(
         RoleGrant._base_manager.filter(pk__in=grant_ids)
         .select_related("membership__tenant", "user_group__tenant", "role__tenant")
