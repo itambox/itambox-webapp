@@ -3,7 +3,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from assets.models import Asset, AssetRole, AssetType, Manufacturer
+from assets.models import Asset, AssetRole, Manufacturer
 from core.models import Notification
 from core.tasks.context import TaskContext
 from extras.models import Bookmark, JournalEntry

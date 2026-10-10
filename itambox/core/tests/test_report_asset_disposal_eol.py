@@ -7,7 +7,6 @@ Covers:
 - Tenant isolation: a second tenant's disposal is excluded.
 """
 
-import pytest
 from django.test import TestCase
 from model_bakery import baker
 

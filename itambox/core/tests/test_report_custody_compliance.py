@@ -1,6 +1,5 @@
 """Tests for the Custody & EULA Sign-off Compliance report type."""
 
-import pytest
 from django.test import TestCase
 from model_bakery import baker
 

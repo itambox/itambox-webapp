@@ -21,10 +21,10 @@ class CoreConfig(AppConfig):
         from django.contrib import admin
         from django_q.models import Failure, Success
 
-        import core.signals  # noqa: F401
+        import core.signals  # noqa: F401 -- registers core signal receivers
 
         # inline import: app-registry: register the production configuration checks after app loading
-        from core import checks  # noqa: F401
+        from core import checks  # noqa: F401 -- registers Django system checks
 
         # inline import: app-registry: avoid AppRegistryNotReady at app-load time
         from core.django_q_task_resubmission import GuardedFailAdmin, GuardedTaskAdmin

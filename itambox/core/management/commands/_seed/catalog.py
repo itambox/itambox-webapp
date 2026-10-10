@@ -416,8 +416,9 @@ class SeedCatalogMixin:
     """Mixin for Command(BaseCommand).  Reads/writes self._ registries."""
 
     def _seed_catalog(self):
+        # inline imports: app-registry: Resolve seed models only after Django has populated the app registry.
         from assets.models import AssetRole, AssetType, Category, Depreciation, Manufacturer, StatusLabel, Supplier
-        from inventory.models import Accessory, Component, Consumable
+        from inventory.models import Component
         from software.models import Software
 
         self.stdout.write("--- Catalog: reference data ---")

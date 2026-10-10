@@ -259,11 +259,10 @@ class SeedFinanceMixin:
     # ──────────────────────────────────────────────────────────────────────────
 
     def _seed_contracts_and_costing(self):
+        # inline import: app-registry: Resolve procurement models only after Django has populated the app registry.
         from procurement.models import (
             Contract,
-            ContractBillingCycleChoices,
             ContractStatusChoices,
-            ContractTypeChoices,
         )
 
         engine = self._get_engine()

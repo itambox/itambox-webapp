@@ -12,9 +12,7 @@ import datetime
 
 from django.test import TestCase
 from django.utils import timezone
-from model_bakery import baker
 
-from assets.models import Asset, StatusLabel
 from assets.models.catalog import Supplier
 from core.tests.mixins import TenantTestMixin, compile_report_with_system_authorization
 from extras.models import ReportTemplate
