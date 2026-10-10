@@ -815,6 +815,8 @@ class AssetForm(TenantScopedFormMixin, CrispyFormMixin, forms.ModelForm):
         # mutated in-memory value; only save_m2m may execute the switch.
         previous_type_id = None
         if not commit and self.instance.pk:
+            # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or
+            # ambient scope
             previous_type_id = Asset._base_manager.values_list("asset_type_id", flat=True).get(pk=self.instance.pk)
         instance = forms.ModelForm.save(self, commit=False)
         self._native_save_m2m = getattr(self, "save_m2m", None)
@@ -832,12 +834,16 @@ class AssetForm(TenantScopedFormMixin, CrispyFormMixin, forms.ModelForm):
         actor = actor_context_for_user(getattr(self.request, "user", None))
         with transaction.atomic():
             if instance.pk:
+                # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or
+                # ambient scope
                 current = Asset._base_manager.get(pk=instance.pk)
                 self._apply_specification_command(current, actor)
                 current = self._persist_native_update(instance)
             else:
                 current = self._persist_native_create(instance)
                 self._apply_specification_command(current, actor)
+            # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or
+            # ambient scope
             self.instance = Asset._base_manager.get(pk=current.pk)
             if self._native_save_m2m is not None:
                 self._native_save_m2m()
@@ -860,6 +866,7 @@ class AssetForm(TenantScopedFormMixin, CrispyFormMixin, forms.ModelForm):
         )
 
     def _persist_native_update(self, instance):
+        # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or ambient scope
         current = Asset._base_manager.get(pk=instance.pk)
         field_names = self._native_field_names()
         for field_name in field_names:
@@ -910,7 +917,11 @@ class AssetForm(TenantScopedFormMixin, CrispyFormMixin, forms.ModelForm):
                 self._native_save_m2m()
             if not self.instance.pk:
                 return
+            # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or
+            # ambient scope
             current = Asset._base_manager.get(pk=self.instance.pk)
             actor = actor_context_for_user(getattr(self.request, "user", None))
             self._apply_specification_command(current, actor)
+            # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or
+            # ambient scope
             self.instance = Asset._base_manager.get(pk=current.pk)

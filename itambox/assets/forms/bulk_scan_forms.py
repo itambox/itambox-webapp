@@ -24,8 +24,8 @@ def bulk_tenant_queryset(request):
     """Return active tenants the request user may explicitly target."""
     user = getattr(request, "user", None)
     if user is None or not user.is_authenticated:
-        return Tenant._base_manager.none()
-    return Tenant._base_manager.filter(
+        return Tenant.objects.none()
+    return Tenant.objects.filter(
         pk__in=accessible_tenant_ids(user),
         deleted_at__isnull=True,
     ).order_by("name")
@@ -67,7 +67,7 @@ class BulkTenantSelectionMixin:
         self.request = request
         super().__init__(*args, **kwargs)
         self.fields["tenant"] = forms.ModelChoiceField(
-            queryset=Tenant._base_manager.none(),
+            queryset=Tenant.objects.none(),
             required=False,
             widget=forms.Select(attrs={"class": "form-select", "data-tom-select": ""}),
             label=_("Target tenant"),
@@ -79,7 +79,7 @@ class BulkTenantSelectionMixin:
         self.fields["tenant"].queryset = (
             bulk_tenant_queryset(request)
             if all_accessible
-            else (Tenant._base_manager.filter(pk=current_tenant.pk) if current_tenant else Tenant._base_manager.none())
+            else (Tenant.objects.filter(pk=current_tenant.pk) if current_tenant else Tenant.objects.none())
         )
         self.fields["tenant"].required = all_accessible
         if not all_accessible:

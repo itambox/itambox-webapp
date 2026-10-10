@@ -34,6 +34,8 @@ class AssetDisposalListView(ObjectListView):
 
     # The history includes tombstones (soft-deleted, uncancelled records are
     # still active evidence), resolved through the tenant-safe manager that includes them.
+    # unscoped: disposal and reservation evidence includes cancelled and soft-deleted rows; asset scope narrows
+    # visibility
     queryset = AssetDisposal.all_objects.select_related("asset", "asset__asset_type__manufacturer", "cancelled_by")
     filterset = AssetDisposalFilterSet
     filterset_form = AssetDisposalFilterForm
@@ -43,6 +45,8 @@ class AssetDisposalListView(ObjectListView):
 
 class AssetDisposalDetailView(ObjectDetailView):
     # The visible "View" links of a tombstone must resolve.
+    # unscoped: disposal and reservation evidence includes cancelled and soft-deleted rows; asset scope narrows
+    # visibility
     queryset = AssetDisposal.all_objects.select_related(
         "asset", "asset__asset_type__manufacturer", "asset__tenant", "cancelled_by"
     )
@@ -123,6 +127,8 @@ class AssetDisposalCancelView(GenericTransactionView):
     # so the cancel view must resolve it through the tenant-safe manager that includes
     # them. Tenant narrowing still happens in SecuredObjectActionMixin.get_queryset
     # (a foreign record stays a 404).
+    # unscoped: disposal and reservation evidence includes cancelled and soft-deleted rows; asset scope narrows
+    # visibility
     queryset = AssetDisposal.all_objects.select_related("asset", "asset__tenant")
     model_form = AssetDisposalCancelForm
     service_callable = cancel_asset_disposal

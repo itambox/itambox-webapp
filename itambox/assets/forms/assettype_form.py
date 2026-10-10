@@ -808,6 +808,7 @@ class AssetTypeForm(TenantScopedFormMixin, CustomFieldModelFormMixin, SlugModelF
         return tuple(name for name in self.changed_data if name in concrete_names)
 
     def _persist_native_update(self, instance):
+        # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or ambient scope
         current = AssetType.all_objects.get(pk=instance.pk)
         field_names = self._native_field_names()
         for field_name in field_names:
@@ -868,6 +869,8 @@ class AssetTypeForm(TenantScopedFormMixin, CustomFieldModelFormMixin, SlugModelF
                 expected_category_default_snapshot_revision=preview.expected_category_default_snapshot_revision,
             )
             owner_id = owner_id_from_result(result)
+            # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or
+            # ambient scope
             created = AssetType.all_objects.get(pk=owner_id)
             stage_id = None  # Successful create owns the staged image lifecycle.
             return created
@@ -894,6 +897,8 @@ class AssetTypeForm(TenantScopedFormMixin, CustomFieldModelFormMixin, SlugModelF
             if not self.instance.pk:
                 return
             actor = self._actor()
+            # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or
+            # ambient scope
             current = AssetType.all_objects.get(pk=self.instance.pk)
             if self._pending_create and self._create_selection().presence == "omitted" and current.category_id:
                 plan = current_specification_plan(current, target_kind="asset_type")
@@ -917,6 +922,8 @@ class AssetTypeForm(TenantScopedFormMixin, CustomFieldModelFormMixin, SlugModelF
                 require_command_success(result)
             else:
                 self._command_update(current, actor)
+            # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or
+            # ambient scope
             self.instance = AssetType.all_objects.get(pk=self.instance.pk)
 
     def save(self, commit=True):
@@ -932,9 +939,13 @@ class AssetTypeForm(TenantScopedFormMixin, CustomFieldModelFormMixin, SlugModelF
         actor = self._actor()
         with transaction.atomic():
             if instance.pk:
+                # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or
+                # ambient scope
                 current = AssetType.all_objects.get(pk=instance.pk)
                 self._command_update(current, actor)
                 current = self._persist_native_update(instance)
+                # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or
+                # ambient scope
                 self.instance = AssetType.all_objects.get(pk=current.pk)
                 if self._native_save_m2m is not None:
                     self._native_save_m2m()

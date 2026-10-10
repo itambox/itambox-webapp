@@ -269,6 +269,8 @@ class SpecificationCommandUpdateMixin(SpecificationContractMixin):
         owner = serializer.instance
         data = serializer.validated_data
         if isinstance(owner, Asset):
+            # unscoped: post-save re-read of the row being persisted must not depend on soft-delete state or
+            # ambient scope
             current_type_id = Asset._base_manager.filter(pk=owner.pk).values_list("asset_type_id", flat=True).first()
             target_type_id = getattr(data.get("asset_type"), "pk", None)
             type_ids = tuple(sorted({value for value in (current_type_id, target_type_id) if value is not None}))

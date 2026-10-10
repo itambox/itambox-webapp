@@ -350,6 +350,7 @@ def _status_events(asset) -> list[TimelineEvent]:
 def _status_labels(label_ids: set) -> dict:
     if not label_ids:
         return {}
+    # unscoped: historical status labels resolve even after soft deletion
     return dict(StatusLabel.all_objects.filter(pk__in=label_ids).values_list("pk", "name"))
 
 

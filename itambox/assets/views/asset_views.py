@@ -304,6 +304,8 @@ class AssetDetailView(ObjectDetailView):
         # lifecycle, so the history must include tombstones through the tenant-safe
         # manager (``all_objects``) - otherwise the UI claims "no record" and offers a
         # disposal the service then rejects.
+        # unscoped: disposal and reservation evidence includes cancelled and soft-deleted rows; asset scope narrows
+        # visibility
         disposal_history = list(
             AssetDisposal.all_objects.filter(asset=asset)
             .select_related("cancelled_by")

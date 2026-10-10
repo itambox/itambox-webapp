@@ -125,7 +125,7 @@ def merge_generic_asset_data(
         raise ValidationError("A positive Asset ID is required.")
 
     with transaction.atomic():
-        asset = Asset._base_manager.select_for_update().filter(pk=asset_id, deleted_at__isnull=True).first()
+        asset = Asset.objects.select_for_update().filter(pk=asset_id, deleted_at__isnull=True).first()
         if asset is None:
             raise ValidationError("The Asset no longer exists.")
         if asset.tenant_id is None:
@@ -159,12 +159,14 @@ def authorize_generic_owner_scope(
         if not allow_global or not user.has_perm(permission):
             raise PermissionDenied("Generic owner data requires an authorized tenant or global owner.")
         return
-    tenant = Tenant._base_manager.filter(pk=tenant_id, deleted_at__isnull=True).first()
+    tenant = Tenant.objects.filter(pk=tenant_id, deleted_at__isnull=True).first()
     if tenant is None or not authorize_tenant_operation(user, tenant, permission):
         raise PermissionDenied("The actor is not authorized for this generic owner.")
 
 
 def _lock_and_authorize_generic_owner(*, owner, user: object):
+    # unscoped: command locks and re-reads the row regardless of soft-delete state; the service authorizes scope
+    # itself
     owner_query = owner.__class__._base_manager.select_for_update().filter(pk=owner.pk)
     if any(field.name == "deleted_at" for field in owner._meta.concrete_fields):
         owner_query = owner_query.filter(deleted_at__isnull=True)
@@ -218,7 +220,7 @@ def apply_asset_specification_patch(
     asset_type_id: int | None = None,
 ) -> object:
     """Apply mapped writer values through the canonical revision/auth command."""
-    asset = Asset._base_manager.filter(pk=asset_id, deleted_at__isnull=True).first()
+    asset = Asset.objects.filter(pk=asset_id, deleted_at__isnull=True).first()
     if asset is None:
         raise ValidationError("The Asset no longer exists.")
     authorization = _authorization_for_asset(user=user, tenant_id=asset.tenant_id)

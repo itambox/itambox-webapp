@@ -322,7 +322,7 @@ def _preview_type_locked(
 ) -> HistoryCleanupPreviewResult:
     owner_ref = OwnerRefDTO("asset_type", asset_type_id)
     owner = (
-        AssetType.all_objects.using(_DEFAULT_DB)
+        AssetType.objects.using(_DEFAULT_DB)
         .select_for_update()
         .filter(pk=asset_type_id, deleted_at__isnull=True)
         .first()
@@ -491,7 +491,7 @@ def _cleanup_type_locked(
 ) -> OwnerMutationResult:
     owner_ref = OwnerRefDTO("asset_type", asset_type_id)
     owner = (
-        AssetType.all_objects.using(_DEFAULT_DB)
+        AssetType.objects.using(_DEFAULT_DB)
         .select_for_update()
         .filter(pk=asset_type_id, deleted_at__isnull=True)
         .first()
@@ -544,6 +544,8 @@ def _cleanup_type_locked(
 
 
 def _preliminary_asset_type_ids(asset_id: int) -> tuple[int, ...]:
+    # unscoped: command locks and re-reads the row regardless of soft-delete state; the service authorizes scope
+    # itself
     current_type_id = (
         Asset._base_manager.using(_DEFAULT_DB).filter(pk=asset_id).values_list("asset_type_id", flat=True).first()
     )
@@ -559,9 +561,7 @@ def _preview_asset_locked(
     expected_definition_revision: str,
 ) -> HistoryCleanupPreviewResult:
     owner_ref = OwnerRefDTO("asset", asset_id)
-    owner = (
-        Asset._base_manager.using(_DEFAULT_DB).select_for_update().filter(pk=asset_id, deleted_at__isnull=True).first()
-    )
+    owner = Asset.objects.using(_DEFAULT_DB).select_for_update().filter(pk=asset_id, deleted_at__isnull=True).first()
     if owner is None:
         return unavailable()
     actor_model = _asset_actor_or_rejection(authorization, owner, owner_ref)
@@ -615,9 +615,7 @@ def _cleanup_asset_locked(
     expected_definition_revision: str,
 ) -> OwnerMutationResult:
     owner_ref = OwnerRefDTO("asset", asset_id)
-    owner = (
-        Asset._base_manager.using(_DEFAULT_DB).select_for_update().filter(pk=asset_id, deleted_at__isnull=True).first()
-    )
+    owner = Asset.objects.using(_DEFAULT_DB).select_for_update().filter(pk=asset_id, deleted_at__isnull=True).first()
     if owner is None:
         return unavailable()
     actor_model = _asset_actor_or_rejection(authorization, owner, owner_ref)

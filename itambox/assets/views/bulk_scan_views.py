@@ -61,6 +61,8 @@ def asset_action_payload(asset, mode):
     if mode == "dispose":
         # Only an ACTIVE record means disposed. An archived asset without a
         # record is archived (book-value freeze), not disposed, so it stays eligible.
+        # unscoped: disposal and reservation evidence includes cancelled and soft-deleted rows; asset scope narrows
+        # visibility
         if AssetDisposal.all_objects.filter(asset=asset, cancelled_at__isnull=True).exists():
             eligible = False
             warning = str(_("Already disposed; this asset will be skipped."))

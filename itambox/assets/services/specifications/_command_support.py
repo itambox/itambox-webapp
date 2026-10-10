@@ -385,6 +385,7 @@ def save_owner_in_savepoint(
 
 def reload_actor(actor: ActorContextDTO):
     user_model = get_user_model()
+    # unscoped: actor reload for re-authorization must not depend on the ambient tenant
     candidate = user_model._base_manager.filter(pk=actor.actor_id, is_active=True).first()
     if candidate is None:
         return None
