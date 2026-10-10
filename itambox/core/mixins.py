@@ -5,7 +5,6 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from core.choices import ObjectChangeActionChoices
-from core.serialization import serialize_object
 from core.slugs import generate_unique_slug
 from itambox.registry import registry
 
