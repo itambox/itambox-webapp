@@ -90,6 +90,7 @@ class TenantResourceGrantCreateView(ObjectEditView):
             if f"{ct.app_label}.{ct.model}" not in TenantResourceGrant.APPROVED_RESOURCE_MODELS:
                 raise Http404()
             model = ct.model_class()
+            # unscoped: grant flows read pools and run owners across tenants; authorization is checked explicitly
             stock = (
                 model._base_manager.filter(
                     pk=self.kwargs["resource_id"],
@@ -185,7 +186,7 @@ def _run_owner_ids(request):
         candidate_ids = {tenant.pk}
     elif group is not None:
         candidate_ids = set(
-            Tenant._base_manager.filter(
+            Tenant.objects.filter(
                 group_id__in=get_descendant_tenant_group_ids(group.pk, live_only=True),
                 deleted_at__isnull=True,
             ).values_list("pk", flat=True)
@@ -196,7 +197,7 @@ def _run_owner_ids(request):
         candidate_ids = set(accessible_tenant_ids(request.user))
     else:
         return set()
-    live = Tenant._base_manager.filter(pk__in=candidate_ids, deleted_at__isnull=True)
+    live = Tenant.objects.filter(pk__in=candidate_ids, deleted_at__isnull=True)
     if request.user.is_superuser:
         return set(live.values_list("pk", flat=True))
     return {item.pk for item in live if request.user.has_perm("organization.view_tenantresourcegrant", obj=item)}
@@ -256,6 +257,7 @@ class TenantResourceGrantExpiryRunDetailView(ObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        # unscoped: grant flows read pools and run owners across tenants; authorization is checked explicitly
         context["expiry_evidence"] = (
             TenantResourceGrantExpiryRevocation._base_manager.integrity_valid()
             .filter(run=self.object)

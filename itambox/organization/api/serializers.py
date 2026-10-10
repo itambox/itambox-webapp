@@ -86,6 +86,7 @@ class TenantResourceGrantAuditSerializer(BaseModelSerializer):
     def _current_evidence(self, obj):
         if obj.deleted_at is None:
             return None
+        # unscoped: audit evidence must stay readable after the grant and its evidence rows are soft-deleted
         return (
             TenantResourceGrantExpiryRevocation._base_manager.integrity_valid()
             .filter(grant_id=obj.pk, revoked_at=obj.deleted_at)
@@ -97,6 +98,7 @@ class TenantResourceGrantAuditSerializer(BaseModelSerializer):
     def _current_raw_evidence(self, obj):
         if obj.deleted_at is None:
             return None
+        # unscoped: audit evidence must stay readable after the grant and its evidence rows are soft-deleted
         return (
             TenantResourceGrantExpiryRevocation._base_manager.filter(
                 grant_id=obj.pk,
@@ -110,6 +112,7 @@ class TenantResourceGrantAuditSerializer(BaseModelSerializer):
         if obj.deleted_at is None:
             return None
         grant_type = ContentType.objects.get_for_model(TenantResourceGrant)
+        # unscoped: audit evidence must stay readable after the grant and its evidence rows are soft-deleted
         return (
             ObjectChange._base_manager.filter(
                 tenant_id=obj.tenant_id,

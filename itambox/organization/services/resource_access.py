@@ -79,7 +79,7 @@ def _resource_grant_container_ids(  # noqa: C901
     elif active_group is not None:
         group_ids = get_descendant_tenant_group_ids(active_group.pk, live_only=True)
         candidate_ids = set(
-            Tenant._base_manager.filter(
+            Tenant.objects.filter(
                 group_id__in=group_ids,
                 deleted_at__isnull=True,
             ).values_list("pk", flat=True)
@@ -95,7 +95,7 @@ def _resource_grant_container_ids(  # noqa: C901
     else:
         return set()
 
-    live_tenants = Tenant._base_manager.filter(pk__in=candidate_ids, deleted_at__isnull=True)
+    live_tenants = Tenant.objects.filter(pk__in=candidate_ids, deleted_at__isnull=True)
     if user.is_superuser:
         return set(live_tenants.values_list("pk", flat=True))
     return {tenant.pk for tenant in live_tenants if user.has_perm(perm, obj=tenant)}
@@ -118,7 +118,7 @@ def visible_to_containers(
         if not container_ids:
             return qs.none()
         group_ids = set(
-            Tenant._base_manager.filter(
+            Tenant.objects.filter(
                 pk__in=container_ids,
                 deleted_at__isnull=True,
             )
@@ -139,7 +139,7 @@ def visible_to_containers(
     candidate_ids = accessible_tenant_ids(user)
     allowed = [
         tenant.pk
-        for tenant in Tenant._base_manager.filter(
+        for tenant in Tenant.objects.filter(
             pk__in=candidate_ids,
             deleted_at__isnull=True,
         )

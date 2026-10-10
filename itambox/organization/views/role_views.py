@@ -44,6 +44,7 @@ def _roles_visible_in(tenant):
             tenant__is_provider=True,
             shared_with_managed=True,
         )
+    # unscoped: shared roles live outside the active tenant scope
     return Role._base_manager.filter(deleted_at__isnull=True).filter(q)
 
 
@@ -203,7 +204,7 @@ class RoleEditView(ObjectEditView):
             tenant_id = self.request.GET.get("tenant")
             if tenant_id:
                 try:
-                    tenant = Tenant._base_manager.filter(
+                    tenant = Tenant.objects.filter(
                         pk=tenant_id,
                         deleted_at__isnull=True,
                     ).first()
