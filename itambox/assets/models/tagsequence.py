@@ -76,9 +76,10 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
 
         # Lock the sequence row before reading: formatting the tag from an unlocked
         # read lets two concurrent saves claim the same value and collide on the
-        # asset_tag unique constraint.
+        # asset_tag unique constraint. The live-row predicate is repeated under
+        # the lock so an archive committed while this caller waited cannot allocate.
         with transaction.atomic():
-            locked = type(self)._base_manager.select_for_update().get(pk=self.pk)
+            locked = type(self)._base_manager.select_for_update().get(pk=self.pk, deleted_at__isnull=True)
             tag = f"{locked.prefix}{locked.next_value:0{locked.zero_padding}d}"
             type(self)._base_manager.filter(pk=self.pk).update(next_value=F("next_value") + 1)
         self.refresh_from_db(fields=["next_value"])
@@ -111,6 +112,7 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
                 tenant__isnull=True,
                 category__isnull=True,
                 prefix="ASSET-",
+                deleted_at__isnull=True,
                 defaults={"next_value": 1, "zero_padding": 6, "is_active": True},
             )
             return seq
@@ -124,14 +126,28 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         """Re-select the global default row the winner of the race committed."""
         for _attempt in range(5):
             try:
-                return cls._base_manager.get(tenant__isnull=True, category__isnull=True, prefix="ASSET-")
+                return cls._base_manager.get(
+                    tenant__isnull=True, category__isnull=True, prefix="ASSET-", deleted_at__isnull=True
+                )
             except cls.DoesNotExist:
                 time.sleep(0.05)
         # No row after the retry bound: surface the real DoesNotExist.
-        return cls._base_manager.get(tenant__isnull=True, category__isnull=True, prefix="ASSET-")
+        return cls._base_manager.get(
+            tenant__isnull=True, category__isnull=True, prefix="ASSET-", deleted_at__isnull=True
+        )
 
     @classmethod
     def get_next_tag_for_asset(cls, asset):
+        """Allocate from the first eligible sequence, retrying if it is archived under lock."""
+        for _attempt in range(5):
+            try:
+                return cls._allocate_next_tag_for_asset(asset)
+            except cls.DoesNotExist:
+                continue
+        raise cls.DoesNotExist("No live asset tag sequence remained available during allocation.")
+
+    @classmethod
+    def _allocate_next_tag_for_asset(cls, asset):
         """
         Resolves the next asset tag for the given asset based on a hierarchical fallback chain:
         1. Tenant-specific + Category-specific sequence
@@ -141,19 +157,25 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         """
         # 1. Tenant + Category specific
         if asset.tenant_id and asset.category:
-            seq = cls._base_manager.filter(tenant_id=asset.tenant_id, category=asset.category, is_active=True).first()
+            seq = cls._base_manager.filter(
+                tenant_id=asset.tenant_id, category=asset.category, is_active=True, deleted_at__isnull=True
+            ).first()
             if seq:
                 return seq.next_tag()
 
         # 2. Tenant default (no category)
         if asset.tenant_id:
-            seq = cls._base_manager.filter(tenant_id=asset.tenant_id, category__isnull=True, is_active=True).first()
+            seq = cls._base_manager.filter(
+                tenant_id=asset.tenant_id, category__isnull=True, is_active=True, deleted_at__isnull=True
+            ).first()
             if seq:
                 return seq.next_tag()
 
         # 3. Global + Category specific
         if asset.category:
-            seq = cls._base_manager.filter(tenant__isnull=True, category=asset.category, is_active=True).first()
+            seq = cls._base_manager.filter(
+                tenant__isnull=True, category=asset.category, is_active=True, deleted_at__isnull=True
+            ).first()
             if seq:
                 return seq.next_tag()
 
@@ -168,19 +190,25 @@ class AssetTagSequence(ChangeLoggingMixin, BaseModel, SoftDeleteMixin):
         """
         # 1. Tenant + Category specific
         if asset.tenant_id and asset.category:
-            seq = cls._base_manager.filter(tenant_id=asset.tenant_id, category=asset.category, is_active=True).first()
+            seq = cls._base_manager.filter(
+                tenant_id=asset.tenant_id, category=asset.category, is_active=True, deleted_at__isnull=True
+            ).first()
             if seq:
                 return seq
 
         # 2. Tenant default (no category)
         if asset.tenant_id:
-            seq = cls._base_manager.filter(tenant_id=asset.tenant_id, category__isnull=True, is_active=True).first()
+            seq = cls._base_manager.filter(
+                tenant_id=asset.tenant_id, category__isnull=True, is_active=True, deleted_at__isnull=True
+            ).first()
             if seq:
                 return seq
 
         # 3. Global + Category specific
         if asset.category:
-            seq = cls._base_manager.filter(tenant__isnull=True, category=asset.category, is_active=True).first()
+            seq = cls._base_manager.filter(
+                tenant__isnull=True, category=asset.category, is_active=True, deleted_at__isnull=True
+            ).first()
             if seq:
                 return seq
 
