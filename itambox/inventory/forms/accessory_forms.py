@@ -167,7 +167,7 @@ class AccessoryCheckoutForm(BaseCheckoutForm):
         source_location = cleaned_data.get("from_location")
         if self.accessory and qty and source_location:
             stock_qty = (
-                AccessoryStock._base_manager.filter(
+                AccessoryStock.objects.filter(
                     accessory=self.accessory,
                     location=source_location,
                 )
