@@ -48,7 +48,7 @@ from core.tenant_scope import (
     resolve_default_workspace,
 )
 
-from .ratelimit import RateLimitMiddleware
+from .ratelimit import RateLimitMiddleware  # noqa: F401 -- Django resolves this dotted path at runtime
 
 
 class CurrentUserMiddleware:

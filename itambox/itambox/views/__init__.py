@@ -18,3 +18,19 @@ from .features import (
 )
 from .utility import SearchView, health
 # isort: on
+
+__all__ = [
+    "BaseHTMXView",
+    "ObjectBulkDeleteView",
+    "ObjectBulkEditView",
+    "ObjectChangeListView",
+    "ObjectChangeView",
+    "ObjectCloneView",
+    "ObjectDeleteView",
+    "ObjectDetailView",
+    "ObjectEditView",
+    "ObjectImportView",
+    "ObjectListView",
+    "SearchView",
+    "health",
+]

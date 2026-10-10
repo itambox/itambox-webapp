@@ -2,7 +2,7 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 
 from core.forms import TenantScopedFormMixin
-from extras.dashboard.widgets import WidgetConfigForm, get_registered_widgets, get_widget
+from extras.dashboard.widgets import get_registered_widgets, get_widget
 
 
 class DashboardWidgetAddForm(TenantScopedFormMixin, forms.Form):

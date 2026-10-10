@@ -7,10 +7,7 @@ from uuid import UUID
 from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.core.paginator import Paginator
 from django.db.models import Model
-from django.forms.models import model_to_dict
-from django.shortcuts import reverse
 from django.utils.module_loading import import_string
 
 from itambox.constants import DEFAULT_PAGINATE_COUNT, PAGINATE_COUNT_CHOICES

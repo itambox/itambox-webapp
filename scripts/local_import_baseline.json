@@ -1205,12 +1205,6 @@
     },
     {
       "path": "itambox/extras/dashboard/widgets.py",
-      "context": "ClassDef:ChangelogWidget/FunctionDef:get_context",
-      "statement": "from django.contrib.contenttypes.models import ContentType",
-      "count": 1
-    },
-    {
-      "path": "itambox/extras/dashboard/widgets.py",
       "context": "ClassDef:EOLAlertsWidget/FunctionDef:get_context",
       "statement": "from assets.models import AssetType",
       "count": 1

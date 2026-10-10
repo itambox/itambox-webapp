@@ -15,7 +15,7 @@ from django.views.generic import TemplateView
 import extras.dashboard.widgets as dashboard_widgets
 from extras.dashboard.forms import DashboardWidgetAddForm, DashboardWidgetConfigForm
 from extras.dashboard.utils import get_dashboard, get_default_dashboard
-from extras.dashboard.widgets import get_registered_widgets, get_widget
+from extras.dashboard.widgets import get_widget
 from extras.models import Dashboard
 from itambox.views.htmx import BaseHTMXView
 from organization.access import accessible_tenant_ids
