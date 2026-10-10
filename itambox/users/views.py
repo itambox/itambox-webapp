@@ -697,7 +697,7 @@ class UserDeleteView(ObjectDeleteView):
 def _group_admin_tenant_ids(user, perms):
     """Ids of the user's accessible tenants where they hold ANY of ``perms``.
 
-    _base_manager: gate evaluation is cross-tenant machinery — the tenant-scoped
+    The default manager: gate evaluation is cross-tenant machinery — the tenant-scoped
     default Tenant manager silently returns nothing outside a matching tenant context.
     """
     ids = accessible_tenant_ids(user)
@@ -705,7 +705,7 @@ def _group_admin_tenant_ids(user, perms):
         return []
     return [
         tenant.pk
-        for tenant in Tenant._base_manager.filter(pk__in=ids, deleted_at__isnull=True)
+        for tenant in Tenant.objects.filter(pk__in=ids, deleted_at__isnull=True)
         if any(user.has_perm(perm, obj=tenant) for perm in perms)
     ]
 
