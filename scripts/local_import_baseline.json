@@ -1073,12 +1073,6 @@
     },
     {
       "path": "itambox/core/views/graphql.py",
-      "context": "ClassDef:PrivateGraphQLView/FunctionDef:dispatch",
-      "statement": "from rest_framework.throttling import AnonRateThrottle, UserRateThrottle",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/views/graphql.py",
       "context": "FunctionDef:query_complexity_validator",
       "statement": "from graphql import visit",
       "count": 1
