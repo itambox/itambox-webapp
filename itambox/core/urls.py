@@ -27,7 +27,6 @@ from django.views.decorators.cache import never_cache
 from django.views.generic import RedirectView, TemplateView
 from django.views.i18n import JavaScriptCatalog
 
-from assets import views as asset_views  # Import the assets views
 from assets.views_scan import ScanResolveView
 from core.auth.oidc import TenantOIDCAuthorizeView, TenantOIDCCallbackView
 from core.schema import schema

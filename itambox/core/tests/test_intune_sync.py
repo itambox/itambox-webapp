@@ -12,7 +12,6 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.test import TransactionTestCase, override_settings
-from django.utils import timezone
 
 from assets.models import Asset, AssetType, Manufacturer, StatusLabel
 from core.models import Job

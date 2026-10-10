@@ -97,7 +97,8 @@ class SeedOperationsMixin:
         return next(iter(without_device or holders), None)
 
     def _seed_operations(self):
-        from assets.models import Asset, AssetRequest, AssetType
+        # inline imports: app-registry: Resolve seed models only after Django has populated the app registry.
+        from assets.models import Asset, AssetRequest
         from compliance.models import AssetAudit, AuditSession
         from extras.models import (
             AlertLog,

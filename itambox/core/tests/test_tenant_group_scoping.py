@@ -20,7 +20,7 @@ from django.test import TestCase
 from core.managers import Scope, set_current_tenant, set_current_tenant_group
 from core.tests.mixins import grant
 from itambox.middleware import _current_user
-from organization.models import Membership, Role, Tenant, TenantGroup
+from organization.models import Role, Tenant, TenantGroup
 
 User = get_user_model()
 

@@ -5,11 +5,8 @@
 # itambox/templatetags/utility_tags.py
 import json
 from decimal import Decimal, InvalidOperation
-from urllib.parse import urlencode
 
 from django import template
-from django.contrib.auth import get_user_model  # Import get_user_model
-from django.contrib.messages import constants as messages
 from django.utils.translation import gettext_lazy as _  # Import gettext_lazy
 
 from core.html_styles import color_chip_class, length_class, percentage_class, status_tint_class

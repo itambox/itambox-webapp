@@ -2,21 +2,18 @@
 #
 # Framework-level form mixins and base classes.
 # No dependency on extras (or any other domain app).
-import json
 import re
 
 import django_filters
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import HTML, Column, Div, Field, Fieldset, Layout, Row, Submit
+from crispy_forms.layout import HTML, Submit
 from django import forms
 from django.apps import apps
-from django.contrib.contenttypes.models import ContentType
 from django.urls import NoReverseMatch, reverse
 from django.utils.translation import gettext_lazy as _
 
 from core.forms.base import TenantScopedFormMixin, apply_tom_select
 from core.search import SEARCH_INDEXES
-from itambox.middleware import get_current_user
 from itambox.utils import get_model_viewname
 
 OBJ_TYPE_CHOICES = [

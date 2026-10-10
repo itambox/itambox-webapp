@@ -16,8 +16,6 @@ Wire-up (in seed_data.py):
 import datetime
 import random
 
-from django.utils import timezone
-
 
 class SeedLifecycleMixin:
     """Mixin for Command(BaseCommand).  Reads/writes self._ registries."""

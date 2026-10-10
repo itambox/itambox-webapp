@@ -690,12 +690,6 @@
     {
       "path": "itambox/core/management/commands/_seed/catalog.py",
       "context": "ClassDef:SeedCatalogMixin/FunctionDef:_seed_catalog",
-      "statement": "from assets.models import AssetRole, AssetType, Category, Depreciation, Manufacturer, StatusLabel, Supplier",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/catalog.py",
-      "context": "ClassDef:SeedCatalogMixin/FunctionDef:_seed_catalog",
       "statement": "from assets.models import AssetType as AssetTypeModel",
       "count": 1
     },
@@ -714,19 +708,7 @@
     {
       "path": "itambox/core/management/commands/_seed/catalog.py",
       "context": "ClassDef:SeedCatalogMixin/FunctionDef:_seed_catalog",
-      "statement": "from inventory.models import Accessory, Component, Consumable",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/catalog.py",
-      "context": "ClassDef:SeedCatalogMixin/FunctionDef:_seed_catalog",
       "statement": "from organization.models import Contact, ContactAssignment, ContactRole",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/catalog.py",
-      "context": "ClassDef:SeedCatalogMixin/FunctionDef:_seed_catalog",
-      "statement": "from software.models import Software",
       "count": 1
     },
     {
@@ -745,12 +727,6 @@
       "path": "itambox/core/management/commands/_seed/finance.py",
       "context": "ClassDef:SeedFinanceMixin/FunctionDef:_get_engine",
       "statement": "from core.management.commands._seed.engine import ChangeLogEngine",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/finance.py",
-      "context": "ClassDef:SeedFinanceMixin/FunctionDef:_seed_contracts_and_costing",
-      "statement": "from procurement.models import Contract, ContractBillingCycleChoices, ContractStatusChoices, ContractTypeChoices",
       "count": 1
     },
     {
@@ -787,30 +763,6 @@
       "path": "itambox/core/management/commands/_seed/lifecycle.py",
       "context": "ClassDef:SeedLifecycleMixin/FunctionDef:_seed_lifecycle",
       "statement": "from assets.models import AssetDisposal, AssetReservation, DataSanitizationMethodChoices, DisposalMethodChoices, ReservationStatusChoices, Warranty, WarrantyTypeChoices",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/operations.py",
-      "context": "ClassDef:SeedOperationsMixin/FunctionDef:_seed_operations",
-      "statement": "from assets.models import Asset, AssetRequest, AssetType",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/operations.py",
-      "context": "ClassDef:SeedOperationsMixin/FunctionDef:_seed_operations",
-      "statement": "from compliance.models import AssetAudit, AuditSession",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/operations.py",
-      "context": "ClassDef:SeedOperationsMixin/FunctionDef:_seed_operations",
-      "statement": "from extras.models import AlertLog, AlertRule, Dashboard, EventRule, JournalEntry, LabelTemplate, NotificationChannel, ReportTemplate, ScheduledReport, WebhookEndpoint",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/_seed/operations.py",
-      "context": "ClassDef:SeedOperationsMixin/FunctionDef:_seed_operations",
-      "statement": "from licenses.models import License",
       "count": 1
     },
     {
@@ -865,12 +817,6 @@
       "path": "itambox/core/management/commands/import_snipeit.py",
       "context": "ClassDef:Command/FunctionDef:handle",
       "statement": "from core.tasks.context import TaskContext",
-      "count": 1
-    },
-    {
-      "path": "itambox/core/management/commands/import_snipeit.py",
-      "context": "ClassDef:Command/FunctionDef:handle",
-      "statement": "from django.contrib.contenttypes.models import ContentType",
       "count": 1
     },
     {

@@ -1,8 +1,7 @@
 import logging
 
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import PermissionDenied
 from django.db.models import Q
-from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
 from core.slugs import generate_unique_slug
