@@ -4,7 +4,11 @@
   "changed_tests": [
     "itambox/assets/tests/test_asset_archive.py",
     "itambox/compliance/tests/test_audit_basket.py",
+    "itambox/core/tests/test_archive_handlers.py",
+    "itambox/core/tests/test_context_isolation.py",
     "itambox/core/tests/test_htmx.py",
+    "itambox/core/tests/test_import_boundaries.py",
+    "itambox/core/tests/test_tenant_owned_deletion.py",
     "itambox/core/tests/test_intune_sync.py",
     "itambox/core/tests/test_label_print_perms.py",
     "itambox/core/tests/test_migration_baseline_preflight.py",
