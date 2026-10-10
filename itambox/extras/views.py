@@ -1075,6 +1075,7 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
             return []
         # Live tenants only: generation resolves the same way, so a
         # soft-deleted scope tenant must not read as approvable here.
+        # unscoped: the stored scope tenant ids resolve to live tenants irrespective of the viewer's active scope
         return list(Tenant._base_manager.filter(pk__in=scope_tenant_ids, deleted_at__isnull=True).order_by("name"))
 
     def _principal_covers_scope(self, principal, scope_tenants):
@@ -1126,6 +1127,7 @@ class ScheduledReportScopeApprovalView(CapabilityRequiredMixin, PermissionRequir
         if authorization is None or not authorization.scope_tenant_ids:
             return []
         Tenant = apps.get_model("organization", "Tenant")
+        # unscoped: stored approval scope is displayed as persisted, irrespective of the viewer's active scope
         tenants = Tenant._base_manager.filter(pk__in=authorization.scope_tenant_ids).order_by("name")
         by_pk = {tenant.pk: tenant.name for tenant in tenants}
         return [by_pk.get(pk, f"#{pk}") for pk in authorization.scope_tenant_ids]
@@ -1632,6 +1634,7 @@ class ReportTemplateDownloadView(CapabilityRequiredMixin, PermissionRequiredMixi
         from django.apps import apps as django_apps
 
         Tenant = django_apps.get_model("organization", "Tenant")
+        # unscoped: persisted report scope is compiled as stored; authorization is checked by the caller
         filter_tenants = list(Tenant._base_manager.filter(pk__in=pinned_ids, deleted_at__isnull=True).order_by("pk"))
         if len(filter_tenants) != len(set(pinned_ids)):
             logger.error(

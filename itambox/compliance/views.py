@@ -258,6 +258,7 @@ def _resolve_custody_signing_session(request, receipt):
         return None, None
     if CUSTODY_SIGNING_SESSION_TOKEN_PATTERN.fullmatch(session_token) is None:
         return None, _custody_signing_session_error_response(request, gone=False)
+    # unscoped: public signing token resolves the session without a logged-in tenant scope
     signing_session = (
         CustodySigningSession._base_manager.select_related("intended_holder", "intended_holder__user")
         .filter(token=session_token, receipt_id=receipt.pk)
@@ -280,6 +281,7 @@ def _resolve_custody_signing_context(request, receipt):
 def _lock_custody_signing_session(request, receipt, signing_session):
     if signing_session is None:
         return None, None
+    # unscoped: public signing session lock by pk; token possession is the authorization
     signing_session = (
         CustodySigningSession._base_manager.select_for_update()
         .filter(pk=signing_session.pk, receipt_id=receipt.pk)

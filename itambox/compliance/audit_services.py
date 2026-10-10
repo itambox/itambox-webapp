@@ -87,6 +87,7 @@ class ReconciliationReportV2(TypedDict):
 def _lock_audit_session(session: AuditSession) -> AuditSession:
     """Resolve and lock the current session before any other domain row."""
     try:
+        # unscoped: audit session lock by pk; the service authorizes the actor against the session tenant
         locked = (
             AuditSession._base_manager.select_related("location").select_for_update(of=("self",)).get(pk=session.pk)
         )
@@ -139,6 +140,7 @@ def _authorize_system_session(
     current_tenant = get_current_tenant()
     if session.tenant_id is None or current_tenant is None or current_tenant.pk != session.tenant_id:
         raise PermissionDenied("System authorization must match the active session tenant.")
+    # unscoped: system-run session check reads the tenant row directly; no actor scope exists
     if not Tenant._base_manager.filter(pk=session.tenant_id, deleted_at__isnull=True).exists():
         raise PermissionDenied("System authorization requires a live session tenant.")
     if not system_authorization.is_valid_for(
@@ -175,6 +177,7 @@ def _authorize_session(
 
 
 def _expected_assets_for_tenants(session: AuditSession, tenant_ids: frozenset[int]) -> QuerySet[Asset]:
+    # unscoped: expected-asset set is bounded by the explicit authorized tenant ids passed in
     queryset = Asset._base_manager.filter(
         deleted_at__isnull=True,
         tenant_id__in=tenant_ids,
@@ -231,6 +234,7 @@ def _classify_authorized(session: AuditSession, tenant_ids: frozenset[int]) -> A
             mismatched.append(audit)
 
     missing_ids = expected_ids - scanned_ids
+    # unscoped: classification is bounded by the explicit authorized tenant ids passed in
     missing = Asset._base_manager.filter(
         deleted_at__isnull=True,
         tenant_id__in=tenant_ids,
@@ -312,6 +316,7 @@ def authorized_scan_assets_queryset(session: AuditSession, *, user: User) -> Que
         permission=SCAN_PERMISSION,
         operation=SCAN_OPERATION,
     )
+    # unscoped: queryset is narrowed by the explicit authorized tenant ids passed in
     return Asset._base_manager.filter(
         deleted_at__isnull=True,
         tenant_id__in=tenant_ids,
@@ -354,6 +359,7 @@ def _lock_and_validate_scan_asset(
     status: StatusLabel | None,
 ) -> tuple[Asset, Location, StatusLabel]:
     try:
+        # unscoped: scan asset lock by pk; tenant and soft-delete validated explicitly right after
         asset = (
             Asset._base_manager.select_for_update(of=("self",))
             .select_related("status")
@@ -625,6 +631,7 @@ def _read_v1_report(stored_rows: list[Any], tenant_ids: frozenset[int]) -> list[
         for row in stored_rows
         if isinstance(row, dict) and type(row.get("asset_id")) is int and row["asset_id"] > 0
     }
+    # unscoped: v1 report replays the frozen session population irrespective of current scope
     assets = {
         asset.pk: asset
         for asset in Asset._base_manager.filter(
@@ -725,6 +732,7 @@ def preview_missing_assets(
 
 
 def _all_expected_assets(session: AuditSession) -> QuerySet[Asset]:
+    # unscoped: frozen session population is read for system-level close, bounded by session tenants
     queryset = Asset._base_manager.filter(
         deleted_at__isnull=True,
         tenant_id__isnull=False,
@@ -750,6 +758,7 @@ def _lock_close_assets(session: AuditSession) -> list[Asset]:
     )
     expected_ids = expected_queryset.values_list("pk", flat=True)
     observed_ids = AssetAudit.objects.filter(session=session, asset_id__isnull=False).values_list("asset_id", flat=True)
+    # unscoped: close locks the frozen session population by pk; session authorization precedes it
     return list(
         Asset._base_manager.select_for_update(of=("self",))
         .filter(
@@ -882,6 +891,7 @@ def _frozen_rehome_location(
     location_id = report["rehome_location_id"]
     if type(location_id) is not int or location_id <= 0:
         raise ValidationError(_("The selected target location is no longer available."))
+    # unscoped: frozen rehome target is locked by pk and validated against the session tenant
     location = (
         Location._base_manager.select_for_update(of=("self",))
         .filter(
@@ -901,6 +911,7 @@ def _frozen_rehome_location(
 
 
 def _canonical_missing_status(*, lock: bool = False) -> StatusLabel:
+    # unscoped: global StatusLabel reference data has no tenant; soft-delete filtered explicitly
     queryset = StatusLabel._base_manager.filter(slug="missing", deleted_at__isnull=True)
     if lock:
         queryset = queryset.select_for_update(of=("self",))
@@ -976,6 +987,7 @@ def rehome_audit_session_mismatches(
     report = _read_report_for_tenants(session, tenant_ids)
     mismatch_rows = [row for row in report["rows"] if row["category"] == "mismatched"]
     mismatch_ids = [row["asset_id"] for row in mismatch_rows]
+    # unscoped: rehome locks the frozen session population; session authorization precedes it
     assets = {
         asset.pk: asset
         for asset in Asset._base_manager.select_for_update()
@@ -1030,6 +1042,7 @@ def flag_missing_assets(
     if not missing_rows:
         return {"flagged": 0, "skipped": 0}
 
+    # unscoped: missing-flag locks the frozen session population; session authorization precedes it
     assets = {
         asset.pk: asset
         for asset in Asset._base_manager.select_for_update(of=("self",))

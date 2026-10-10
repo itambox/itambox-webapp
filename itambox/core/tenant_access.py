@@ -54,6 +54,7 @@ class TenantAccessPolicy(Protocol):
         pass
 
 
+# provider-slot: process-wide single-provider seam slot; the provider registers explicitly at startup
 _tenant_access_policy = SingleProviderSlot[TenantAccessPolicy]("tenant access policy")
 
 
