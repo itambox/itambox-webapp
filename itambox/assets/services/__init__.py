@@ -437,6 +437,7 @@ def _lock_repair_maintenance(maintenance: "AssetMaintenance") -> "AssetMaintenan
     completing the repair all take this lock first and re-read their eligibility
     after acquiring it.
     """
+    # unscoped: repair flow locks the maintenance row by pk; re-reads eligibility under the lock
     return AssetMaintenance._base_manager.select_for_update().get(pk=maintenance.pk)
 
 
