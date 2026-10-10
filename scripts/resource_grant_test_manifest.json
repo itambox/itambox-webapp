@@ -4,6 +4,7 @@
   "changed_tests": [
     "itambox/assets/tests/test_asset_archive.py",
     "itambox/assets/tests/test_specification_native_reference_races.py",
+    "itambox/assets/tests/test_depreciation.py",
     "itambox/assets/tests/test_tag_sequence_concurrency.py",
     "itambox/assets/tests/test_tag_sequence_soft_delete.py",
     "itambox/compliance/tests/test_audit_basket.py",
@@ -26,6 +27,7 @@
     "itambox/core/tests/test_report_hardware_inventory.py",
     "itambox/core/tests/test_report_warranty_expiration.py",
     "itambox/core/tests/test_security_finish.py",
+    "itambox/core/tests/test_task_error_contracts.py",
     "itambox/core/tests/test_tasks.py",
     "itambox/core/tests/test_tenant_field_scoping.py",
     "itambox/core/tests/test_tenant_group_scoping.py",
