@@ -20,8 +20,7 @@ from django.utils.html import escape
 from django.utils.http import urlencode
 from django.utils.translation import gettext, ngettext
 from django.utils.translation import gettext_lazy as _
-from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView, View
-from django_tables2 import RequestConfig
+from django.views.generic import View
 
 from assets.services.specification_consumers.contracts import FieldReference, parse_filter_document
 from assets.services.specification_consumers.exporting import machine_csv_bytes
@@ -36,7 +35,7 @@ from core.schedules import (
 )
 from extras.tasks.reports import delivery_ledger_message, generate_scheduled_report_task, retry_failed_deliveries
 from itambox.panels import Panel
-from itambox.utils import get_model_viewname, get_paginate_count  # Import the utility function
+from itambox.utils import get_model_viewname  # Import the utility function
 from itambox.views.generic import (
     ObjectBulkDeleteView,
     ObjectBulkEditView,
@@ -48,7 +47,6 @@ from itambox.views.generic import (
 from itambox.views.generic.mixins import CapabilityRequiredMixin, is_managed_definition
 from itambox.views.generic.service_views import SimplePostView
 from itambox.views.generic.utils import safe_return_url
-from users.models import UserPreference  # Import UserPreference
 
 from .filters import (
     AlertLogFilterSet,

@@ -10,7 +10,6 @@ from rest_framework import serializers
 from rest_framework.utils.serializer_helpers import BindingDict
 
 from core.managers import Scope
-from itambox.api.exceptions import SerializerNotFound
 from itambox.api.related import get_related_object_by_attrs
 
 

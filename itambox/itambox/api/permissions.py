@@ -1,5 +1,5 @@
 from django.conf import settings
-from rest_framework.permissions import SAFE_METHODS, BasePermission, DjangoObjectPermissions
+from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 from core.tenant_access import accessible_tenant_ids, shared_stock_read_allowed
 

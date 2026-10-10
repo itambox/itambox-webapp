@@ -1,8 +1,5 @@
-from datetime import date, timedelta
-
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
-from django.core.exceptions import PermissionDenied
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
@@ -21,9 +18,8 @@ from core.managers import (
 from core.tenant_access import accessible_tenant_ids
 from core.tests.mixins import grant
 from extras.dashboard.utils import get_dashboard, get_default_dashboard
-from extras.dashboard.widgets import FinancialWidget, LowStockWidget, StatusLabelsWidget
 from extras.models import Dashboard
-from extras.templatetags.dashboard import get_widget_footer_links, render_widget
+from extras.templatetags.dashboard import render_widget
 from itambox.middleware import set_current_user
 from organization.models import AssetHolder, Membership, Role, Tenant
 

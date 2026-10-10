@@ -1,4 +1,3 @@
-from extras.dashboard.widgets import get_registered_widgets
 from extras.models import Dashboard
 
 

@@ -8,9 +8,9 @@ from types import SimpleNamespace
 import markdown as md
 from django import forms
 from django.conf import settings
-from django.core.exceptions import FieldDoesNotExist, PermissionDenied
-from django.db.models import Avg, Case, Count, F, IntegerField, OuterRef, Q, Subquery, Sum, Value, When
-from django.db.models.functions import Coalesce, Extract
+from django.core.exceptions import FieldDoesNotExist
+from django.db.models import Count, OuterRef, Q, Subquery, Sum
+from django.db.models.functions import Coalesce
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.html import escape
@@ -939,8 +939,6 @@ class ChangelogWidget(DashboardWidget):
         )
 
     def get_context(self, request):
-        from django.contrib.contenttypes.models import ContentType
-
         from core.models import ObjectChange
 
         limit = self.get_config_value("limit", 10)

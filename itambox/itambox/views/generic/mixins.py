@@ -5,10 +5,8 @@ from django.contrib.auth.mixins import AccessMixin
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured, PermissionDenied
 from django.db import router, transaction
 from django.http import Http404
-from django.shortcuts import get_object_or_404
 from django.urls import NoReverseMatch, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.generic import View
 
 from itambox.capabilities import registry as capability_registry
 from itambox.utils import get_model_viewname
